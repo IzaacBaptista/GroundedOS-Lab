@@ -33,18 +33,19 @@ This is a **complete system for grounded AI**.
 
 ## ⚡ Local-First Philosophy
 
-GroundedOS Lab is designed to run **locally first**, with optional cloud integration.
+GroundedOS Lab is designed to run **locally first**, with optional cloud integration as the project evolves.
 
-You can:
+Goals:
 
-* Run models locally using **Ollama**
+* Enable local model execution for experimentation
 * Compare local vs cloud performance
-* Avoid API costs during experimentation
+* Avoid API costs during experimentation where local backends are available
 
-Supports:
+Planned / target integrations:
 
 * Local Transformers (quantized models)
-* OpenAI / Anthropic APIs (optional)
+* Ollama-based local execution
+* OpenAI / Anthropic APIs (optional, planned)
 
 ---
 
@@ -211,31 +212,27 @@ Response + Data Lineage
 
 ### 🔹 Structured Systems
 
-* Pydantic / Structured Outputs
+* Roadmap: Pydantic / Structured Outputs
 
 ---
 
 ## 🗺️ How to Learn With This Repo
 
-This repository is designed as a **learning map**.
+This repository is currently a **documentation-first learning map**.
 
-* Want to understand **Chunking**?
-  → `packages/rag/strategies`
+Since the current repo layout only includes this `README.md`, use the sections below as your guide:
 
-* Curious about **Guardrails**?
-  → `packages/safety/rules`
+* Want the big-picture introduction?
+  → Start with [🚀 Overview](#-overview)
 
-* Studying **Evals**?
-  → `pnpm run test:evals`
+* Want to understand the platform goals and learning focus?
+  → Review the introduction at the top of this document
 
-* Exploring **Agents**?
-  → `packages/agents`
+* Interested in the hands-on module concepts?
+  → Jump to [🔬 Laboratory Modules](#-laboratory-modules)
 
-* Learning **Model Routing**?
-  → `packages/model-routing`
-
-* Testing **Prompt Engineering**?
-  → `packages/experiment-toolkit`
+* Looking for evals, agents, guardrails, routing, or prompt experimentation?
+  → These are described conceptually in this README today; add linked folders/scripts here once they exist in the repository
 
 ---
 
@@ -320,7 +317,9 @@ Compare prompts with automatic eval scoring
 
 ---
 
-## 🗂️ Project Structure
+## 🗂️ Intended Project Structure (Target Architecture)
+
+> ⚠️ The structure below represents the **planned monorepo layout**. It does not yet exist in the repository and is provided as a roadmap reference.
 
 ```text
 groundedos-lab/
@@ -362,7 +361,9 @@ groundedos-lab/
 
 ---
 
-## ⚙️ Tech Stack
+## ⚙️ Tech Stack (Planned)
+
+> ⚠️ The tech stack below describes the **intended target architecture** and is not yet implemented in this repository.
 
 * Frontend: Next.js + TypeScript
 * Backend: Node.js (Fastify/Nest)
@@ -371,7 +372,7 @@ groundedos-lab/
 * Vector DB: pgvector / Qdrant
 * Queue: Redis + BullMQ
 * Observability: OpenTelemetry + Grafana
-* AI: Local (Ollama) + OpenAI / Anthropic
+* AI: Local (Ollama, planned) + OpenAI / Anthropic (optional, planned)
 
 ---
 
