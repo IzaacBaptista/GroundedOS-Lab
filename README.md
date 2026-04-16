@@ -1,12 +1,15 @@
-# 🧠 Cortex Lab AI
+# 🧠 GroundedOS Lab
 
-**An open-source platform to build, study and evaluate modern AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
+**An open-source platform to build, study and evaluate grounded AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
+
+> ⚠️ This project is a learning and experimentation platform for modern AI systems.
+> It intentionally exposes internal mechanics such as RAG pipelines, agent orchestration, evaluation, observability and safety layers.
 
 ---
 
 ## 🚀 Overview
 
-Cortex Lab AI is a **product + laboratory + engineering platform** designed to help developers:
+GroundedOS Lab is a **product + laboratory + engineering platform** designed to help developers:
 
 * Build real AI-powered applications
 * Understand how modern AI systems work internally
@@ -14,7 +17,7 @@ Cortex Lab AI is a **product + laboratory + engineering platform** designed to h
 * Experiment safely with cutting-edge techniques
 
 This is not just a chatbot.
-This is a **complete system for applied AI**.
+This is a **complete system for grounded AI**.
 
 ---
 
@@ -30,7 +33,7 @@ This is a **complete system for applied AI**.
 
 ## ⚡ Local-First Philosophy
 
-Cortex Lab AI is designed to run **locally first**, with optional cloud integration.
+GroundedOS Lab is designed to run **locally first**, with optional cloud integration.
 
 You can:
 
@@ -53,8 +56,6 @@ Supports:
 * Grounded responses with source attribution
 * Memory-aware conversations
 
----
-
 ### 🧠 Dev Mode
 
 * Inspect:
@@ -64,8 +65,6 @@ Supports:
   * latency
   * model routing decisions
   * grounding sources
-
----
 
 ### 🧪 Lab Mode
 
@@ -79,7 +78,7 @@ Supports:
 
 ## 🏗️ Architecture
 
-```id="arch-final"
+```text
 User Input
    ↓
 Prompt / Context Engineering
@@ -133,8 +132,6 @@ Response + Data Lineage
 * Context Window
 * Inference
 
----
-
 ### 🔹 Retrieval & Data
 
 * RAG
@@ -145,8 +142,6 @@ Response + Data Lineage
 * Re-ranking
 * Knowledge Graphs (GraphRAG)
 * Data Lineage
-
----
 
 ### 🔹 Context & Reasoning
 
@@ -160,15 +155,11 @@ Response + Data Lineage
 * Context Pruning / Trimming
 * Adaptive RAG
 
----
-
 ### 🔹 Agents & Execution
 
 * Multi-agents
 * Tool Calling / Function Calling
 * Memory
-
----
 
 ### 🔹 Optimization
 
@@ -178,15 +169,11 @@ Response + Data Lineage
 * Distillation
 * Fine-tuning
 
----
-
 ### 🔹 Generation Control
 
 * Temperature
 * Top-P / Top-K
 * Tokenization
-
----
 
 ### 🔹 Data Engineering
 
@@ -195,14 +182,10 @@ Response + Data Lineage
 * Synthetic Data Generation
 * Uniform Document Schema
 
----
-
 ### 🔹 Performance
 
 * Latency / Throughput
 * Semantic Caching
-
----
 
 ### 🔹 Evaluation & Observability
 
@@ -210,8 +193,6 @@ Response + Data Lineage
 * Observability
 * Cost Analysis (Showback/Chargeback)
 * A/B Testing of Prompts
-
----
 
 ### 🔹 Safety & Reliability
 
@@ -221,16 +202,12 @@ Response + Data Lineage
 * PII Stripping
 * Jailbreaking Defense
 
----
-
 ### 🔹 Multimodality
 
 * Text
 * PDF
 * Image
 * Audio
-
----
 
 ### 🔹 Structured Systems
 
@@ -273,8 +250,6 @@ This repository is designed as a **learning map**.
   * top-p
   * models
 
----
-
 ### ⚡ benchmarks
 
 * Compare:
@@ -283,8 +258,6 @@ This repository is designed as a **learning map**.
   * latency
   * cost
   * quality
-
----
 
 ### 📊 viz
 
@@ -325,8 +298,6 @@ Try to break the system and see:
 * why it was blocked
 * which rule triggered
 
----
-
 ### 🧩 Chunk Visualizer
 
 See:
@@ -334,8 +305,6 @@ See:
 * which chunks were used
 * relevance score
 * document origin
-
----
 
 ### ⚡ Local vs Cloud Toggle
 
@@ -345,8 +314,6 @@ Compare:
 * cost
 * quality
 
----
-
 ### 🧪 Prompt A/B Testing
 
 Compare prompts with automatic eval scoring
@@ -355,8 +322,8 @@ Compare prompts with automatic eval scoring
 
 ## 🗂️ Project Structure
 
-```id="struct-final"
-cortex-lab-ai/
+```text
+groundedos-lab/
   apps/
     web/
     api/
@@ -416,16 +383,12 @@ cortex-lab-ai/
 * Multimodal ingestion standardization
 * ETL pipeline
 
----
-
 ### Phase 1 — Core RAG
 
 * Chunking
 * Embeddings
 * Vector DB
 * Chat
-
----
 
 ### Phase 2 — Quality
 
@@ -434,8 +397,6 @@ cortex-lab-ai/
 * Memory
 * Observability
 
----
-
 ### Phase 3 — Intelligence
 
 * Agents
@@ -443,16 +404,12 @@ cortex-lab-ai/
 * Guardrails
 * Evals
 
----
-
 ### Phase 4 — Lab
 
 * Benchmarking
 * A/B testing
 * Visualization
 * Model routing
-
----
 
 ### Phase 5 — Advanced ML
 
@@ -471,13 +428,13 @@ This project is designed to be:
 * extensible
 * experiment-friendly
 
-Contributions welcome.
+Contributions are welcome.
 
 ---
 
 ## 📚 Purpose
 
-Cortex Lab AI exists to help developers:
+GroundedOS Lab exists to help developers:
 
 * move beyond basic AI usage
 * understand real-world AI systems
@@ -490,6 +447,4 @@ Cortex Lab AI exists to help developers:
 
 This is not a demo.
 
-This is a **laboratory for understanding AI systems in production.**
-
----
+This is a **laboratory for understanding grounded AI systems in production.**
