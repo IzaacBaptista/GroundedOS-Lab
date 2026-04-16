@@ -14,3 +14,7 @@ export type {
   SourceDocument,
   NormalizedDocument,
 } from "./types/document";
+
+// Ingestion contract (Phase 0 — Multimodal Ingestion Standardization)
+export type { IngestionInput } from "./types/ingestion";
+export type { Extractor } from "./types/extractor";
