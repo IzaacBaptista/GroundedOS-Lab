@@ -6,26 +6,42 @@
 
 ## 🚀 Overview
 
-Cortex Lab AI is not just another AI app.
+Cortex Lab AI is a **product + laboratory + engineering platform** designed to help developers:
 
-It is a **complete laboratory for applied AI systems**, designed to:
-
-* Build real AI-powered products
-* Experiment with modern LLM architectures
+* Build real AI-powered applications
+* Understand how modern AI systems work internally
 * Evaluate quality, cost and performance
-* Understand how AI behaves under real-world constraints
+* Experiment safely with cutting-edge techniques
 
-This project combines **product + engineering + research** in a single platform.
+This is not just a chatbot.
+This is a **complete system for applied AI**.
 
 ---
 
 ## 🎯 Goals
 
-* Provide a **real, usable AI application**
+* Deliver a **usable AI assistant**
 * Expose **internal mechanics of LLM systems**
 * Enable **experimentation and benchmarking**
-* Serve as a **learning platform for developers**
-* Demonstrate **production-ready AI architecture**
+* Serve as a **learning platform**
+* Demonstrate **production-ready architecture**
+
+---
+
+## ⚡ Local-First Philosophy
+
+Cortex Lab AI is designed to run **locally first**, with optional cloud integration.
+
+You can:
+
+* Run models locally using **Ollama**
+* Compare local vs cloud performance
+* Avoid API costs during experimentation
+
+Supports:
+
+* Local Transformers (quantized models)
+* OpenAI / Anthropic APIs (optional)
 
 ---
 
@@ -37,6 +53,8 @@ This project combines **product + engineering + research** in a single platform.
 * Grounded responses with source attribution
 * Memory-aware conversations
 
+---
+
 ### 🧠 Dev Mode
 
 * Inspect:
@@ -47,19 +65,21 @@ This project combines **product + engineering + research** in a single platform.
   * model routing decisions
   * grounding sources
 
+---
+
 ### 🧪 Lab Mode
 
 * Prompt A/B testing
 * Jailbreak playground
 * Model benchmarking
 * Embedding visualization
-* Cost and performance analysis
+* Cost analysis
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```id="arch-final"
 User Input
    ↓
 Prompt / Context Engineering
@@ -69,6 +89,8 @@ Model Routing
 --------------------------------
 | Semantic Cache (optional)     |
 --------------------------------
+   ↓
+(Adaptive RAG Decision)
    ↓
 --------------------------------
 | RAG Pipeline                 |
@@ -90,13 +112,18 @@ Self-Reflection / Validation
 Guardrails & Safety Layer
    ↓
 Response + Data Lineage
+   ↓
+--------------------------------
+| Feedback Loop                |
+| → Evaluation (Evals)         |
+| → Observability              |
+| → Memory Update              |
+--------------------------------
 ```
 
 ---
 
 ## 🧠 Concepts Implemented
-
-This project is designed to cover **the full modern AI stack**.
 
 ### 🔹 Core AI
 
@@ -105,6 +132,8 @@ This project is designed to cover **the full modern AI stack**.
 * Weights
 * Context Window
 * Inference
+
+---
 
 ### 🔹 Retrieval & Data
 
@@ -117,6 +146,8 @@ This project is designed to cover **the full modern AI stack**.
 * Knowledge Graphs (GraphRAG)
 * Data Lineage
 
+---
+
 ### 🔹 Context & Reasoning
 
 * Prompt Engineering
@@ -126,12 +157,18 @@ This project is designed to cover **the full modern AI stack**.
 * Chain-of-Thought (CoT)
 * Self-Reflection / Self-Correction
 * Grounding
+* Context Pruning / Trimming
+* Adaptive RAG
+
+---
 
 ### 🔹 Agents & Execution
 
 * Multi-agents
 * Tool Calling / Function Calling
 * Memory
+
+---
 
 ### 🔹 Optimization
 
@@ -141,22 +178,31 @@ This project is designed to cover **the full modern AI stack**.
 * Distillation
 * Fine-tuning
 
+---
+
 ### 🔹 Generation Control
 
 * Temperature
 * Top-P / Top-K
 * Tokenization
 
+---
+
 ### 🔹 Data Engineering
 
 * ETL for LLM
 * Data Augmentation
 * Synthetic Data Generation
+* Uniform Document Schema
+
+---
 
 ### 🔹 Performance
 
 * Latency / Throughput
 * Semantic Caching
+
+---
 
 ### 🔹 Evaluation & Observability
 
@@ -164,6 +210,8 @@ This project is designed to cover **the full modern AI stack**.
 * Observability
 * Cost Analysis (Showback/Chargeback)
 * A/B Testing of Prompts
+
+---
 
 ### 🔹 Safety & Reliability
 
@@ -173,12 +221,44 @@ This project is designed to cover **the full modern AI stack**.
 * PII Stripping
 * Jailbreaking Defense
 
+---
+
 ### 🔹 Multimodality
 
 * Text
 * PDF
 * Image
 * Audio
+
+---
+
+### 🔹 Structured Systems
+
+* Pydantic / Structured Outputs
+
+---
+
+## 🗺️ How to Learn With This Repo
+
+This repository is designed as a **learning map**.
+
+* Want to understand **Chunking**?
+  → `packages/rag/strategies`
+
+* Curious about **Guardrails**?
+  → `packages/safety/rules`
+
+* Studying **Evals**?
+  → `pnpm run test:evals`
+
+* Exploring **Agents**?
+  → `packages/agents`
+
+* Learning **Model Routing**?
+  → `packages/model-routing`
+
+* Testing **Prompt Engineering**?
+  → `packages/experiment-toolkit`
 
 ---
 
@@ -193,6 +273,8 @@ This project is designed to cover **the full modern AI stack**.
   * top-p
   * models
 
+---
+
 ### ⚡ benchmarks
 
 * Compare:
@@ -201,6 +283,8 @@ This project is designed to cover **the full modern AI stack**.
   * latency
   * cost
   * quality
+
+---
 
 ### 📊 viz
 
@@ -245,7 +329,7 @@ Try to break the system and see:
 
 ### 🧩 Chunk Visualizer
 
-See exactly:
+See:
 
 * which chunks were used
 * relevance score
@@ -260,22 +344,18 @@ Compare:
 * latency
 * cost
 * quality
-  between local models and APIs
 
 ---
 
 ### 🧪 Prompt A/B Testing
 
-Run:
-
-* prompt A vs prompt B
-* compare eval scores automatically
+Compare prompts with automatic eval scoring
 
 ---
 
 ## 🗂️ Project Structure
 
-```
+```id="struct-final"
 cortex-lab-ai/
   apps/
     web/
@@ -324,35 +404,62 @@ cortex-lab-ai/
 * Vector DB: pgvector / Qdrant
 * Queue: Redis + BullMQ
 * Observability: OpenTelemetry + Grafana
-* AI: OpenAI / Anthropic / Local (Ollama)
+* AI: Local (Ollama) + OpenAI / Anthropic
 
 ---
 
-## 🧪 Getting Started (MVP)
+## 🧪 Roadmap
 
-### Phase 1
+### Phase 0 — Data Foundation
 
-* Document ingestion
-* RAG pipeline
-* Chat interface
+* Uniform Document Schema
+* Multimodal ingestion standardization
+* ETL pipeline
 
-### Phase 2
+---
 
-* Hybrid search + re-ranking
+### Phase 1 — Core RAG
+
+* Chunking
+* Embeddings
+* Vector DB
+* Chat
+
+---
+
+### Phase 2 — Quality
+
+* Hybrid search
+* Re-ranking
 * Memory
 * Observability
 
-### Phase 3
+---
 
-* Agents + tool calling
+### Phase 3 — Intelligence
+
+* Agents
+* Tool calling
 * Guardrails
 * Evals
 
-### Phase 4
+---
 
-* Lab features
+### Phase 4 — Lab
+
 * Benchmarking
+* A/B testing
+* Visualization
 * Model routing
+
+---
+
+### Phase 5 — Advanced ML
+
+* LoRA
+* Quantization
+* Fine-tuning
+* Distillation
 
 ---
 
@@ -364,13 +471,7 @@ This project is designed to be:
 * extensible
 * experiment-friendly
 
-You can contribute by:
-
-* adding new evals
-* improving RAG quality
-* implementing new models
-* testing safety mechanisms
-* improving documentation
+Contributions welcome.
 
 ---
 
@@ -378,10 +479,10 @@ You can contribute by:
 
 Cortex Lab AI exists to help developers:
 
-* move beyond "chatbots"
-* understand AI systems deeply
-* build production-ready AI architectures
-* experiment safely with modern techniques
+* move beyond basic AI usage
+* understand real-world AI systems
+* build reliable and observable pipelines
+* experiment safely and systematically
 
 ---
 
@@ -389,6 +490,6 @@ Cortex Lab AI exists to help developers:
 
 This is not a demo.
 
-This is a **system to understand how AI actually works in production.**
+This is a **laboratory for understanding AI systems in production.**
 
 ---
