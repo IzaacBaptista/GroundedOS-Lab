@@ -1,31 +1,53 @@
-# 🧠 Cortex Lab AI
+# 🧠 GroundedOS Lab
 
-**An open-source platform to build, study and evaluate modern AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
+> Build, evaluate and understand grounded AI systems — from RAG pipelines to multi-agent orchestration.
+
+**An open-source platform to build, study and evaluate grounded AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
+
+> ⚠️ This project is a learning and experimentation platform for modern AI systems.
+> It intentionally exposes internal mechanics such as RAG pipelines, agent orchestration, evaluation, observability and safety layers.
 
 ---
 
 ## 🚀 Overview
 
-Cortex Lab AI is not just another AI app.
+GroundedOS Lab is a **product + laboratory + engineering platform** designed to help developers:
 
-It is a **complete laboratory for applied AI systems**, designed to:
-
-* Build real AI-powered products
-* Experiment with modern LLM architectures
+* Build real AI-powered applications
+* Understand how modern AI systems work internally
 * Evaluate quality, cost and performance
-* Understand how AI behaves under real-world constraints
+* Experiment safely with cutting-edge techniques
 
-This project combines **product + engineering + research** in a single platform.
+This is not just a chatbot.
+This is a **complete system for grounded AI**.
 
 ---
 
 ## 🎯 Goals
 
-* Provide a **real, usable AI application**
+* Deliver a **usable AI assistant**
 * Expose **internal mechanics of LLM systems**
 * Enable **experimentation and benchmarking**
-* Serve as a **learning platform for developers**
-* Demonstrate **production-ready AI architecture**
+* Serve as a **learning platform**
+* Demonstrate **production-ready architecture**
+
+---
+
+## ⚡ Local-First Philosophy
+
+GroundedOS Lab is designed to run **locally first**, with optional cloud integration as the project evolves.
+
+Goals:
+
+* Enable local model execution for experimentation
+* Compare local vs cloud performance
+* Reduce or eliminate dependency on paid APIs during experimentation
+
+Planned / target integrations:
+
+* Local Transformers (quantized models)
+* Ollama-based local execution
+* OpenAI / Anthropic APIs (optional, planned)
 
 ---
 
@@ -53,13 +75,13 @@ This project combines **product + engineering + research** in a single platform.
 * Jailbreak playground
 * Model benchmarking
 * Embedding visualization
-* Cost and performance analysis
+* Cost analysis
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 User Input
    ↓
 Prompt / Context Engineering
@@ -69,6 +91,8 @@ Model Routing
 --------------------------------
 | Semantic Cache (optional)     |
 --------------------------------
+   ↓
+(Adaptive RAG Decision)
    ↓
 --------------------------------
 | RAG Pipeline                 |
@@ -90,13 +114,18 @@ Self-Reflection / Validation
 Guardrails & Safety Layer
    ↓
 Response + Data Lineage
+   ↓
+--------------------------------
+| Feedback Loop                |
+| → Evaluation (Evals)         |
+| → Observability              |
+| → Memory Update              |
+--------------------------------
 ```
 
 ---
 
 ## 🧠 Concepts Implemented
-
-This project is designed to cover **the full modern AI stack**.
 
 ### 🔹 Core AI
 
@@ -126,6 +155,8 @@ This project is designed to cover **the full modern AI stack**.
 * Chain-of-Thought (CoT)
 * Self-Reflection / Self-Correction
 * Grounding
+* Context Pruning / Trimming
+* Adaptive RAG
 
 ### 🔹 Agents & Execution
 
@@ -152,6 +183,7 @@ This project is designed to cover **the full modern AI stack**.
 * ETL for LLM
 * Data Augmentation
 * Synthetic Data Generation
+* Uniform Document Schema
 
 ### 🔹 Performance
 
@@ -179,6 +211,32 @@ This project is designed to cover **the full modern AI stack**.
 * PDF
 * Image
 * Audio
+
+### 🔹 Structured Systems
+
+* Structured Outputs (planned via Pydantic / schema validation)
+
+---
+
+## 🗺️ How to Learn With This Repo
+
+This repository is currently a **documentation-first learning map**.
+
+Since the current repo layout only includes this `README.md`, use the sections below as your guide:
+
+* Want the big-picture introduction?
+  → Start with [🚀 Overview](#-overview)
+
+* Want to understand the platform goals and learning focus?
+  → Review the introduction at the top of this document
+
+* Interested in the hands-on module concepts?
+  → Jump to [🔬 Laboratory Modules](#-laboratory-modules)
+
+* Looking for evals, agents, guardrails, routing, or prompt experimentation?
+  → These are described conceptually in this README today; add linked folders/scripts here once they exist in the repository
+
+As the project evolves, this section will map each concept directly to code implementations.
 
 ---
 
@@ -241,17 +299,13 @@ Try to break the system and see:
 * why it was blocked
 * which rule triggered
 
----
-
 ### 🧩 Chunk Visualizer
 
-See exactly:
+See:
 
 * which chunks were used
 * relevance score
 * document origin
-
----
 
 ### ⚡ Local vs Cloud Toggle
 
@@ -260,23 +314,19 @@ Compare:
 * latency
 * cost
 * quality
-  between local models and APIs
-
----
 
 ### 🧪 Prompt A/B Testing
 
-Run:
-
-* prompt A vs prompt B
-* compare eval scores automatically
+Compare prompts with automatic eval scoring
 
 ---
 
-## 🗂️ Project Structure
+## 🗂️ Intended Project Structure (Target Architecture)
 
-```
-cortex-lab-ai/
+> ⚠️ The structure below represents the **planned monorepo layout**. It does not yet exist in the repository and is provided as a roadmap reference.
+
+```text
+groundedos-lab/
   apps/
     web/
     api/
@@ -315,7 +365,9 @@ cortex-lab-ai/
 
 ---
 
-## ⚙️ Tech Stack
+## ⚙️ Tech Stack (Planned)
+
+> ⚠️ The tech stack below describes the **intended target architecture** and is not yet implemented in this repository.
 
 * Frontend: Next.js + TypeScript
 * Backend: Node.js (Fastify/Nest)
@@ -324,35 +376,53 @@ cortex-lab-ai/
 * Vector DB: pgvector / Qdrant
 * Queue: Redis + BullMQ
 * Observability: OpenTelemetry + Grafana
-* AI: OpenAI / Anthropic / Local (Ollama)
+* AI: Local (Ollama, planned) + OpenAI / Anthropic (optional, planned)
 
 ---
 
-## 🧪 Getting Started (MVP)
+## 🧪 Roadmap
 
-### Phase 1
+### Phase 0 — Data Foundation
 
-* Document ingestion
-* RAG pipeline
-* Chat interface
+* Uniform Document Schema
+* Multimodal ingestion standardization
+* ETL pipeline
 
-### Phase 2
+### Phase 1 — Core RAG
 
-* Hybrid search + re-ranking
+* Chunking
+* Embeddings
+* Vector DB
+* Chat
+
+### Phase 2 — Quality
+
+* Hybrid search
+* Re-ranking
 * Memory
 * Observability
 
-### Phase 3
+### Phase 3 — Intelligence
 
-* Agents + tool calling
+* Agents
+* Tool calling
 * Guardrails
 * Evals
+* Self-reflection / validation layer
 
-### Phase 4
+### Phase 4 — Lab
 
-* Lab features
 * Benchmarking
+* A/B testing
+* Visualization
 * Model routing
+
+### Phase 5 — Advanced ML
+
+* LoRA
+* Quantization
+* Fine-tuning
+* Distillation
 
 ---
 
@@ -364,24 +434,28 @@ This project is designed to be:
 * extensible
 * experiment-friendly
 
-You can contribute by:
-
-* adding new evals
-* improving RAG quality
-* implementing new models
-* testing safety mechanisms
-* improving documentation
+Contributions are welcome.
 
 ---
 
 ## 📚 Purpose
 
-Cortex Lab AI exists to help developers:
+GroundedOS Lab exists to help developers:
 
-* move beyond "chatbots"
-* understand AI systems deeply
-* build production-ready AI architectures
-* experiment safely with modern techniques
+* move beyond basic AI usage
+* understand real-world AI systems
+* build reliable and observable pipelines
+* experiment safely and systematically
+
+---
+
+## 🧠 What This Project Is NOT
+
+* Not a wrapper around an LLM API
+* Not just a chatbot interface
+* Not a toy project
+
+This project focuses on system design, reliability, and real-world AI engineering.
 
 ---
 
@@ -389,6 +463,4 @@ Cortex Lab AI exists to help developers:
 
 This is not a demo.
 
-This is a **system to understand how AI actually works in production.**
-
----
+This is a **laboratory for understanding grounded AI systems in production.**
