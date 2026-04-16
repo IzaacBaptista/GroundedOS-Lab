@@ -28,7 +28,7 @@ export type DocumentStatus =
   | "uploaded"    // Raw file received; no processing has started
   | "processing"  // ETL pipeline is actively working on it
   | "processed"   // Normalized document is ready for downstream use
-  | "failed";     // Processing failed; see error details in metadata
+  | "failed";     // Processing failed; see SourceDocument.processingError
 
 // ---------------------------------------------------------------------------
 // SourceDocument — the raw ingestion record
@@ -63,18 +63,28 @@ export interface SourceDocument {
   /** BCP-47 language tag (e.g. "en", "pt-BR"). Populated after detection. */
   language?: string;
 
-  /** Where this document came from. */
-  source: {
-    type: "upload" | "url" | "manual";
-    /** Remote URL when type is "url". */
-    uri?: string;
-  };
+  /**
+   * Where this document came from.
+   *
+   * Discriminated union — `uri` is required when `type` is `"url"` and must
+   * be omitted for `"upload"` and `"manual"` origins.
+   */
+  source:
+    | { type: "upload" | "manual" }
+    | {
+        type: "url";
+        /** Remote URL from which the document was fetched. */
+        uri: string;
+      };
 
   /**
    * File-system or object-storage paths produced at each pipeline stage.
    * Paths are relative to the configured storage root.
+   *
+   * The entire object is optional — omit it when on-demand extraction is
+   * preferred over persisting intermediate files.
    */
-  storage: {
+  storage?: {
     /** Path to the original raw file. */
     rawPath?: string;
     /** Path to the plain-text extraction output. */
@@ -95,6 +105,19 @@ export interface SourceDocument {
     createdAtSource?: string;
     /** User-defined or auto-detected tags for filtering and search. */
     tags?: string[];
+  };
+
+  /**
+   * Populated when `status` is `"failed"`.
+   * Stores the reason the ETL pipeline could not process the document.
+   */
+  processingError?: {
+    /** Human-readable description of the failure. */
+    message: string;
+    /** Machine-readable error code (e.g. "EXTRACTION_FAILED"). */
+    code?: string;
+    /** Stack trace or additional context for debugging. */
+    details?: string;
   };
 
   /** Current lifecycle state of the document. */
@@ -125,7 +148,7 @@ export interface DocumentSection {
   heading?: string;
   /** Full plain-text content of this section. */
   text: string;
-  /** Page number in page-based formats (PDF, DOCX). */
+  /** Page number in page-based formats (PDF). */
   page?: number;
   /** Byte/character offset where this section starts in fullText. */
   startOffset?: number;

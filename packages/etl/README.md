@@ -4,7 +4,7 @@ Extract, Transform, Load pipeline for ingesting multimodal documents into a unif
 
 ## Responsibilities
 
-- Extract content from text, PDF, image and audio sources
+- Extract content from supported source modalities (for example text, PDF, image, audio, CSV, Markdown, and HTML)
 - Normalize documents into a uniform internal schema (`NormalizedDocument`)
 - Apply chunking, cleaning and metadata enrichment
 - Load processed documents into vector stores and databases
