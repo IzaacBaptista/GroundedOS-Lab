@@ -11,8 +11,9 @@ import type { DocumentModality } from "./document";
 /**
  * Unified input descriptor for the ingestion pipeline.
  *
- * Exactly one of `content`, `filePath`, or `url` must be provided,
- * depending on how the raw material is being supplied.
+ * At least one of `content`, `filePath`, or `url` should be provided.
+ * When multiple are present, extractors follow this precedence order:
+ * `content` → `filePath` → `url`.
  */
 export interface IngestionInput {
   /**

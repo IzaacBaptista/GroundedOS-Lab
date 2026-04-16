@@ -7,8 +7,9 @@
  * derived by splitting on blank lines (double-newline paragraphs).
  */
 
-import { readFileSync } from "fs";
+import { readFile } from "fs/promises";
 import { basename } from "path";
+import { randomUUID } from "crypto";
 import type { DocumentModality, NormalizedDocument, DocumentSection } from "../../../core/src/types/document";
 import type { Extractor } from "../../../core/src/types/extractor";
 import type { IngestionInput } from "../../../core/src/types/ingestion";
@@ -20,7 +21,12 @@ export class TextExtractor implements Extractor {
   readonly supportedModalities: DocumentModality[] = ["text"];
 
   async extract(input: IngestionInput): Promise<NormalizedDocument> {
-    const fullText = this._readContent(input);
+    if (input.type !== "text") {
+      throw new Error(
+        `[${EXTRACTOR_NAME}] Unsupported modality "${input.type}". TextExtractor only handles "text".`
+      );
+    }
+    const fullText = await this._readContent(input);
     const sections = this._splitSections(fullText);
     const title = this._resolveTitle(input);
     const now = new Date().toISOString();
@@ -50,12 +56,12 @@ export class TextExtractor implements Extractor {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private _readContent(input: IngestionInput): string {
+  private async _readContent(input: IngestionInput): Promise<string> {
     if (input.content !== undefined) {
       return input.content;
     }
     if (input.filePath) {
-      return readFileSync(input.filePath, "utf-8");
+      return await readFile(input.filePath, "utf-8");
     }
     throw new Error(
       `[${EXTRACTOR_NAME}] Either 'content' or 'filePath' must be provided for modality "text".`
@@ -65,8 +71,10 @@ export class TextExtractor implements Extractor {
   private _splitSections(fullText: string): DocumentSection[] {
     // Use a regex that gives us the exact position of each separator so we can
     // compute accurate startOffset / endOffset values, even when the same
-    // paragraph text appears more than once in the document.
-    const separatorPattern = /\n{2,}/g;
+    // paragraph text appears more than once in the document. Support both LF
+    // and CRLF paragraph separators without normalizing the source text so
+    // offsets remain aligned with the original content.
+    const separatorPattern = /(?:\r?\n){2,}/g;
     const sections: DocumentSection[] = [];
     let lastEnd = 0;
     let sectionIndex = 0;
@@ -120,7 +128,7 @@ export class TextExtractor implements Extractor {
     if (input.metadata?.documentId && typeof input.metadata.documentId === "string") {
       return input.metadata.documentId;
     }
-    // Fallback: generate a simple time-based ID when no external ID is supplied.
-    return `doc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    // Fallback: generate a collision-resistant UUID when no external ID is supplied.
+    return randomUUID();
   }
 }
