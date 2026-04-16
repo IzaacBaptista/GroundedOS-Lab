@@ -1,5 +1,7 @@
 # 🧠 GroundedOS Lab
 
+> Build, evaluate and understand grounded AI systems — from RAG pipelines to multi-agent orchestration.
+
 **An open-source platform to build, study and evaluate grounded AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
 
 > ⚠️ This project is a learning and experimentation platform for modern AI systems.
@@ -39,7 +41,7 @@ Goals:
 
 * Enable local model execution for experimentation
 * Compare local vs cloud performance
-* Avoid API costs during experimentation where local backends are available
+* Reduce or eliminate dependency on paid APIs during experimentation
 
 Planned / target integrations:
 
@@ -212,7 +214,7 @@ Response + Data Lineage
 
 ### 🔹 Structured Systems
 
-* Roadmap: Pydantic / Structured Outputs
+* Structured Outputs (planned via Pydantic / schema validation)
 
 ---
 
@@ -233,6 +235,8 @@ Since the current repo layout only includes this `README.md`, use the sections b
 
 * Looking for evals, agents, guardrails, routing, or prompt experimentation?
   → These are described conceptually in this README today; add linked folders/scripts here once they exist in the repository
+
+As the project evolves, this section will map each concept directly to code implementations.
 
 ---
 
@@ -404,6 +408,7 @@ groundedos-lab/
 * Tool calling
 * Guardrails
 * Evals
+* Self-reflection / validation layer
 
 ### Phase 4 — Lab
 
@@ -441,6 +446,16 @@ GroundedOS Lab exists to help developers:
 * understand real-world AI systems
 * build reliable and observable pipelines
 * experiment safely and systematically
+
+---
+
+## 🧠 What This Project Is NOT
+
+* Not a wrapper around an LLM API
+* Not just a chatbot interface
+* Not a toy project
+
+This project focuses on system design, reliability, and real-world AI engineering.
 
 ---
 
