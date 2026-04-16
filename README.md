@@ -218,11 +218,24 @@ Response + Data Lineage
 
 ---
 
+## 👥 Target Audience
+
+GroundedOS Lab is built for:
+
+| Audience | What you get |
+|---|---|
+| **AI/ML Engineers** | A structured monorepo to experiment with RAG, agents, evals, and safety in a real-world architecture |
+| **Backend Engineers** | Hands-on exposure to LLM-powered pipelines, model routing, observability, and async workers |
+| **Students & Researchers** | A documented learning map that connects concepts (embeddings, CoT, guardrails) directly to working code |
+| **Technical Leaders** | A reference architecture for grounded AI systems, including cost tracking, evaluation and safety layers |
+
+> ⚠️ This project assumes basic Python and TypeScript knowledge. No prior AI/ML experience is required — the goal is to build it as you learn.
+
+---
+
 ## 🗺️ How to Learn With This Repo
 
-This repository is currently a **documentation-first learning map**.
-
-Since the current repo layout only includes this `README.md`, use the sections below as your guide:
+Use this repository as a structured learning path:
 
 * Want the big-picture introduction?
   → Start with [🚀 Overview](#-overview)
@@ -234,7 +247,10 @@ Since the current repo layout only includes this `README.md`, use the sections b
   → Jump to [🔬 Laboratory Modules](#-laboratory-modules)
 
 * Looking for evals, agents, guardrails, routing, or prompt experimentation?
-  → These are described conceptually in this README today; add linked folders/scripts here once they exist in the repository
+  → Browse the [`packages/`](./packages/) and [`experiments/`](./experiments/) folders — each has its own `README.md`
+
+* Want to understand AI concepts behind the system?
+  → Start at [`docs/concepts/`](./docs/concepts/)
 
 As the project evolves, this section will map each concept directly to code implementations.
 
@@ -321,53 +337,51 @@ Compare prompts with automatic eval scoring
 
 ---
 
-## 🗂️ Intended Project Structure (Target Architecture)
+## 🗂️ Project Structure
 
-> ⚠️ The structure below represents the **planned monorepo layout**. It does not yet exist in the repository and is provided as a roadmap reference.
+> The monorepo scaffold below is **already created**. Each folder contains a `README.md` describing its responsibilities. Code implementation follows the roadmap phases.
 
 ```text
 groundedos-lab/
   apps/
-    web/
-    api/
-    worker/
+    api/        ← Backend API server (REST + GraphQL, auth, pipeline orchestration)
+    web/        ← Frontend application (Next.js)
+    worker/     ← Async workers for ML pipelines and background tasks
 
   packages/
-    core/
-    rag/
-    agents/
-    memory/
-    model-routing/
-    safety/
-    observability/
-    evals/
-    etl/
-    experiment-toolkit/
-    benchmarks/
-    viz/
+    core/               ← Shared types, utilities, and base abstractions
+    rag/                ← Full RAG pipeline (chunking, embeddings, hybrid search, re-ranking)
+    agents/             ← Multi-agent orchestration and tool calling layer
+    memory/             ← Conversation and long-term memory management
+    model-routing/      ← LLM routing logic (local vs cloud, cost-aware)
+    safety/             ← Guardrails, PII stripping, jailbreak defense
+    observability/      ← OpenTelemetry tracing, cost tracking, latency metrics
+    evals/              ← Evaluation framework (RAGAS, custom scorers)
+    etl/                ← Document ingestion and preprocessing pipelines
+    experiment-toolkit/ ← Batch prompt testing, parameter sweeps
+    benchmarks/         ← Local vs cloud model benchmarking
+    viz/                ← Embedding visualization (t-SNE / UMAP)
 
   experiments/
-    fine-tuning/
-    lora/
-    distillation/
-    quantization/
-    jailbreak-defense/
-    bias-tests/
+    fine-tuning/        ← Full fine-tuning experiments
+    lora/               ← LoRA adapter training
+    distillation/       ← Knowledge distillation
+    quantization/       ← Model quantization experiments
+    jailbreak-defense/  ← Red-teaming and prompt injection defense
+    bias-tests/         ← Bias evaluation across models and prompts
 
   docs/
-    concepts/
-    architecture/
-    tutorials/
-
-  datasets/
-  infra/
+    concepts/           ← One file per AI concept, linked to code
+  
+  datasets/   ← Raw, processed and synthetic datasets registry
+  infra/      ← Docker, Compose, K8s, environment configs
 ```
 
 ---
 
 ## ⚙️ Tech Stack (Planned)
 
-> ⚠️ The tech stack below describes the **intended target architecture** and is not yet implemented in this repository.
+> ⚠️ The tech stack below describes the **intended target architecture**. Tooling configuration (package.json, turbo.json, etc.) will be added before Phase 0 coding begins.
 
 * Frontend: Next.js + TypeScript
 * Backend: Node.js (Fastify/Nest)
@@ -388,6 +402,11 @@ groundedos-lab/
 * Multimodal ingestion standardization
 * ETL pipeline
 
+**✅ Success Criteria:**
+- [ ] `packages/etl` ingests PDF, image and audio files into a uniform schema
+- [ ] At least one sample dataset registered in `datasets/`
+- [ ] ETL pipeline is runnable locally with a single command
+
 ### Phase 1 — Core RAG
 
 * Chunking
@@ -395,12 +414,22 @@ groundedos-lab/
 * Vector DB
 * Chat
 
+**✅ Success Criteria:**
+- [ ] User can upload a document and ask a question grounded in its content
+- [ ] Retrieved chunks are visible in Dev Mode with relevance scores
+- [ ] `packages/rag` has integration tests covering the full retrieval flow
+
 ### Phase 2 — Quality
 
 * Hybrid search
 * Re-ranking
 * Memory
 * Observability
+
+**✅ Success Criteria:**
+- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline
+- [ ] Re-ranking is applied and token usage / latency per stage is logged
+- [ ] Conversation memory persists across sessions
 
 ### Phase 3 — Intelligence
 
@@ -410,12 +439,22 @@ groundedos-lab/
 * Evals
 * Self-reflection / validation layer
 
+**✅ Success Criteria:**
+- [ ] At least one end-to-end agent flow is runnable (tool call → LLM → response)
+- [ ] Guardrails block at least prompt injection and PII leakage
+- [ ] Evals report automated scores (faithfulness, relevance) for a baseline dataset
+
 ### Phase 4 — Lab
 
 * Benchmarking
 * A/B testing
 * Visualization
 * Model routing
+
+**✅ Success Criteria:**
+- [ ] A/B prompt test runs automatically and reports winner with statistical summary
+- [ ] Benchmark compares at least two models (local + cloud) on latency, cost and quality
+- [ ] Embedding visualization renders in the web app
 
 ### Phase 5 — Advanced ML
 
@@ -424,17 +463,85 @@ groundedos-lab/
 * Fine-tuning
 * Distillation
 
+**✅ Success Criteria:**
+- [ ] Each `experiments/` folder contains a reproducible notebook or script
+- [ ] Benchmark scores compare base model vs tuned variant
+- [ ] Results are logged and stored in `datasets/`
+
+---
+
+## ⚙️ Monorepo Tooling
+
+> ⚠️ Tooling is not yet configured. The section below describes the **intended setup**. It will be implemented before Phase 0 coding begins.
+
+**Planned stack:**
+
+| Layer | Tool | Purpose |
+|---|---|---|
+| Package manager | `pnpm` (workspaces) | Manage JS/TS packages |
+| Build orchestration | `Turborepo` | Incremental builds, task pipelines |
+| Python environment | `Poetry` (per package) | Isolate ML package dependencies |
+| Linting (JS/TS) | `ESLint` + `Prettier` | Code style and formatting |
+| Linting (Python) | `Ruff` | Fast Python linter |
+| Type checking | `TypeScript` strict mode | Static analysis across JS/TS packages |
+| Testing (JS/TS) | `Vitest` | Unit and integration tests |
+| Testing (Python) | `pytest` | Unit and integration tests |
+| Containers | `Docker` + `docker-compose` | Local environment |
+| CI | GitHub Actions | Test, lint and build on every PR |
+
+**Repo conventions (to be enforced once tooling is configured):**
+
+* All packages declare their dependencies explicitly — no implicit sharing
+* Each package is buildable and testable in isolation
+* The root `turbo.json` (or equivalent) defines all task pipelines
+* Python packages pin dependencies via `pyproject.toml` and `poetry.lock`
+
 ---
 
 ## 🤝 Contributing
 
-This project is designed to be:
+### Who can contribute?
 
-* modular
-* extensible
-* experiment-friendly
+Anyone — from students exploring AI to engineers building production systems.
+Contributions at all levels are welcome: documentation, experiments, package implementations, bug reports, and feature ideas.
 
-Contributions are welcome.
+### Getting started
+
+1. **Fork** the repository and create a new branch from `main`
+2. **Pick a phase** from the [Roadmap](#-roadmap) and check the success criteria
+3. **Find or open an issue** describing what you want to work on before starting large changes
+4. **Follow the folder conventions**: each package or experiment has its own `README.md` — keep it updated
+
+### Contribution types
+
+| Type | Where | Notes |
+|---|---|---|
+| AI concept documentation | `docs/concepts/` | Follow the template in the folder's `README.md` |
+| Package implementation | `packages/<name>/` | Start with the `README.md` in that package |
+| Experiment | `experiments/<name>/` | Include a reproducible notebook or script |
+| Dataset | `datasets/` | Include metadata (source, license, size) |
+| Bug report / feature request | GitHub Issues | Use the issue templates |
+
+### Code standards
+
+* Write clear, self-contained code with inline comments for non-obvious logic
+* Every package must have at least one test before being merged
+* Use the tooling defined in [⚙️ Monorepo Tooling](#️-monorepo-tooling)
+* All Python code must include type hints
+* All TypeScript code must pass strict type checking
+
+### Pull request checklist
+
+- [ ] Branch is up to date with `main`
+- [ ] Code follows the style guide for the language (see Monorepo Tooling)
+- [ ] Tests pass locally
+- [ ] The relevant `README.md` is updated
+- [ ] The PR description explains *what* changed and *why*
+
+### Need help?
+
+Open a GitHub Discussion or comment on an existing issue.
+No question is too basic.
 
 ---
 
