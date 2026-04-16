@@ -403,6 +403,7 @@ groundedos-lab/
 * ETL pipeline
 
 **✅ Success Criteria:**
+- [x] `packages/core` defines `SourceDocument` and `NormalizedDocument` — the [Uniform Document Schema](./docs/concepts/uniform-document-schema.md)
 - [ ] `packages/etl` ingests PDF, image and audio files into a uniform schema
 - [ ] At least one sample dataset registered in `datasets/`
 - [ ] ETL pipeline is runnable locally with a single command

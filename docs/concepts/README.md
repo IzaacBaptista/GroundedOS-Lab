@@ -20,4 +20,10 @@ Every concept file must describe:
 
 ## Status
 
-Planned
+🟡 In Progress
+
+## Concept Index
+
+| File | Concept | Phase |
+|---|---|---|
+| [uniform-document-schema.md](./uniform-document-schema.md) | Uniform Document Schema | Phase 0 — Data Foundation |

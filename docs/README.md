@@ -10,4 +10,4 @@ This folder contains documentation for the GroundedOS Lab project. At present, i
 
 ## Status
 
-Planned
+🟡 In Progress — see [concepts/](./concepts/README.md) for the current index.
