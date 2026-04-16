@@ -1,12 +1,11 @@
 # docs
 
-This folder contains all documentation for the GroundedOS Lab project, including architecture decisions, AI concept explanations and hands-on tutorials.
+This folder contains documentation for the GroundedOS Lab project. At present, it focuses on AI concept explanations, with architecture decisions and hands-on tutorials planned for future additions.
 
 ## Responsibilities
 
-- Document the overall system architecture and design decisions
 - Explain core AI concepts used throughout the project
-- Provide tutorials and guides for getting started with each module
+- Provide a foundation for future architecture and tutorial documentation
 - Serve as the single source of truth for project knowledge
 
 ## Status
