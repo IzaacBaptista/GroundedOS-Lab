@@ -50,14 +50,17 @@ Definition of done:
 
 ### M3 — Data and local execution
 
+Status: partial — `text` smoke command is available; dataset registry is still pending.
+
 Deliverables:
 - sample dataset entry documented in `datasets/`
-- local smoke command for ETL run
-- expected output format documented
+- `npm run ingest:smoke` local ETL smoke command
+- expected output format documented in `packages/etl/README.md`
 
 Definition of done:
-- any contributor can run ETL locally with one command
+- any contributor can run text ETL locally with one command
 - sample input and expected shape are reproducible
+- sample dataset entry is documented in `datasets/`
 
 ### M4 — Readiness for Phase 1
 
