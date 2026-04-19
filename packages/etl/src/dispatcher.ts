@@ -10,9 +10,7 @@
  *   2. Register an instance in the `EXTRACTOR_REGISTRY` array below.
  */
 
-import type { NormalizedDocument } from "../../core/src/types/document";
-import type { Extractor } from "../../core/src/types/extractor";
-import type { IngestionInput } from "../../core/src/types/ingestion";
+import type { Extractor, IngestionInput, NormalizedDocument } from "@groundedos/core";
 
 import { AudioExtractor } from "./extractors/audio";
 import { ImageExtractor } from "./extractors/image";

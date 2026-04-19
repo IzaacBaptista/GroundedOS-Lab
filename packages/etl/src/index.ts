@@ -26,13 +26,10 @@ export { ImageExtractor } from "./extractors/image";
 export { AudioExtractor } from "./extractors/audio";
 
 // Re-exported core types (convenience)
-// NOTE: Using relative paths until packages/core has a package.json that
-// declares the "name" field (e.g. "@groundedos/core"). At that point these
-// imports should change to `from "@groundedos/core"`.
 export type {
   IngestionInput,
   Extractor,
   DocumentModality,
   NormalizedDocument,
   DocumentSection,
-} from "../../core/src/index";
+} from "@groundedos/core";

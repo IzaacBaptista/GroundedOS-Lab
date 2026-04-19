@@ -25,14 +25,16 @@ Out of scope:
 
 ### M1 — Monorepo baseline tooling
 
+Status: complete for the initial TypeScript baseline.
+
 Deliverables:
-- workspace/package manager setup
+- npm workspace/package manager setup
 - TypeScript config and package build scripts
-- lint + test framework bootstrap
+- Vitest test framework bootstrap
 
 Definition of done:
-- all packages compile
-- one command validates build and tests
+- `npm run build` type-checks the active TypeScript packages
+- `npm test` runs the active Vitest suite
 
 ### M2 — ETL runnable vertical slice
 
@@ -86,4 +88,4 @@ Definition of done:
 
 ## Next immediate action
 
-Start M1 by adding monorepo tooling skeleton, then implement M2 (`pdf` extractor + tests).
+Start M2 by implementing the first functional `pdf` extractor and adding integration tests for text + PDF ingestion.

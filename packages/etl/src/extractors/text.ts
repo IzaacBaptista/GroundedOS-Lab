@@ -10,9 +10,13 @@
 import { readFile } from "fs/promises";
 import { basename } from "path";
 import { randomUUID } from "crypto";
-import type { DocumentModality, NormalizedDocument, DocumentSection } from "../../../core/src/types/document";
-import type { Extractor } from "../../../core/src/types/extractor";
-import type { IngestionInput } from "../../../core/src/types/ingestion";
+import type {
+  DocumentModality,
+  DocumentSection,
+  Extractor,
+  IngestionInput,
+  NormalizedDocument,
+} from "@groundedos/core";
 
 const EXTRACTOR_NAME = "text-extractor";
 const EXTRACTOR_VERSION = "0.1.0";

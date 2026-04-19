@@ -498,7 +498,7 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 ### Current focus
 
-- Establish minimal monorepo tooling baseline (build/test)
+- Extend the minimal monorepo tooling baseline as packages become runnable
 - Deliver ETL vertical slice with `text` + first functional `pdf`
 - Add one sample dataset registry entry and one local smoke command
 - Keep roadmap checkboxes and package READMEs synchronized with implementation
@@ -507,28 +507,33 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 ## ⚙️ Monorepo Tooling
 
-> ⚠️ Tooling is not yet configured. The section below describes the **intended setup**. It will be implemented before Phase 0 coding begins.
+Initial TypeScript workspace tooling is configured so Phase 0 packages can be validated locally.
 
-**Planned stack:**
+**Current stack:**
 
 | Layer | Tool | Purpose |
 |---|---|---|
-| Package manager | `pnpm` (workspaces) | Manage JS/TS packages |
+| Package manager | `npm` workspaces | Manage JS/TS packages |
+| Type checking | `TypeScript` strict mode | Static analysis across JS/TS packages |
+| Testing (JS/TS) | `Vitest` | Unit and integration tests |
+
+**Planned additions:**
+
+| Layer | Tool | Purpose |
+|---|---|---|
 | Build orchestration | `Turborepo` | Incremental builds, task pipelines |
 | Python environment | `Poetry` (per package) | Isolate ML package dependencies |
 | Linting (JS/TS) | `ESLint` + `Prettier` | Code style and formatting |
 | Linting (Python) | `Ruff` | Fast Python linter |
-| Type checking | `TypeScript` strict mode | Static analysis across JS/TS packages |
-| Testing (JS/TS) | `Vitest` | Unit and integration tests |
 | Testing (Python) | `pytest` | Unit and integration tests |
 | Containers | `Docker` + `docker-compose` | Local environment |
 | CI | GitHub Actions | Test, lint and build on every PR |
 
-**Repo conventions (to be enforced once tooling is configured):**
+**Repo conventions:**
 
 * All packages declare their dependencies explicitly — no implicit sharing
-* Each package is buildable and testable in isolation
-* The root `turbo.json` (or equivalent) defines all task pipelines
+* Active TypeScript packages are validated through root build and test scripts
+* The root package scripts define the current validation pipeline
 * Python packages pin dependencies via `pyproject.toml` and `poetry.lock`
 
 ---
