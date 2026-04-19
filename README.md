@@ -9,6 +9,10 @@
 
 ---
 
+![alt text](image-1.png)
+
+---
+
 ## 🚀 Overview
 
 GroundedOS Lab is a **product + laboratory + engineering platform** designed to help developers:
