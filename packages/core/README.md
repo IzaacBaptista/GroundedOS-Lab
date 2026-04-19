@@ -71,9 +71,8 @@ Key fields:
 // From within packages/core itself:
 import type { SourceDocument, NormalizedDocument } from "./src/types/document";
 
-// From another package in the monorepo (once package.json is added):
-// import type { SourceDocument, NormalizedDocument } from "@groundedos/core";
+// From another package in the monorepo:
+import type { SourceDocument, NormalizedDocument } from "@groundedos/core";
 ```
 
 > All types are pure TypeScript interfaces — no runtime dependencies.
-> Once a `package.json` with a `name` field is added, the import path will become `@groundedos/core`.

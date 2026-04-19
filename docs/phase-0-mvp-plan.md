@@ -25,14 +25,16 @@ Out of scope:
 
 ### M1 — Monorepo baseline tooling
 
+Status: complete for the initial TypeScript baseline.
+
 Deliverables:
-- workspace/package manager setup
+- npm workspace/package manager setup
 - TypeScript config and package build scripts
-- lint + test framework bootstrap
+- Vitest test framework bootstrap
 
 Definition of done:
-- all packages compile
-- one command validates build and tests
+- `npm run build` type-checks the active TypeScript packages
+- `npm test` runs the active Vitest suite
 
 ### M2 — ETL runnable vertical slice
 
@@ -48,14 +50,17 @@ Definition of done:
 
 ### M3 — Data and local execution
 
+Status: partial — `text` smoke command is available; dataset registry is still pending.
+
 Deliverables:
 - sample dataset entry documented in `datasets/`
-- local smoke command for ETL run
-- expected output format documented
+- `npm run ingest:smoke` local ETL smoke command
+- expected output format documented in `packages/etl/README.md`
 
 Definition of done:
-- any contributor can run ETL locally with one command
+- any contributor can run text ETL locally with one command
 - sample input and expected shape are reproducible
+- sample dataset entry is documented in `datasets/`
 
 ### M4 — Readiness for Phase 1
 
@@ -86,4 +91,4 @@ Definition of done:
 
 ## Next immediate action
 
-Start M1 by adding monorepo tooling skeleton, then implement M2 (`pdf` extractor + tests).
+Start M2 by implementing the first functional `pdf` extractor and adding integration tests for text + PDF ingestion.

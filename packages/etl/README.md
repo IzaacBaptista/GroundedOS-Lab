@@ -24,7 +24,7 @@ Execution follows the repository-level plan at
 1. Keep `text` ingestion stable and covered by tests
 2. Implement first functional `pdf` extractor
 3. Keep `image` and `audio` behind explicit, clear not-implemented errors
-4. Expose one local smoke command and document expected output shape
+4. ✅ Expose one local smoke command and document expected output shape
 
 ## Ingestion Flow
 
@@ -48,6 +48,23 @@ NormalizedDocument      ← uniform payload for all downstream stages
 ```
 
 ### Quick start
+
+Run the local smoke command from the repository root:
+
+```bash
+npm run ingest:smoke
+```
+
+The command runs a real `text` ingestion through the dispatcher and prints a
+`NormalizedDocument` JSON payload. Expected output includes:
+
+| Field | Expected value |
+|---|---|
+| `documentId` | `smoke-text-001` |
+| `title` | `ETL Smoke Test` |
+| `modality` | `text` |
+| `lineage.extractor` | `text-extractor` |
+| `content.sections` | Two paragraph sections |
 
 ```ts
 import { ingest } from "./src";
@@ -92,4 +109,4 @@ from `packages/etl/src/index.ts` for convenience.
 - [x] `TextExtractor` — working plain-text ingestion with section splitting
 - [ ] Ingests PDF, image and audio files into `NormalizedDocument`
 - [ ] At least one sample dataset registered in `datasets/`
-- [ ] Pipeline is runnable locally with a single command
+- [x] Pipeline is runnable locally with a single smoke command for `text`
