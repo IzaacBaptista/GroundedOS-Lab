@@ -1,0 +1,89 @@
+# Phase 0 MVP Plan
+
+Implementation plan to move GroundedOS Lab from architectural scaffold to a runnable and testable data foundation.
+
+## Objective
+
+Deliver a minimum vertical slice for ingestion that is executable locally and provides a stable base for Phase 1 (Core RAG).
+
+## Scope
+
+In scope:
+- `packages/core` as canonical schema contract
+- `packages/etl` with dispatcher and extractors for `text` + one multimodal path (`pdf`)
+- local runnable command for ingestion smoke test
+- minimal dataset registry example in `datasets/`
+- documentation and success-criteria tracking
+
+Out of scope:
+- full RAG retrieval pipeline
+- web/API apps
+- model routing, agents, safety runtime
+- production infra
+
+## Milestones
+
+### M1 — Monorepo baseline tooling
+
+Deliverables:
+- workspace/package manager setup
+- TypeScript config and package build scripts
+- lint + test framework bootstrap
+
+Definition of done:
+- all packages compile
+- one command validates build and tests
+
+### M2 — ETL runnable vertical slice
+
+Deliverables:
+- `ingest()` stable for `text`
+- `pdf` extractor implemented (first functional version)
+- clear error contract for unsupported/incomplete modalities
+
+Definition of done:
+- `text` and `pdf` return `NormalizedDocument`
+- extraction output includes sections + lineage
+- integration tests cover dispatcher routing and extractor outputs
+
+### M3 — Data and local execution
+
+Deliverables:
+- sample dataset entry documented in `datasets/`
+- local smoke command for ETL run
+- expected output format documented
+
+Definition of done:
+- any contributor can run ETL locally with one command
+- sample input and expected shape are reproducible
+
+### M4 — Readiness for Phase 1
+
+Deliverables:
+- updated roadmap checkboxes for Phase 0
+- package READMEs aligned with real implementation status
+- open issues list for Phase 1 handoff
+
+Definition of done:
+- Phase 0 status is auditable by documentation + tests
+- no ambiguity between “planned” and “implemented” states
+
+## Execution order
+
+1. Setup tooling baseline (M1)
+2. Implement and test ETL vertical slice (M2)
+3. Add dataset + run command (M3)
+4. Documentation closure and roadmap update (M4)
+
+## Risks and mitigations
+
+- PDF extraction library instability
+  - Mitigation: isolate adapter and keep extractor contract unchanged
+- Tooling setup overhead slowing feature delivery
+  - Mitigation: choose minimal stack first; expand after green baseline
+- Documentation drift
+  - Mitigation: require README updates in each implementation PR
+
+## Next immediate action
+
+Start M1 by adding monorepo tooling skeleton, then implement M2 (`pdf` extractor + tests).

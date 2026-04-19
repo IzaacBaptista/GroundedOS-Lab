@@ -14,6 +14,18 @@ Extract, Transform, Load pipeline for ingesting multimodal documents into a unif
 
 🟡 In Progress — Phase 0 (Data Foundation)
 
+## Current plan
+
+Execution follows the repository-level plan at
+[`docs/phase-0-mvp-plan.md`](../../docs/phase-0-mvp-plan.md), focused on an ETL MVP that is locally runnable and testable.
+
+### ETL milestones (active)
+
+1. Keep `text` ingestion stable and covered by tests
+2. Implement first functional `pdf` extractor
+3. Keep `image` and `audio` behind explicit, clear not-implemented errors
+4. Expose one local smoke command and document expected output shape
+
 ## Ingestion Flow
 
 Any content enters the pipeline through the unified `ingest()` function.
@@ -59,9 +71,9 @@ from `packages/etl/src/index.ts` for convenience.
 | Modality | Class | Status | Notes |
 |---|---|---|---|
 | `text` | `TextExtractor` | ✅ Complete | Inline `content` or `filePath`; paragraph-based section splitting |
-| `pdf` | `PdfExtractor` | 🔲 Planned | Page-aware section extraction |
-| `image` | `ImageExtractor` | 🔲 Planned | OCR / captioning via local or cloud vision API |
-| `audio` | `AudioExtractor` | 🔲 Planned | ASR (Whisper) speech-to-text transcription |
+| `pdf` | `PdfExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
+| `image` | `ImageExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
+| `audio` | `AudioExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
 | `markdown` | — | 🔲 Planned | Heading-aware section splitting |
 | `html` | — | 🔲 Planned | Tag-aware content extraction |

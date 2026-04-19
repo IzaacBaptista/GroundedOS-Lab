@@ -471,6 +471,21 @@ groundedos-lab/
 
 ---
 
+## 🧭 Execution Plan (Current)
+
+To move from architecture scaffold to runnable foundation, the active plan is documented in:
+
+- [`docs/phase-0-mvp-plan.md`](./docs/phase-0-mvp-plan.md)
+
+### Current focus
+
+- Establish minimal monorepo tooling baseline (build/test)
+- Deliver ETL vertical slice with `text` + first functional `pdf`
+- Add one sample dataset registry entry and one local smoke command
+- Keep roadmap checkboxes and package READMEs synchronized with implementation
+
+---
+
 ## ⚙️ Monorepo Tooling
 
 > ⚠️ Tooling is not yet configured. The section below describes the **intended setup**. It will be implemented before Phase 0 coding begins.
