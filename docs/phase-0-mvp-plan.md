@@ -66,10 +66,12 @@ Definition of done:
 
 ### M4 — Readiness for Phase 1
 
+Status: complete.
+
 Deliverables:
 - updated roadmap checkboxes for Phase 0
 - package READMEs aligned with real implementation status
-- open issues list for Phase 1 handoff
+- open issues list for Phase 1 handoff in [`phase-1-handoff.md`](./phase-1-handoff.md)
 
 Definition of done:
 - Phase 0 status is auditable by documentation + tests
@@ -93,4 +95,4 @@ Definition of done:
 
 ## Next immediate action
 
-Start M4 by closing Phase 0 documentation gaps and listing Phase 1 handoff issues.
+Start Phase 1 with the first RAG chunking contract and integration tests described in [`phase-1-handoff.md`](./phase-1-handoff.md).

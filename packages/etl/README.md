@@ -12,7 +12,7 @@ Extract, Transform, Load pipeline for ingesting multimodal documents into a unif
 
 ## Status
 
-🟡 In Progress — Phase 0 (Data Foundation)
+🟡 In Progress — Phase 0 MVP complete for text + PDF ingestion; additional modalities remain planned.
 
 ## Current plan
 
@@ -130,5 +130,5 @@ from `packages/etl/src/index.ts` for convenience.
 - [x] `TextExtractor` — working plain-text ingestion with section splitting
 - [x] `PdfExtractor` — working PDF text extraction into page sections
 - [ ] Ingests image and audio files into `NormalizedDocument`
-- [ ] At least one sample dataset registered in `datasets/`
+- [x] At least one sample dataset registered in `datasets/`
 - [x] Pipeline is runnable locally with a single smoke command for `text`

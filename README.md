@@ -427,7 +427,8 @@ groundedos-lab/
 
 **✅ Success Criteria:**
 - [x] `packages/core` defines `SourceDocument` and `NormalizedDocument` — the [Uniform Document Schema](./docs/concepts/uniform-document-schema.md)
-- [ ] `packages/etl` ingests PDF, image and audio files into a uniform schema
+- [x] `packages/etl` ingests text and PDF files into `NormalizedDocument`
+- [ ] Image and audio ingestion remain registered stubs for a later multimodal slice
 - [x] At least one sample dataset registered in [`datasets/`](./datasets/)
 - [x] ETL pipeline is runnable locally with a single smoke command
 
@@ -499,11 +500,12 @@ groundedos-lab/
 To move from architecture scaffold to runnable foundation, the active plan is documented in:
 
 - [`docs/phase-0-mvp-plan.md`](./docs/phase-0-mvp-plan.md)
+- [`docs/phase-1-handoff.md`](./docs/phase-1-handoff.md)
 
 ### Current focus
 
-- Close Phase 0 documentation gaps and list Phase 1 handoff issues
-- Keep roadmap checkboxes and package READMEs synchronized with implementation
+- Start Phase 1 with the RAG chunking contract
+- Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 ---
 
