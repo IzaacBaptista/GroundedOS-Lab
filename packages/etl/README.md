@@ -55,8 +55,12 @@ Run the local smoke command from the repository root:
 npm run ingest:smoke
 ```
 
-The command runs a real `text` ingestion through the dispatcher and prints a
-`NormalizedDocument` JSON payload. Expected output includes:
+The command reads the `phase-0-smoke-text` dataset from
+[`datasets/registry.json`](../../datasets/registry.json), verifies its checksum,
+runs a real `text` ingestion through the dispatcher, and prints a
+`NormalizedDocument` JSON payload.
+
+Expected output includes:
 
 | Field | Expected value |
 |---|---|
@@ -65,6 +69,12 @@ The command runs a real `text` ingestion through the dispatcher and prints a
 | `modality` | `text` |
 | `lineage.extractor` | `text-extractor` |
 | `content.sections` | Two paragraph sections |
+
+To run a different registered dataset, pass its ID:
+
+```bash
+npm run ingest:smoke -- <dataset-id>
+```
 
 ```ts
 import { ingest } from "./src";

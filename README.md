@@ -428,8 +428,8 @@ groundedos-lab/
 **✅ Success Criteria:**
 - [x] `packages/core` defines `SourceDocument` and `NormalizedDocument` — the [Uniform Document Schema](./docs/concepts/uniform-document-schema.md)
 - [ ] `packages/etl` ingests PDF, image and audio files into a uniform schema
-- [ ] At least one sample dataset registered in `datasets/`
-- [ ] ETL pipeline is runnable locally with a single command
+- [x] At least one sample dataset registered in [`datasets/`](./datasets/)
+- [x] ETL pipeline is runnable locally with a single smoke command
 
 ### Phase 1 — Core RAG
 
@@ -502,8 +502,7 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 ### Current focus
 
-- Extend the minimal monorepo tooling baseline as packages become runnable
-- Add one sample dataset registry entry
+- Close Phase 0 documentation gaps and list Phase 1 handoff issues
 - Keep roadmap checkboxes and package READMEs synchronized with implementation
 
 ---

@@ -1,0 +1,3 @@
+GroundedOS Lab smoke test.
+
+This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.

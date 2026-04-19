@@ -52,7 +52,7 @@ Definition of done:
 
 ### M3 — Data and local execution
 
-Status: partial — `text` smoke command is available; dataset registry is still pending.
+Status: complete for the first local smoke dataset.
 
 Deliverables:
 - sample dataset entry documented in `datasets/`
@@ -93,4 +93,4 @@ Definition of done:
 
 ## Next immediate action
 
-Start M3 by adding a minimal sample dataset registry entry in `datasets/` and keeping the smoke command output documented.
+Start M4 by closing Phase 0 documentation gaps and listing Phase 1 handoff issues.
