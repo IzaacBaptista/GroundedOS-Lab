@@ -252,7 +252,26 @@ Use this repository as a structured learning path:
 * Want to understand AI concepts behind the system?
   → Start at [`docs/concepts/`](./docs/concepts/)
 
+* Want a guided learning path by topic?
+  → Explore the [📘 Guided Study Tracks](./docs/study-tracks/README.md)
+
 As the project evolves, this section will map each concept directly to code implementations.
+
+---
+
+## 📘 Guided Study Tracks
+
+Guided Study Tracks are topic-based routes through the existing GroundedOS Lab documentation, packages, experiments and roadmap phases.
+
+Start here:
+
+* [Track 1 - LLM Foundations](./docs/study-tracks/README.md#track-1---llm-foundations): model basics, Transformer concepts, inference, context windows and generation controls
+* [Track 2 - Multi-Modal & Agents](./docs/study-tracks/README.md#track-2---multi-modal--agents): multimodal ingestion, tool calling, multi-agent flows and memory
+* [Track 3 - Open-Source Ecosystem](./docs/study-tracks/README.md#track-3---open-source-ecosystem): Hugging Face, local models, quantization and inference trade-offs
+* [Track 4 - Evaluation & Comparison](./docs/study-tracks/README.md#track-4---evaluation--comparison): evals, observability, cost analysis, A/B testing and benchmarking
+* [Track 5 - Advanced RAG](./docs/study-tracks/README.md#track-5---advanced-rag): embeddings, chunking, vector databases, hybrid search, reranking, grounding and lineage
+* [Track 6 - Fine-tuning & Adaptation](./docs/study-tracks/README.md#track-6---fine-tuning--adaptation): fine-tuning, LoRA, distillation, data augmentation, synthetic data and RLHF
+* [Track 7 - Autonomous AI Systems](./docs/study-tracks/README.md#track-7---autonomous-ai-systems): planning, self-reflection, memory, multi-agent collaboration and guardrails
 
 ---
 
