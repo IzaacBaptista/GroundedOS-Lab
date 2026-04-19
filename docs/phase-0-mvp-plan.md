@@ -38,6 +38,8 @@ Definition of done:
 
 ### M2 — ETL runnable vertical slice
 
+Status: complete for the first `text` + `pdf` vertical slice.
+
 Deliverables:
 - `ingest()` stable for `text`
 - `pdf` extractor implemented (first functional version)
@@ -91,4 +93,4 @@ Definition of done:
 
 ## Next immediate action
 
-Start M2 by implementing the first functional `pdf` extractor and adding integration tests for text + PDF ingestion.
+Start M3 by adding a minimal sample dataset registry entry in `datasets/` and keeping the smoke command output documented.

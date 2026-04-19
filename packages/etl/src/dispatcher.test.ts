@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 
 import { ingest } from "./dispatcher";
+import { createSimplePdfBuffer } from "../test-fixtures/pdf";
 import type { IngestionInput } from "@groundedos/core";
 
 describe("ingest", () => {
@@ -35,12 +39,32 @@ describe("ingest", () => {
     );
   });
 
-  it("surfaces explicit not-implemented errors from registered stubs", async () => {
-    await expect(
-      ingest({
+  it("routes PDF file input to the PDF extractor", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "groundedos-dispatcher-pdf-"));
+    const filePath = join(dir, "sample.pdf");
+
+    try {
+      await writeFile(
+        filePath,
+        createSimplePdfBuffer(["Dispatcher PDF test."])
+      );
+
+      const doc = await ingest({
         type: "pdf",
-        filePath: "sample.pdf",
-      })
-    ).rejects.toThrow("NOT_IMPLEMENTED");
+        filePath,
+        metadata: {
+          documentId: "doc-dispatcher-pdf",
+          title: "Dispatcher PDF",
+        },
+      });
+
+      expect(doc.documentId).toBe("doc-dispatcher-pdf");
+      expect(doc.title).toBe("Dispatcher PDF");
+      expect(doc.modality).toBe("pdf");
+      expect(doc.content.sections).toHaveLength(1);
+      expect(doc.content.sections[0]?.text).toBe("Dispatcher PDF test.");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

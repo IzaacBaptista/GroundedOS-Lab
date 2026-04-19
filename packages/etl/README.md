@@ -22,7 +22,7 @@ Execution follows the repository-level plan at
 ### ETL milestones (active)
 
 1. Keep `text` ingestion stable and covered by tests
-2. Implement first functional `pdf` extractor
+2. ✅ Implement first functional `pdf` extractor
 3. Keep `image` and `audio` behind explicit, clear not-implemented errors
 4. ✅ Expose one local smoke command and document expected output shape
 
@@ -77,6 +77,17 @@ const doc = await ingest({
 // doc.content.sections → [ { id: "section-1", text: "Hello world", … }, … ]
 ```
 
+PDF files can be ingested through the same dispatcher:
+
+```ts
+const pdfDoc = await ingest({
+  type: "pdf",
+  filePath: "./sample.pdf",
+  metadata: { title: "Sample PDF" },
+});
+// pdfDoc.content.sections → one section per PDF page with extractable text
+```
+
 ## Document Schema
 
 The ETL pipeline consumes an `IngestionInput` and produces a `NormalizedDocument`.
@@ -88,7 +99,7 @@ from `packages/etl/src/index.ts` for convenience.
 | Modality | Class | Status | Notes |
 |---|---|---|---|
 | `text` | `TextExtractor` | ✅ Complete | Inline `content` or `filePath`; paragraph-based section splitting |
-| `pdf` | `PdfExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
+| `pdf` | `PdfExtractor` | ✅ Complete | Local `filePath` or remote `url`; page-based text extraction |
 | `image` | `ImageExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
 | `audio` | `AudioExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
@@ -107,6 +118,7 @@ from `packages/etl/src/index.ts` for convenience.
 - [x] `Extractor` interface defined in `packages/core`
 - [x] Dispatcher routes by modality with clear error for unregistered types
 - [x] `TextExtractor` — working plain-text ingestion with section splitting
-- [ ] Ingests PDF, image and audio files into `NormalizedDocument`
+- [x] `PdfExtractor` — working PDF text extraction into page sections
+- [ ] Ingests image and audio files into `NormalizedDocument`
 - [ ] At least one sample dataset registered in `datasets/`
 - [x] Pipeline is runnable locally with a single smoke command for `text`

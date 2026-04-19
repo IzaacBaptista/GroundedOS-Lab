@@ -503,7 +503,6 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 ### Current focus
 
 - Extend the minimal monorepo tooling baseline as packages become runnable
-- Deliver ETL vertical slice with `text` + first functional `pdf`
 - Add one sample dataset registry entry
 - Keep roadmap checkboxes and package READMEs synchronized with implementation
 
