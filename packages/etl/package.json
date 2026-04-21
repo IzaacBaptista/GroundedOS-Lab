@@ -12,6 +12,7 @@
     }
   },
   "dependencies": {
-    "@groundedos/core": "0.1.0"
+    "@groundedos/core": "0.1.0",
+    "pdf-parse": "^2.4.5"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "datasets": [
+    {
+      "id": "phase-0-smoke-text",
+      "name": "Phase 0 Text Smoke Dataset",
+      "description": "Minimal synthetic text document used to verify local ETL ingestion.",
+      "modality": "text",
+      "path": "samples/phase-0-smoke.txt",
+      "source": "synthetic",
+      "license": "CC0-1.0",
+      "sha256": "0681e6b0b774e05817630d61e19268d1b5284f7e4065e0387cf8852ab514355a",
+      "metadata": {
+        "documentId": "smoke-text-001",
+        "title": "ETL Smoke Test",
+        "language": "en",
+        "tags": ["smoke", "phase-0"]
+      }
+    }
+  ]
+}

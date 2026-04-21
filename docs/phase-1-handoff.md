@@ -1,0 +1,65 @@
+# Phase 1 Handoff
+
+This handoff captures the current Phase 0 baseline and the next implementation issues for Phase 1 — Core RAG.
+
+## Current baseline
+
+Phase 0 now provides a runnable data foundation:
+
+- `packages/core` defines the canonical `SourceDocument`, `NormalizedDocument`, `DocumentSection`, `IngestionInput`, and `Extractor` contracts.
+- `packages/etl` supports `text` ingestion from inline content or local files.
+- `packages/etl` supports `pdf` ingestion from local files or remote URLs, producing page-based sections.
+- `image` and `audio` extractors remain registered stubs with explicit `NOT_IMPLEMENTED` errors.
+- `datasets/registry.json` registers `phase-0-smoke-text` with source, license, path, checksum, and ETL metadata.
+- `npm run ingest:smoke` reads the registered sample dataset, validates its checksum, runs ETL, and prints a `NormalizedDocument`.
+
+## Verified commands
+
+Run these from the repository root:
+
+```bash
+npm run build
+npm test
+npm run ingest:smoke
+```
+
+Expected status:
+
+- TypeScript typecheck passes.
+- Vitest passes for ETL dispatcher, text extraction, and PDF extraction.
+- Smoke ingestion returns `documentId: "smoke-text-001"` and two text sections.
+
+## Phase 1 implementation issues
+
+1. Implement the RAG chunking contract.
+   - Input: `NormalizedDocument.content.sections`
+   - Output: stable retrieval chunks with `documentId`, `sectionId`, offsets, text, and metadata
+   - Package: `packages/rag`
+
+2. Add embedding interfaces and a local stub provider.
+   - Define an embedding model contract before wiring a real provider
+   - Keep outputs deterministic in tests
+   - Package: `packages/rag`
+
+3. Add an in-memory vector store for local development.
+   - Support insert, similarity search, and metadata filtering
+   - Avoid external database requirements for the first RAG test
+   - Package: `packages/rag`
+
+4. Build the first retrieval flow.
+   - Ingest document → chunk sections → embed chunks → retrieve candidates
+   - Cover the full flow with integration tests
+   - Packages: `packages/etl`, `packages/rag`
+
+5. Document Dev Mode retrieval output shape.
+   - Include retrieved chunk IDs, relevance scores, document origin, and offsets
+   - Keep this as a data contract before building UI
+   - Packages: `packages/rag`, future `apps/web`
+
+## Explicit non-goals for the first Phase 1 slice
+
+- No production vector database yet.
+- No chat UI yet.
+- No model-provider routing yet.
+- No agent orchestration yet.
+- No image or audio extraction beyond current stubs.

@@ -12,7 +12,7 @@ Extract, Transform, Load pipeline for ingesting multimodal documents into a unif
 
 ## Status
 
-🟡 In Progress — Phase 0 (Data Foundation)
+🟡 In Progress — Phase 0 MVP complete for text + PDF ingestion; additional modalities remain planned.
 
 ## Current plan
 
@@ -22,7 +22,7 @@ Execution follows the repository-level plan at
 ### ETL milestones (active)
 
 1. Keep `text` ingestion stable and covered by tests
-2. Implement first functional `pdf` extractor
+2. ✅ Implement first functional `pdf` extractor
 3. Keep `image` and `audio` behind explicit, clear not-implemented errors
 4. ✅ Expose one local smoke command and document expected output shape
 
@@ -55,8 +55,12 @@ Run the local smoke command from the repository root:
 npm run ingest:smoke
 ```
 
-The command runs a real `text` ingestion through the dispatcher and prints a
-`NormalizedDocument` JSON payload. Expected output includes:
+The command reads the `phase-0-smoke-text` dataset from
+[`datasets/registry.json`](../../datasets/registry.json), verifies its checksum,
+runs a real `text` ingestion through the dispatcher, and prints a
+`NormalizedDocument` JSON payload.
+
+Expected output includes:
 
 | Field | Expected value |
 |---|---|
@@ -65,6 +69,12 @@ The command runs a real `text` ingestion through the dispatcher and prints a
 | `modality` | `text` |
 | `lineage.extractor` | `text-extractor` |
 | `content.sections` | Two paragraph sections |
+
+To run a different registered dataset, pass its ID:
+
+```bash
+npm run ingest:smoke -- <dataset-id>
+```
 
 ```ts
 import { ingest } from "./src";
@@ -75,6 +85,17 @@ const doc = await ingest({
   metadata: { title: "My first document" },
 });
 // doc.content.sections → [ { id: "section-1", text: "Hello world", … }, … ]
+```
+
+PDF files can be ingested through the same dispatcher:
+
+```ts
+const pdfDoc = await ingest({
+  type: "pdf",
+  filePath: "./sample.pdf",
+  metadata: { title: "Sample PDF" },
+});
+// pdfDoc.content.sections → one section per PDF page with extractable text
 ```
 
 ## Document Schema
@@ -88,7 +109,7 @@ from `packages/etl/src/index.ts` for convenience.
 | Modality | Class | Status | Notes |
 |---|---|---|---|
 | `text` | `TextExtractor` | ✅ Complete | Inline `content` or `filePath`; paragraph-based section splitting |
-| `pdf` | `PdfExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
+| `pdf` | `PdfExtractor` | ✅ Complete | Local `filePath` or remote `url`; page-based text extraction |
 | `image` | `ImageExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
 | `audio` | `AudioExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
@@ -107,6 +128,7 @@ from `packages/etl/src/index.ts` for convenience.
 - [x] `Extractor` interface defined in `packages/core`
 - [x] Dispatcher routes by modality with clear error for unregistered types
 - [x] `TextExtractor` — working plain-text ingestion with section splitting
-- [ ] Ingests PDF, image and audio files into `NormalizedDocument`
-- [ ] At least one sample dataset registered in `datasets/`
+- [x] `PdfExtractor` — working PDF text extraction into page sections
+- [ ] Ingests image and audio files into `NormalizedDocument`
+- [x] At least one sample dataset registered in `datasets/`
 - [x] Pipeline is runnable locally with a single smoke command for `text`

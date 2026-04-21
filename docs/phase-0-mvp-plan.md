@@ -38,6 +38,8 @@ Definition of done:
 
 ### M2 — ETL runnable vertical slice
 
+Status: complete for the first `text` + `pdf` vertical slice.
+
 Deliverables:
 - `ingest()` stable for `text`
 - `pdf` extractor implemented (first functional version)
@@ -50,7 +52,7 @@ Definition of done:
 
 ### M3 — Data and local execution
 
-Status: partial — `text` smoke command is available; dataset registry is still pending.
+Status: complete for the first local smoke dataset.
 
 Deliverables:
 - sample dataset entry documented in `datasets/`
@@ -64,10 +66,12 @@ Definition of done:
 
 ### M4 — Readiness for Phase 1
 
+Status: complete.
+
 Deliverables:
 - updated roadmap checkboxes for Phase 0
 - package READMEs aligned with real implementation status
-- open issues list for Phase 1 handoff
+- open issues list for Phase 1 handoff in [`phase-1-handoff.md`](./phase-1-handoff.md)
 
 Definition of done:
 - Phase 0 status is auditable by documentation + tests
@@ -91,4 +95,4 @@ Definition of done:
 
 ## Next immediate action
 
-Start M2 by implementing the first functional `pdf` extractor and adding integration tests for text + PDF ingestion.
+Start Phase 1 with the first RAG chunking contract and integration tests described in [`phase-1-handoff.md`](./phase-1-handoff.md).
