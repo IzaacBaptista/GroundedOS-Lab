@@ -10,6 +10,8 @@
   "scripts": {
     "build": "npm run typecheck",
     "ingest:smoke": "tsx scripts/ingest-smoke.ts",
+    "rag:ask": "tsx scripts/rag-ask.ts",
+    "rag:smoke": "tsx scripts/rag-smoke.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
