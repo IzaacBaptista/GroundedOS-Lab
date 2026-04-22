@@ -21,6 +21,8 @@ Run these from the repository root:
 npm run build
 npm test
 npm run ingest:smoke
+npm run rag:smoke
+npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
 ```
 
 Expected status:
@@ -28,6 +30,8 @@ Expected status:
 - TypeScript typecheck passes.
 - Vitest passes for ETL dispatcher, text extraction, and PDF extraction.
 - Smoke ingestion returns `documentId: "smoke-text-001"` and two text sections.
+- RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
+- RAG ask returns the same retrieval output shape for a direct local file path.
 
 ## Phase 1 implementation issues
 

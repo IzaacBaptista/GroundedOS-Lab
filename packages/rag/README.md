@@ -22,6 +22,18 @@ The first Phase 1 slices expose deterministic character-based chunking through
 end-to-end local retrieval through `buildRetrievalIndex()` and
 `retrieveFromIndex()`.
 
+From the repository root, the complete local pipeline can be exercised with:
+
+```bash
+npm run rag:smoke -- --dataset phase-0-smoke-text --query "What does this command verify?"
+npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
+```
+
+The smoke command runs a registered dataset through ETL, chunking, embeddings,
+in-memory vector search and Dev Mode output generation. The ask command runs
+the same local pipeline against an arbitrary local text or PDF file. Both print
+a simple grounded answer plus retrieval diagnostics.
+
 ```ts
 import { chunkDocument } from "@groundedos/rag";
 

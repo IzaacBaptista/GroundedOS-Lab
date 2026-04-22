@@ -441,6 +441,7 @@ groundedos-lab/
 
 **✅ Success Criteria:**
 - [ ] User can upload a document and ask a question grounded in its content
+- [x] Local RAG smoke command can ask a question against a registered dataset
 - [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
 - [x] `packages/rag` has integration tests covering the full retrieval flow
 
@@ -504,9 +505,27 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 ### Current focus
 
-- Phase 1 local RAG foundation is implemented through chunking, deterministic embeddings, in-memory vector search, retrieval flow and Dev Mode output contract
-- Next focus: decide whether to build the upload/chat app surface or continue backend-quality work such as reranking and retrieval observability
+- Phase 1 local RAG foundation is executable through `npm run rag:smoke` and `npm run rag:ask`
+- Next focus: decide whether to build the API/web upload surface or continue backend-quality work such as reranking and retrieval observability
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
+
+### Local RAG commands
+
+Run a registered dataset through ETL, chunking, embeddings, in-memory vector
+search and Dev Mode retrieval output:
+
+```bash
+npm run rag:smoke -- --dataset phase-0-smoke-text --query "What does this command verify?"
+```
+
+Ask a grounded question against a local text or PDF file:
+
+```bash
+npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
+```
+
+Both commands print JSON containing the query, a simple grounded answer,
+retrieved chunk IDs, scores, source metadata and offsets.
 
 ---
 

@@ -39,6 +39,12 @@ From the repository root:
 
 ```bash
 npm run ingest:smoke
+npm run rag:smoke -- --dataset phase-0-smoke-text --query "What does this command verify?"
+npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
 ```
 
 The smoke command reads `phase-0-smoke-text` from the registry, verifies its checksum, runs it through `packages/etl`, and prints the resulting `NormalizedDocument`.
+The RAG smoke command uses the same registry entry, then runs local chunking,
+embedding, vector search and Dev Mode retrieval output.
+The RAG ask command runs the same local retrieval pipeline against a direct
+file path, without requiring a registry entry.
