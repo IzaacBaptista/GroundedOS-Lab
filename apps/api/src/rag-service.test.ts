@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiRequestError, askRag } from "./rag-service";
+import { ApiRequestError, askRag, askRagFromFile } from "./rag-service";
 
 describe("askRag", () => {
   it("answers a grounded question against inline text", async () => {
@@ -56,5 +56,28 @@ describe("askRag", () => {
   it("uses typed request errors for validation failures", async () => {
     await expect(askRag(undefined as unknown as Parameters<typeof askRag>[0])).rejects
       .toBeInstanceOf(ApiRequestError);
+  });
+});
+
+describe("askRagFromFile", () => {
+  it("answers a grounded question against a local uploaded file", async () => {
+    const output = await askRagFromFile({
+      type: "text",
+      filePath: "datasets/samples/phase-0-smoke.txt",
+      originalFilename: "phase-0-smoke.txt",
+      query: "What does this command verify?",
+      documentId: "api-file-test",
+      topK: 1,
+    });
+
+    expect(output.document).toMatchObject({
+      documentId: "api-file-test",
+      title: "phase-0-smoke.txt",
+      modality: "text",
+      originalFilename: "phase-0-smoke.txt",
+    });
+    expect(output.answer.grounded).toBe(true);
+    expect(output.answer.text).toContain("This command verifies that the ETL dispatcher");
+    expect(output.devMode.results[0]?.chunkId).toBe("api-file-test:section-2:chunk-1");
   });
 });

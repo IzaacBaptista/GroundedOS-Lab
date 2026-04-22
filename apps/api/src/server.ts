@@ -1,90 +1,123 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "http";
-import { askRag, ApiRequestError, type RagAskRequest } from "./rag-service";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { basename, join } from "path";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
+import multipart from "@fastify/multipart";
+import {
+  ApiRequestError,
+  askRag,
+  askRagFromFile,
+  type RagAskFileRequest,
+  type RagAskRequest,
+} from "./rag-service";
 
 const DEFAULT_PORT = 3001;
-const MAX_BODY_BYTES = 1_000_000;
+const MAX_UPLOAD_BYTES = 5_000_000;
 
-export function createApiServer() {
-  return createServer(async (request, response) => {
-    try {
-      await routeRequest(request, response);
-    } catch (error) {
-      writeError(response, error);
-    }
+export function createApiServer(): FastifyInstance {
+  const app = Fastify({
+    logger: false,
   });
-}
 
-async function routeRequest(
-  request: IncomingMessage,
-  response: ServerResponse
-): Promise<void> {
-  const url = new URL(request.url ?? "/", "http://localhost");
-
-  if (request.method === "GET" && url.pathname === "/health") {
-    writeJson(response, 200, {
-      status: "ok",
-      service: "groundedos-api",
-    });
-    return;
-  }
-
-  if (request.method === "POST" && url.pathname === "/rag/ask") {
-    const body = await readJsonBody<RagAskRequest>(request);
-    const output = await askRag(body);
-
-    writeJson(response, 200, output);
-    return;
-  }
-
-  writeJson(response, 404, {
-    error: {
-      message: `Route not found: ${request.method ?? "UNKNOWN"} ${url.pathname}`,
+  app.register(multipart, {
+    limits: {
+      fileSize: MAX_UPLOAD_BYTES,
+      files: 1,
+      fields: 6,
+      parts: 8,
     },
   });
-}
 
-async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
-  const contentType = request.headers["content-type"];
+  app.setErrorHandler((error, _request, reply) => {
+    writeError(reply, error);
+  });
 
-  if (!contentType?.includes("application/json")) {
-    throw new ApiRequestError("Content-Type must be application/json.", 415);
-  }
+  app.get("/health", async () => {
+    return {
+      status: "ok",
+      service: "groundedos-api",
+    };
+  });
 
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
-
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    totalBytes += buffer.length;
-
-    if (totalBytes > MAX_BODY_BYTES) {
-      throw new ApiRequestError("Request body is too large.", 413);
+  app.post("/rag/ask", async (request, _reply) => {
+    if (request.isMultipart()) {
+      return await handleMultipartRagAsk(request);
     }
 
-    chunks.push(buffer);
+    const contentType = request.headers["content-type"];
+
+    if (!contentType?.includes("application/json")) {
+      throw new ApiRequestError(
+        "Content-Type must be application/json or multipart/form-data.",
+        415
+      );
+    }
+
+    return await askRag(request.body as RagAskRequest);
+  });
+
+  return app;
+}
+
+async function handleMultipartRagAsk(request: FastifyRequest) {
+  const fields: Record<string, string> = {};
+  let upload:
+    | {
+        buffer: Buffer;
+        filename: string;
+      }
+    | undefined;
+
+  for await (const part of request.parts()) {
+    if (part.type === "file") {
+      if (upload) {
+        throw new ApiRequestError("Only one file upload is supported.");
+      }
+
+      upload = {
+        buffer: await part.toBuffer(),
+        filename: sanitizeFilename(part.filename || "upload.txt"),
+      };
+      continue;
+    }
+
+    if (part.type === "field") {
+      fields[part.fieldname] = String(part.value ?? "");
+    }
   }
+
+  if (!upload) {
+    throw new ApiRequestError("file upload is required.");
+  }
+
+  const tempDir = await mkdtemp(join(tmpdir(), "groundedos-api-upload-"));
+  const tempFilePath = join(tempDir, upload.filename);
 
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf-8")) as T;
-  } catch {
-    throw new ApiRequestError("Request body must be valid JSON.");
+    await writeFile(tempFilePath, upload.buffer);
+
+    return await askRagFromFile({
+      filePath: tempFilePath,
+      originalFilename: upload.filename,
+      type: fields.type as RagAskFileRequest["type"],
+      query: fields.query,
+      topK: fields.topK ? parsePositiveInteger(fields.topK, "topK") : undefined,
+      title: fields.title,
+      documentId: fields.documentId,
+      metadata: parseMetadata(fields.metadata),
+    });
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
   }
 }
 
-function writeJson(
-  response: ServerResponse,
-  statusCode: number,
-  payload: unknown
-): void {
-  response.writeHead(statusCode, {
-    "content-type": "application/json; charset=utf-8",
-  });
-  response.end(JSON.stringify(payload, null, 2));
-}
-
-function writeError(response: ServerResponse, error: unknown): void {
+function writeError(reply: FastifyReply, error: unknown): void {
   if (error instanceof ApiRequestError) {
-    writeJson(response, error.statusCode, {
+    reply.status(error.statusCode).send({
       error: {
         message: error.message,
       },
@@ -92,20 +125,65 @@ function writeError(response: ServerResponse, error: unknown): void {
     return;
   }
 
-  const message = error instanceof Error ? error.message : "Unknown API error.";
+  const fastifyError = error as {
+    statusCode?: number;
+    message?: string;
+  };
+  const statusCode =
+    typeof fastifyError.statusCode === "number" && fastifyError.statusCode >= 400
+      ? fastifyError.statusCode
+      : 500;
+  const message = fastifyError.message ?? "Unknown API error.";
 
-  writeJson(response, 500, {
+  reply.status(statusCode).send({
     error: {
       message,
     },
   });
 }
 
+function parsePositiveInteger(value: string, fieldName: string): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ApiRequestError(`${fieldName} must be a positive integer.`);
+  }
+
+  return parsed;
+}
+
+function parseMetadata(value: string | undefined): Record<string, unknown> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const metadata = JSON.parse(value) as unknown;
+
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      throw new ApiRequestError("metadata must be a JSON object.");
+    }
+
+    return metadata as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
+
+    throw new ApiRequestError("metadata must be valid JSON.");
+  }
+}
+
+function sanitizeFilename(filename: string): string {
+  const safe = basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  return safe.length > 0 ? safe : "upload.txt";
+}
+
 if (process.argv[1]?.endsWith("server.ts")) {
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
-  const server = createApiServer();
+  const app = createApiServer();
 
-  server.listen(port, () => {
-    console.log(`GroundedOS API listening on http://localhost:${port}`);
-  });
+  await app.listen({ port, host: "0.0.0.0" });
+  console.log(`GroundedOS API listening on http://localhost:${port}`);
 }

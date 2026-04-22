@@ -6,8 +6,10 @@
   "main": "./src/server.ts",
   "types": "./src/server.ts",
   "dependencies": {
+    "@fastify/multipart": "^10.0.0",
     "@groundedos/core": "0.1.0",
     "@groundedos/etl": "0.1.0",
-    "@groundedos/rag": "0.1.0"
+    "@groundedos/rag": "0.1.0",
+    "fastify": "^5.8.5"
   }
 }

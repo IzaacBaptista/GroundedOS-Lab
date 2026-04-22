@@ -1,4 +1,6 @@
 import { createHash } from "crypto";
+import { readFile } from "fs/promises";
+import { basename, extname } from "path";
 import type { DocumentModality } from "@groundedos/core";
 import { ingest } from "@groundedos/etl";
 import {
@@ -12,9 +14,22 @@ import {
 const DEFAULT_TOP_K = 3;
 const EMBEDDING_DIMENSIONS = 64;
 
+type SupportedApiModality = Extract<DocumentModality, "text" | "pdf">;
+
 export type RagAskRequest = {
   type?: DocumentModality;
   content?: string;
+  query?: string;
+  topK?: number;
+  title?: string;
+  documentId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type RagAskFileRequest = {
+  type?: SupportedApiModality;
+  filePath?: string;
+  originalFilename?: string;
   query?: string;
   topK?: number;
   title?: string;
@@ -26,8 +41,9 @@ export type RagAskResponse = {
   document: {
     documentId: string;
     title: string;
-    modality: "text";
+    modality: SupportedApiModality;
     checksum: string;
+    originalFilename?: string;
   };
   query: string;
   answer: GroundedAnswer;
@@ -106,12 +122,7 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
       checksum,
     },
   });
-  const index = await buildRetrievalIndex(document, {
-    embeddingProvider: new ApiLexicalEmbeddingProvider(),
-  });
-  const devMode = await retrieveForDevMode(index, normalizedRequest.query, {
-    topK: normalizedRequest.topK,
-  });
+  const ragOutput = await runLocalRag(document, normalizedRequest.query, normalizedRequest.topK);
 
   return {
     document: {
@@ -121,13 +132,44 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
       checksum,
     },
     query: normalizedRequest.query,
-    answer: createGroundedAnswer(devMode),
-    index: {
-      chunkCount: index.embeddedChunks.length,
-      embeddingProvider: index.embeddingProvider.name,
-      embeddingDimensions: index.embeddingProvider.dimensions,
+    ...ragOutput,
+  };
+}
+
+export async function askRagFromFile(
+  request: RagAskFileRequest
+): Promise<RagAskResponse> {
+  const normalizedRequest = normalizeFileRequest(request);
+  const rawBytes = await readFile(normalizedRequest.filePath);
+  const checksum = createHash("sha256").update(rawBytes).digest("hex");
+  const documentId = normalizedRequest.documentId ?? `upload-${checksum.slice(0, 16)}`;
+  const title =
+    normalizedRequest.title ??
+    normalizedRequest.originalFilename ??
+    basename(normalizedRequest.filePath);
+  const document = await ingest({
+    type: normalizedRequest.type,
+    filePath: normalizedRequest.filePath,
+    metadata: {
+      ...(normalizedRequest.metadata ?? {}),
+      documentId,
+      title,
+      checksum,
+      originalFilename: normalizedRequest.originalFilename,
     },
-    devMode,
+  });
+  const ragOutput = await runLocalRag(document, normalizedRequest.query, normalizedRequest.topK);
+
+  return {
+    document: {
+      documentId,
+      title,
+      modality: normalizedRequest.type,
+      checksum,
+      originalFilename: normalizedRequest.originalFilename,
+    },
+    query: normalizedRequest.query,
+    ...ragOutput,
   };
 }
 
@@ -143,7 +185,7 @@ function normalizeRequest(request: RagAskRequest): Required<
 
   if (type !== "text") {
     throw new ApiRequestError(
-      'JSON API currently supports only type "text". Use rag:ask for local PDF files until multipart upload is implemented.'
+      'JSON API currently supports only type "text". Use multipart/form-data for text or PDF file uploads.'
     );
   }
 
@@ -184,6 +226,92 @@ function normalizeRequest(request: RagAskRequest): Required<
     documentId: request.documentId,
     metadata: request.metadata,
   };
+}
+
+function normalizeFileRequest(request: RagAskFileRequest): Required<
+  Pick<RagAskFileRequest, "filePath" | "query" | "topK" | "type">
+> &
+  Pick<RagAskFileRequest, "title" | "documentId" | "metadata" | "originalFilename"> {
+  if (!request || typeof request !== "object") {
+    throw new ApiRequestError("Multipart request data must be provided.");
+  }
+
+  if (typeof request.filePath !== "string" || request.filePath.trim().length === 0) {
+    throw new ApiRequestError("file upload is required.");
+  }
+
+  const type = request.type ?? inferModality(request.originalFilename ?? request.filePath);
+
+  if (type !== "text" && type !== "pdf") {
+    throw new ApiRequestError('type must be "text" or "pdf" for file uploads.');
+  }
+
+  if (typeof request.query !== "string" || request.query.trim().length === 0) {
+    throw new ApiRequestError("query must be a non-empty string.");
+  }
+
+  const topK = request.topK ?? DEFAULT_TOP_K;
+
+  if (!Number.isInteger(topK) || topK <= 0) {
+    throw new ApiRequestError("topK must be a positive integer.");
+  }
+
+  if (request.title !== undefined && typeof request.title !== "string") {
+    throw new ApiRequestError("title must be a string when provided.");
+  }
+
+  if (request.documentId !== undefined && typeof request.documentId !== "string") {
+    throw new ApiRequestError("documentId must be a string when provided.");
+  }
+
+  if (
+    request.metadata !== undefined &&
+    (!request.metadata || typeof request.metadata !== "object" || Array.isArray(request.metadata))
+  ) {
+    throw new ApiRequestError("metadata must be an object when provided.");
+  }
+
+  return {
+    filePath: request.filePath,
+    query: request.query.trim(),
+    topK,
+    type,
+    title: request.title,
+    documentId: request.documentId,
+    metadata: request.metadata,
+    originalFilename: request.originalFilename,
+  };
+}
+
+async function runLocalRag(
+  document: Awaited<ReturnType<typeof ingest>>,
+  query: string,
+  topK: number
+): Promise<Pick<RagAskResponse, "answer" | "index" | "devMode">> {
+  const index = await buildRetrievalIndex(document, {
+    embeddingProvider: new ApiLexicalEmbeddingProvider(),
+  });
+  const devMode = await retrieveForDevMode(index, query, {
+    topK,
+  });
+
+  return {
+    answer: createGroundedAnswer(devMode),
+    index: {
+      chunkCount: index.embeddedChunks.length,
+      embeddingProvider: index.embeddingProvider.name,
+      embeddingDimensions: index.embeddingProvider.dimensions,
+    },
+    devMode,
+  };
+}
+
+function inferModality(filePath: string): SupportedApiModality {
+  if (extname(filePath).toLowerCase() === ".pdf") {
+    return "pdf";
+  }
+
+  return "text";
 }
 
 function createGroundedAnswer(devMode: RetrievalDevModeOutput): GroundedAnswer {

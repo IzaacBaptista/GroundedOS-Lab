@@ -506,8 +506,9 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 ### Current focus
 
 - Phase 1 local RAG foundation is executable through `npm run rag:smoke` and `npm run rag:ask`
-- A minimal JSON API is available through `npm run api:dev` with `POST /rag/ask`
-- Next focus: add multipart upload/PDF support or build the web upload surface
+- A minimal local API is available through `npm run api:dev` with `POST /rag/ask`
+  for inline JSON text and multipart text/PDF uploads
+- Next focus: build the web upload surface or harden the local API contract
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in
@@ -537,8 +538,8 @@ Run the local API:
 npm run api:dev
 ```
 
-The first API slice exposes `GET /health` and JSON-only `POST /rag/ask` for
-inline text content.
+The first API slice exposes `GET /health` and `POST /rag/ask` for inline JSON
+text plus multipart text/PDF uploads.
 
 ---
 

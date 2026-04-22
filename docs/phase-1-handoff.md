@@ -23,6 +23,7 @@ npm test
 npm run ingest:smoke
 npm run rag:smoke
 npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
+npm run api:dev
 ```
 
 Expected status:
@@ -32,6 +33,7 @@ Expected status:
 - Smoke ingestion returns `documentId: "smoke-text-001"` and two text sections.
 - RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
 - RAG ask returns the same retrieval output shape for a direct local file path.
+- The local API exposes `GET /health` and `POST /rag/ask` for inline JSON text and multipart text/PDF upload.
 
 See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and limits.
 
