@@ -12,7 +12,7 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-In Progress - Phase 1 chunking, deterministic local embeddings, in-memory vector storage and first retrieval flow implemented. Re-ranking and context assembly remain planned.
+In Progress - Phase 1 chunking, deterministic local embeddings, in-memory vector storage, first retrieval flow and Dev Mode retrieval output contract implemented. Re-ranking and context assembly remain planned.
 
 ## Current implementation
 
@@ -90,6 +90,20 @@ const results = await retrieveFromIndex(index, "what does this document say?", {
 });
 ```
 
+For Dev Mode diagnostics, use `retrieveForDevMode()` to return the documented
+retrieval output shape with chunk IDs, scores, source metadata and offsets.
+
+```ts
+import { retrieveForDevMode } from "@groundedos/rag";
+
+const devOutput = await retrieveForDevMode(index, "what does this document say?", {
+  topK: 3,
+});
+```
+
+The output contract is documented in
+[`docs/phase-1-dev-mode-output.md`](../../docs/phase-1-dev-mode-output.md).
+
 ## Public API
 
 | Export | Purpose |
@@ -106,3 +120,5 @@ const results = await retrieveFromIndex(index, "what does this document say?", {
 | `buildRetrievalIndex(document, options?)` | Chunk, embed and insert a normalized document into a local retrieval index |
 | `retrieveFromIndex(index, query, options?)` | Embed a query and retrieve ranked chunks from an index |
 | `RetrievalIndex` | Local retrieval index with provider, store and embedded chunks |
+| `retrieveForDevMode(index, query, options?)` | Retrieve ranked chunks as the Dev Mode diagnostics contract |
+| `RetrievalDevModeOutput` | Stable Dev Mode retrieval output shape |

@@ -32,8 +32,12 @@ export {
 
 export {
   buildRetrievalIndex,
+  createRetrievalDevOutput,
+  retrieveForDevMode,
   retrieveFromIndex,
   type BuildRetrievalIndexOptions,
+  type RetrievalDevModeOutput,
+  type RetrievalDevModeResult,
   type RetrievalIndex,
   type RetrievalResult,
   type RetrieveFromIndexOptions,

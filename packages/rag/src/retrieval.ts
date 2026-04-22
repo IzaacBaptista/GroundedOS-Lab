@@ -1,8 +1,9 @@
-import type { NormalizedDocument } from "@groundedos/core";
+import type { DocumentModality, NormalizedDocument } from "@groundedos/core";
 
 import {
   chunkDocument,
   type ChunkDocumentOptions,
+  type ChunkOffsetBasis,
 } from "./chunking";
 import {
   DeterministicEmbeddingProvider,
@@ -38,6 +39,38 @@ export interface RetrieveFromIndexOptions {
 }
 
 export type RetrievalResult = VectorSearchResult;
+
+export interface RetrievalDevModeOutput {
+  query: string;
+  resultCount: number;
+  results: RetrievalDevModeResult[];
+}
+
+export interface RetrievalDevModeResult {
+  rank: number;
+  chunkId: string;
+  documentId: string;
+  sectionId: string;
+  score: number;
+  text: string;
+  source: {
+    documentTitle: string;
+    modality: DocumentModality;
+    sourceType: NormalizedDocument["lineage"]["sourceType"];
+    originalFilename?: string;
+    sectionHeading?: string;
+    page?: number;
+  };
+  offsets: {
+    startOffset: number;
+    endOffset: number;
+    offsetBasis: ChunkOffsetBasis;
+  };
+  embedding: {
+    provider: string;
+    dimensions: number;
+  };
+}
 
 export async function buildRetrievalIndex(
   document: NormalizedDocument,
@@ -80,6 +113,59 @@ export async function retrieveFromIndex(
     topK: options.topK,
     filter: options.filter,
   });
+}
+
+export async function retrieveForDevMode(
+  index: RetrievalIndex,
+  query: string,
+  options: RetrieveFromIndexOptions = {}
+): Promise<RetrievalDevModeOutput> {
+  const results = await retrieveFromIndex(index, query, options);
+
+  return createRetrievalDevOutput(query, results);
+}
+
+export function createRetrievalDevOutput(
+  query: string,
+  results: RetrievalResult[]
+): RetrievalDevModeOutput {
+  if (typeof query !== "string" || query.trim().length === 0) {
+    throw new Error(`${ERROR_PREFIX} query must not be empty.`);
+  }
+
+  if (!Array.isArray(results)) {
+    throw new Error(`${ERROR_PREFIX} retrieval results must be an array.`);
+  }
+
+  return {
+    query: query.trim(),
+    resultCount: results.length,
+    results: results.map((result, index) => ({
+      rank: index + 1,
+      chunkId: result.chunk.id,
+      documentId: result.chunk.documentId,
+      sectionId: result.chunk.sectionId,
+      score: result.score,
+      text: result.chunk.text,
+      source: {
+        documentTitle: result.chunk.metadata.documentTitle,
+        modality: result.chunk.metadata.modality,
+        sourceType: result.chunk.metadata.sourceType,
+        originalFilename: result.chunk.metadata.originalFilename,
+        sectionHeading: result.chunk.metadata.sectionHeading,
+        page: result.chunk.metadata.page,
+      },
+      offsets: {
+        startOffset: result.chunk.startOffset,
+        endOffset: result.chunk.endOffset,
+        offsetBasis: result.chunk.metadata.offsetBasis,
+      },
+      embedding: {
+        provider: result.chunk.embeddingMetadata.provider,
+        dimensions: result.chunk.embeddingMetadata.dimensions,
+      },
+    })),
+  };
 }
 
 function validateRetrievalIndex(index: RetrievalIndex): void {

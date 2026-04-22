@@ -5,6 +5,8 @@ import type { EmbeddingProvider, EmbeddingVector } from "./embeddings";
 import { InMemoryVectorStore } from "./vector-store";
 import {
   buildRetrievalIndex,
+  createRetrievalDevOutput,
+  retrieveForDevMode,
   retrieveFromIndex,
   type RetrievalIndex,
 } from "./retrieval";
@@ -61,6 +63,58 @@ describe("retrieval flow", () => {
       },
     });
     expect(results[0]?.score).toBeCloseTo(1);
+  });
+
+  it("returns the Dev Mode retrieval output contract", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Alpha launch note.\n\nBeta retrieval note.",
+      metadata: {
+        documentId: "doc-dev-mode",
+        title: "Dev Mode Test",
+      },
+    });
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: {
+        maxChunkChars: 200,
+        overlapChars: 0,
+      },
+    });
+
+    const output = await retrieveForDevMode(index, "beta question", { topK: 1 });
+
+    expect(output).toEqual({
+      query: "beta question",
+      resultCount: 1,
+      results: [
+        {
+          rank: 1,
+          chunkId: "doc-dev-mode:section-2:chunk-1",
+          documentId: "doc-dev-mode",
+          sectionId: "section-2",
+          score: 1,
+          text: "Beta retrieval note.",
+          source: {
+            documentTitle: "Dev Mode Test",
+            modality: "text",
+            sourceType: "manual",
+            originalFilename: undefined,
+            sectionHeading: undefined,
+            page: undefined,
+          },
+          offsets: {
+            startOffset: 20,
+            endOffset: 40,
+            offsetBasis: "document",
+          },
+          embedding: {
+            provider: "keyword-test-provider",
+            dimensions: 3,
+          },
+        },
+      ],
+    });
   });
 
   it("supports metadata filters during retrieval", async () => {
@@ -175,6 +229,9 @@ describe("retrieval flow", () => {
     );
     await expect(retrieveFromIndex(badProviderIndex, "alpha")).rejects.toThrow(
       "[rag/retrieval] provider must return exactly one query embedding."
+    );
+    expect(() => createRetrievalDevOutput("alpha", undefined as unknown as [])).toThrow(
+      "[rag/retrieval] retrieval results must be an array."
     );
   });
 });

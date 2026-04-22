@@ -51,7 +51,7 @@ Expected status:
    - Cover the full flow with integration tests
    - Packages: `packages/etl`, `packages/rag`
 
-5. [ ] Document Dev Mode retrieval output shape.
+5. [x] Document Dev Mode retrieval output shape.
    - Include retrieved chunk IDs, relevance scores, document origin, and offsets
    - Keep this as a data contract before building UI
    - Packages: `packages/rag`, future `apps/web`
