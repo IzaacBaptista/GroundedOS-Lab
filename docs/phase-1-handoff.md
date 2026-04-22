@@ -24,6 +24,7 @@ npm run ingest:smoke
 npm run rag:smoke
 npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
 npm run api:dev
+npm run web:dev
 ```
 
 Expected status:
@@ -34,6 +35,7 @@ Expected status:
 - RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
 - RAG ask returns the same retrieval output shape for a direct local file path.
 - The local API exposes `GET /health` and `POST /rag/ask` for inline JSON text and multipart text/PDF upload.
+- The local web surface serves `http://localhost:3000` and proxies `/api/*` to the API.
 
 See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and limits.
 
@@ -61,8 +63,8 @@ See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and
 
 5. [x] Document Dev Mode retrieval output shape.
    - Include retrieved chunk IDs, relevance scores, document origin, and offsets
-   - Keep this as a data contract before building UI
-   - Packages: `packages/rag`, future `apps/web`
+   - Keep this as the API/UI retrieval inspection contract
+   - Packages: `packages/rag`, `apps/web`
 
 ## Explicit non-goals for the first Phase 1 slice
 

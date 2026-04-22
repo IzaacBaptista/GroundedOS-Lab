@@ -1,14 +1,38 @@
 # web
 
-Frontend application for GroundedOS Lab. Provides the user interface for AI Assistant, Dev Mode and Lab Mode.
+Frontend application for GroundedOS Lab. Provides the local interface for
+grounded retrieval workflows.
 
 ## Responsibilities
 
-- Render the chat interface and conversation history
-- Display grounding sources and retrieved chunks
-- Expose Dev Mode panels (token usage, latency, model routing)
-- Expose Lab Mode tools (prompt A/B testing, jailbreak playground, embedding visualization)
+- Accept inline text or local text/PDF file input
+- Submit questions to the local API RAG endpoint
+- Display grounded answers, citations and retrieved chunks
+- Expose the raw Dev Mode JSON returned by the API
 
 ## Status
 
-Planned
+In Progress - Phase 1 local RAG upload surface is implemented.
+
+## Local usage
+
+Start the API server from the repository root:
+
+```bash
+npm run api:dev
+```
+
+In another terminal, start the web server:
+
+```bash
+npm run web:dev
+```
+
+The web server listens on `PORT` or `3000` by default and proxies `/api/*` to
+`API_BASE_URL` or `http://localhost:3001`.
+
+## Current limits
+
+- Local-development server only; no production build pipeline yet.
+- No authentication, saved history or persisted indexes.
+- Answers remain extractive and deterministic, matching the Phase 1 API.

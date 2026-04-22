@@ -1,7 +1,7 @@
 # Phase 1 Local RAG Usage
 
 Phase 1 now has a local, executable RAG foundation. It runs without external
-model APIs, production vector databases or web UI.
+model APIs or production vector databases.
 
 ## Commands
 
@@ -63,10 +63,11 @@ The output includes:
 - The vector store is in memory only.
 - The API is local-development only; it has no auth, persistence or
   observability yet.
-- There is no web UI yet.
+- The web surface is local-development only; it has no saved history,
+  production build pipeline or persisted indexes yet.
 - There is no reranking, token accounting, latency tracing or model routing yet.
 
-## Next Step
+## Local API And Web
 
 The local package and CLI layer are wrapped by the first API surface:
 
@@ -76,6 +77,14 @@ npm run api:dev
 
 It exposes `GET /health` and `POST /rag/ask` for inline JSON text plus
 multipart text/PDF uploads.
+
+Start the web surface in another terminal:
+
+```bash
+npm run web:dev
+```
+
+It serves `http://localhost:3000` and proxies `/api/*` to the local API.
 
 Example multipart upload:
 
@@ -87,5 +96,5 @@ curl -X POST http://localhost:3001/rag/ask \
   -F topK=1
 ```
 
-The next implementation target is a web upload surface or stricter API
-contract hardening.
+The next implementation target is stricter API contract hardening or persisted
+local document indexes.

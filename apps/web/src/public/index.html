@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GroundedOS Local RAG</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Phase 1</p>
+          <h1>Local RAG Console</h1>
+        </div>
+        <div class="topbar__meta">
+          <span id="apiHealth" class="health health--checking">API checking</span>
+          <span class="tag">Local retrieval</span>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="Local RAG workspace">
+        <form id="ragForm" class="panel input-panel">
+          <div class="panel__header">
+            <h2>Source</h2>
+            <button class="secondary-button" type="button" id="clearButton">Clear</button>
+          </div>
+
+          <div class="segmented" aria-label="Source mode">
+            <label>
+              <input type="radio" name="sourceMode" value="file" checked>
+              <span>File</span>
+            </label>
+            <label>
+              <input type="radio" name="sourceMode" value="text">
+              <span>Text</span>
+            </label>
+          </div>
+
+          <div class="mode-panel" data-mode-panel="file">
+            <label class="field">
+              <span>File</span>
+              <input id="fileInput" type="file" accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf">
+            </label>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>Type</span>
+                <select id="fileType">
+                  <option value="text">Text</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Title</span>
+                <input id="fileTitle" type="text" autocomplete="off" placeholder="Optional">
+              </label>
+            </div>
+          </div>
+
+          <div class="mode-panel" data-mode-panel="text" hidden>
+            <label class="field">
+              <span>Text</span>
+              <textarea id="textContent" rows="11" placeholder="Document content"></textarea>
+            </label>
+
+            <label class="field">
+              <span>Title</span>
+              <input id="textTitle" type="text" autocomplete="off" placeholder="Inline text">
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Question</span>
+            <textarea id="queryInput" rows="4" required placeholder="Question"></textarea>
+          </label>
+
+          <div class="run-row">
+            <label class="field field--compact">
+              <span>Top K</span>
+              <input id="topKInput" type="number" min="1" max="10" step="1" value="3">
+            </label>
+            <button id="submitButton" class="primary-button" type="submit">Ask</button>
+          </div>
+
+          <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+
+        <section class="panel output-panel" aria-label="RAG output">
+          <div class="panel__header">
+            <h2>Answer</h2>
+            <span id="resultMeta" class="tag">No result</span>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <div class="empty-state__mark" aria-hidden="true"></div>
+            <p>No result yet.</p>
+          </div>
+
+          <div id="resultView" class="result-view" hidden>
+            <section class="answer-block">
+              <p id="answerText"></p>
+            </section>
+
+            <section class="output-section">
+              <div class="section-title">
+                <h3>Citations</h3>
+                <span id="citationCount" class="count">0</span>
+              </div>
+              <div id="citationsList" class="result-list"></div>
+            </section>
+
+            <section class="output-section">
+              <div class="section-title">
+                <h3>Retrieved Chunks</h3>
+                <span id="chunkCount" class="count">0</span>
+              </div>
+              <div id="chunksList" class="result-list"></div>
+            </section>
+
+            <details class="dev-mode">
+              <summary>Dev Mode JSON</summary>
+              <pre id="devModeJson"></pre>
+            </details>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
