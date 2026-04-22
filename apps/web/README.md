@@ -6,13 +6,14 @@ grounded retrieval workflows.
 ## Responsibilities
 
 - Accept inline text or local text/PDF file input
-- Submit questions to the local API RAG endpoint
+- Index documents through the local API and ask against the active persisted index
 - Display grounded answers, citations and retrieved chunks
 - Expose the raw Dev Mode JSON returned by the API
 
 ## Status
 
-In Progress - Phase 1 local RAG upload surface is implemented.
+In Progress - Phase 1 local RAG upload and persisted-index surface is
+implemented.
 
 ## Local usage
 
@@ -34,5 +35,7 @@ The web server listens on `PORT` or `3000` by default and proxies `/api/*` to
 ## Current limits
 
 - Local-development server only; no production build pipeline yet.
-- No authentication, saved history or persisted indexes.
+- No authentication or saved question history.
+- Persisted indexes are local JSON files managed by the API under
+  `.groundedos/indexes/`.
 - Answers remain extractive and deterministic, matching the Phase 1 API.

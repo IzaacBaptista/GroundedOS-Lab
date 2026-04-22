@@ -506,10 +506,11 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 ### Current focus
 
 - Phase 1 local RAG foundation is executable through `npm run rag:smoke` and `npm run rag:ask`
-- A minimal local API is available through `npm run api:dev` with `POST /rag/ask`
-  for inline JSON text and multipart text/PDF uploads
+- A local API is available through `npm run api:dev` with `POST /rag/index`
+  and `POST /rag/ask` for inline JSON text, multipart text/PDF uploads and
+  persisted local indexes
 - A first local web surface is available through `npm run web:dev`
-- Next focus: harden the API contract or persist local document indexes
+- Next focus: harden the API contract or introduce semantic embedding providers
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in
@@ -539,8 +540,9 @@ Run the local API:
 npm run api:dev
 ```
 
-The first API slice exposes `GET /health` and `POST /rag/ask` for inline JSON
-text plus multipart text/PDF uploads.
+The first API slice exposes `GET /health`, `POST /rag/index`, and
+`POST /rag/ask` for inline JSON text, multipart text/PDF uploads and persisted
+local indexes under `.groundedos/indexes/`.
 
 Run the local web surface in another terminal:
 
@@ -549,7 +551,8 @@ npm run web:dev
 ```
 
 The web server listens on `http://localhost:3000` and proxies requests to the
-local API.
+local API. Use `Index` to persist the current source, then `Ask` to query that
+saved local index by `documentId`.
 
 ---
 

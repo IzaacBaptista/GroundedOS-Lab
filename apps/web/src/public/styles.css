@@ -50,10 +50,10 @@ button:disabled {
 }
 
 .shell {
-  width: min(1440px, 100%);
+  width: min(1280px, 100%);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 28px;
 }
 
 .topbar {
@@ -61,7 +61,7 @@ button:disabled {
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 10px 0 22px;
+  padding: 8px 0 18px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -83,7 +83,7 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 4vw, 3.8rem);
+  font-size: clamp(2rem, 3.2vw, 3.2rem);
   line-height: 0.95;
   letter-spacing: 0;
 }
@@ -138,9 +138,10 @@ h3 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(340px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
   gap: 18px;
-  padding-top: 22px;
+  align-items: start;
+  padding-top: 18px;
 }
 
 .panel {
@@ -148,12 +149,12 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: 0 14px 28px rgba(43, 38, 30, 0.08);
 }
 
 .input-panel,
 .output-panel {
-  padding: 18px;
+  padding: 16px;
 }
 
 .panel__header,
@@ -211,7 +212,7 @@ h3 {
 .field {
   display: grid;
   gap: 7px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 700;
@@ -308,23 +309,42 @@ textarea:focus {
   color: var(--danger);
 }
 
+.action-buttons {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.index-status {
+  min-height: 20px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.index-status--active {
+  color: var(--accent-strong);
+}
+
 .output-panel {
-  min-height: 680px;
+  min-height: clamp(460px, calc(100vh - 235px), 620px);
 }
 
 .empty-state {
   display: grid;
-  min-height: 520px;
+  min-height: 350px;
   place-items: center;
   align-content: center;
-  gap: 18px;
+  gap: 14px;
   color: var(--muted);
   text-align: center;
 }
 
 .empty-state__mark {
-  width: min(260px, 72vw);
-  height: 150px;
+  width: min(220px, 72vw);
+  height: 126px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background:
@@ -333,10 +353,10 @@ textarea:focus {
     linear-gradient(90deg, rgba(44, 71, 94, 0.18) 0 64%, transparent 64% 100%),
     linear-gradient(90deg, rgba(21, 109, 97, 0.22) 0 84%, transparent 84% 100%),
     var(--panel-strong);
-  background-position: 24px 28px, 24px 60px, 24px 92px, 24px 124px, 0 0;
+  background-position: 22px 24px, 22px 50px, 22px 76px, 22px 102px, 0 0;
   background-repeat: no-repeat;
-  background-size: calc(100% - 48px) 12px, calc(100% - 48px) 12px,
-    calc(100% - 48px) 12px, calc(100% - 48px) 12px, 100% 100%;
+  background-size: calc(100% - 44px) 10px, calc(100% - 44px) 10px,
+    calc(100% - 44px) 10px, calc(100% - 44px) 10px, 100% 100%;
 }
 
 .answer-block {
@@ -451,7 +471,11 @@ pre {
   }
 
   .output-panel {
-    min-height: 520px;
+    min-height: 440px;
+  }
+
+  .empty-state {
+    min-height: 300px;
   }
 }
 
@@ -466,7 +490,14 @@ pre {
   }
 
   .field--compact,
-  .primary-button {
+  .action-buttons,
+  .primary-button,
+  .secondary-button {
     width: 100%;
+  }
+
+  .action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }

@@ -13,6 +13,8 @@ const elements = {
   fileType: document.getElementById("fileType"),
   form: document.getElementById("ragForm"),
   formMessage: document.getElementById("formMessage"),
+  indexButton: document.getElementById("indexButton"),
+  indexStatus: document.getElementById("indexStatus"),
   modeInputs: Array.from(document.querySelectorAll("input[name='sourceMode']")),
   modePanels: Array.from(document.querySelectorAll("[data-mode-panel]")),
   queryInput: document.getElementById("queryInput"),
@@ -24,15 +26,29 @@ const elements = {
   topKInput: document.getElementById("topKInput"),
 };
 
+let activeIndex = undefined;
+
 elements.form.addEventListener("submit", handleSubmit);
 elements.clearButton.addEventListener("click", clearForm);
-elements.fileInput.addEventListener("change", syncFileFields);
+elements.indexButton.addEventListener("click", handleIndex);
+elements.fileInput.addEventListener("change", () => {
+  syncFileFields();
+  clearActiveIndex();
+});
+elements.fileType.addEventListener("change", clearActiveIndex);
+elements.fileTitle.addEventListener("input", clearActiveIndex);
+elements.textContent.addEventListener("input", clearActiveIndex);
+elements.textTitle.addEventListener("input", clearActiveIndex);
 
 for (const input of elements.modeInputs) {
-  input.addEventListener("change", syncMode);
+  input.addEventListener("change", () => {
+    syncMode();
+    clearActiveIndex();
+  });
 }
 
 syncMode();
+renderIndexStatus();
 checkApiHealth();
 
 async function checkApiHealth() {
@@ -72,22 +88,59 @@ async function handleSubmit(event) {
   }
 
   elements.submitButton.disabled = true;
+  elements.indexButton.disabled = true;
   elements.submitButton.textContent = "Asking";
 
   try {
-    const output = mode === "file"
-      ? await askWithFile(query, topK)
-      : await askWithText(query, topK);
+    const output = activeIndex
+      ? await askWithPersistedIndex(query, topK)
+      : mode === "file"
+        ? await askWithFile(query, topK)
+        : await askWithText(query, topK);
 
     renderResult(output);
-    setMessage("Done.");
+    setMessage(activeIndex ? "Answered from persisted index." : "Done.");
     await checkApiHealth();
   } catch (error) {
     setMessage(error instanceof Error ? error.message : "Request failed.", true);
     await checkApiHealth();
   } finally {
     elements.submitButton.disabled = false;
+    elements.indexButton.disabled = false;
     elements.submitButton.textContent = "Ask";
+  }
+}
+
+async function handleIndex() {
+  setMessage("");
+
+  const mode = getSourceMode();
+  elements.indexButton.disabled = true;
+  elements.submitButton.disabled = true;
+  elements.indexButton.textContent = "Indexing";
+
+  try {
+    const output = mode === "file"
+      ? await indexFile()
+      : await indexText();
+
+    activeIndex = {
+      documentId: output.document.documentId,
+      title: output.document.title,
+      chunkCount: output.index.chunkCount,
+      indexPath: output.storage.indexPath,
+    };
+    renderIndexStatus();
+    setMessage(`Indexed ${output.index.chunkCount} chunks.`);
+    await checkApiHealth();
+  } catch (error) {
+    clearActiveIndex();
+    setMessage(error instanceof Error ? error.message : "Indexing failed.", true);
+    await checkApiHealth();
+  } finally {
+    elements.indexButton.disabled = false;
+    elements.submitButton.disabled = false;
+    elements.indexButton.textContent = "Index";
   }
 }
 
@@ -110,7 +163,7 @@ async function askWithFile(query, topK) {
     form.append("title", title);
   }
 
-  return await postRagRequest({
+  return await postRagRequest("/api/rag/ask", {
     body: form,
   });
 }
@@ -123,7 +176,7 @@ async function askWithText(query, topK) {
     throw new Error("Text is required.");
   }
 
-  return await postRagRequest({
+  return await postRagRequest("/api/rag/ask", {
     headers: {
       "content-type": "application/json",
     },
@@ -137,8 +190,63 @@ async function askWithText(query, topK) {
   });
 }
 
-async function postRagRequest(init) {
-  const response = await fetch("/api/rag/ask", {
+async function askWithPersistedIndex(query, topK) {
+  return await postRagRequest("/api/rag/ask", {
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      documentId: activeIndex.documentId,
+      query,
+      topK,
+    }),
+  });
+}
+
+async function indexFile() {
+  const file = elements.fileInput.files && elements.fileInput.files[0];
+
+  if (!file) {
+    throw new Error("File is required.");
+  }
+
+  const form = new FormData();
+  const title = elements.fileTitle.value.trim();
+
+  form.append("file", file);
+  form.append("type", elements.fileType.value);
+
+  if (title) {
+    form.append("title", title);
+  }
+
+  return await postRagRequest("/api/rag/index", {
+    body: form,
+  });
+}
+
+async function indexText() {
+  const content = elements.textContent.value.trim();
+  const title = elements.textTitle.value.trim();
+
+  if (!content) {
+    throw new Error("Text is required.");
+  }
+
+  return await postRagRequest("/api/rag/index", {
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      type: "text",
+      content,
+      title: title || undefined,
+    }),
+  });
+}
+
+async function postRagRequest(path, init) {
+  const response = await fetch(path, {
     method: "POST",
     ...init,
   });
@@ -283,8 +391,26 @@ function clearForm() {
   elements.emptyState.hidden = false;
   elements.resultView.hidden = true;
   elements.resultMeta.textContent = "No result";
+  clearActiveIndex();
   setMessage("");
   syncMode();
+}
+
+function clearActiveIndex() {
+  activeIndex = undefined;
+  renderIndexStatus();
+}
+
+function renderIndexStatus() {
+  if (!activeIndex) {
+    elements.indexStatus.textContent = "No indexed document.";
+    elements.indexStatus.classList.remove("index-status--active");
+    return;
+  }
+
+  elements.indexStatus.textContent =
+    `Indexed: ${activeIndex.title} | ${activeIndex.chunkCount} chunks | ${activeIndex.documentId}`;
+  elements.indexStatus.classList.add("index-status--active");
 }
 
 function setHealth(status, label) {

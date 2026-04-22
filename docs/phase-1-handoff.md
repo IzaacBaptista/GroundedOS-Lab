@@ -34,8 +34,8 @@ Expected status:
 - Smoke ingestion returns `documentId: "smoke-text-001"` and two text sections.
 - RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
 - RAG ask returns the same retrieval output shape for a direct local file path.
-- The local API exposes `GET /health` and `POST /rag/ask` for inline JSON text and multipart text/PDF upload.
-- The local web surface serves `http://localhost:3000` and proxies `/api/*` to the API.
+- The local API exposes `GET /health`, `POST /rag/index`, and `POST /rag/ask` for inline JSON text, multipart text/PDF upload, and persisted local indexes.
+- The local web surface serves `http://localhost:3000`, proxies `/api/*` to the API, and supports `Index` then `Ask` against the active persisted document.
 
 See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and limits.
 
@@ -65,6 +65,11 @@ See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and
    - Include retrieved chunk IDs, relevance scores, document origin, and offsets
    - Keep this as the API/UI retrieval inspection contract
    - Packages: `packages/rag`, `apps/web`
+
+6. [x] Add local persisted RAG indexes.
+   - Persist embedded chunks as local JSON under `.groundedos/indexes/`
+   - Support `POST /rag/index` and `POST /rag/ask` by `documentId`
+   - Packages: `apps/api`, `apps/web`
 
 ## Explicit non-goals for the first Phase 1 slice
 

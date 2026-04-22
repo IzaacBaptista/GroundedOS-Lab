@@ -81,9 +81,13 @@
               <span>Top K</span>
               <input id="topKInput" type="number" min="1" max="10" step="1" value="3">
             </label>
-            <button id="submitButton" class="primary-button" type="submit">Ask</button>
+            <div class="action-buttons">
+              <button id="indexButton" class="secondary-button" type="button">Index</button>
+              <button id="submitButton" class="primary-button" type="submit">Ask</button>
+            </div>
           </div>
 
+          <p id="indexStatus" class="index-status">No indexed document.</p>
           <p id="formMessage" class="form-message" role="status" aria-live="polite"></p>
         </form>
 
