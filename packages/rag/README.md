@@ -12,13 +12,15 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-In Progress - Phase 1 chunking, deterministic local embeddings and in-memory vector storage implemented. Retrieval flow, re-ranking and context assembly remain planned.
+In Progress - Phase 1 chunking, deterministic local embeddings, in-memory vector storage and first retrieval flow implemented. Re-ranking and context assembly remain planned.
 
 ## Current implementation
 
 The first Phase 1 slices expose deterministic character-based chunking through
 `chunkDocument()`, a local deterministic embedding provider through
-`embedChunks()`, and local similarity search through `InMemoryVectorStore`.
+`embedChunks()`, local similarity search through `InMemoryVectorStore`, and
+end-to-end local retrieval through `buildRetrievalIndex()` and
+`retrieveFromIndex()`.
 
 ```ts
 import { chunkDocument } from "@groundedos/rag";
@@ -77,6 +79,17 @@ const results = store.search({
 });
 ```
 
+For the first local retrieval flow:
+
+```ts
+import { buildRetrievalIndex, retrieveFromIndex } from "@groundedos/rag";
+
+const index = await buildRetrievalIndex(normalizedDocument);
+const results = await retrieveFromIndex(index, "what does this document say?", {
+  topK: 3,
+});
+```
+
 ## Public API
 
 | Export | Purpose |
@@ -90,3 +103,6 @@ const results = store.search({
 | `EmbeddedChunk` | Retrieval chunk plus embedding vector and embedding metadata |
 | `InMemoryVectorStore` | Local vector store with insert, similarity search and metadata filtering |
 | `VectorSearchResult` | Search result containing an embedded chunk and cosine similarity score |
+| `buildRetrievalIndex(document, options?)` | Chunk, embed and insert a normalized document into a local retrieval index |
+| `retrieveFromIndex(index, query, options?)` | Embed a query and retrieve ranked chunks from an index |
+| `RetrievalIndex` | Local retrieval index with provider, store and embedded chunks |

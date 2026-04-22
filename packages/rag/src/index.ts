@@ -29,3 +29,12 @@ export {
   type VectorSearchResult,
   type VectorStore,
 } from "./vector-store";
+
+export {
+  buildRetrievalIndex,
+  retrieveFromIndex,
+  type BuildRetrievalIndexOptions,
+  type RetrievalIndex,
+  type RetrievalResult,
+  type RetrieveFromIndexOptions,
+} from "./retrieval";

@@ -46,7 +46,7 @@ Expected status:
    - Avoid external database requirements for the first RAG test
    - Package: `packages/rag`
 
-4. [ ] Build the first retrieval flow.
+4. [x] Build the first retrieval flow.
    - Ingest document → chunk sections → embed chunks → retrieve candidates
    - Cover the full flow with integration tests
    - Packages: `packages/etl`, `packages/rag`
