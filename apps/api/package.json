@@ -1,0 +1,13 @@
+{
+  "name": "@groundedos/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/server.ts",
+  "types": "./src/server.ts",
+  "dependencies": {
+    "@groundedos/core": "0.1.0",
+    "@groundedos/etl": "0.1.0",
+    "@groundedos/rag": "0.1.0"
+  }
+}

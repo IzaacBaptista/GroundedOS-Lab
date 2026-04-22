@@ -67,5 +67,12 @@ The output includes:
 ## Next Step
 
 The local package and CLI layer are ready to be wrapped by an API surface. The
-recommended next implementation target is a minimal `POST /rag/ask` endpoint
-that reuses the same pipeline and returns `answer` plus `devMode` JSON.
+first API surface is available with:
+
+```bash
+npm run api:dev
+```
+
+It exposes `GET /health` and JSON-only `POST /rag/ask` for inline text content.
+The next implementation target is multipart upload support for local files and
+PDFs.
