@@ -13,6 +13,7 @@
     "skipLibCheck": true
   },
   "include": [
+    "apps/**/*.ts",
     "packages/**/*.ts",
     "scripts/**/*.ts",
     "vitest.config.ts"

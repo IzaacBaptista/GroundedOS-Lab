@@ -5,9 +5,11 @@
   "description": "Local-first open-source lab for building, studying, and evaluating grounded AI systems.",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
+    "api:dev": "tsx apps/api/src/server.ts",
     "build": "npm run typecheck",
     "ingest:smoke": "tsx scripts/ingest-smoke.ts",
     "rag:ask": "tsx scripts/rag-ask.ts",
