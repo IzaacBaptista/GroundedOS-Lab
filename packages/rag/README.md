@@ -115,6 +115,8 @@ const devOutput = await retrieveForDevMode(index, "what does this document say?"
 
 The output contract is documented in
 [`docs/phase-1-dev-mode-output.md`](../../docs/phase-1-dev-mode-output.md).
+The local CLI usage guide is documented in
+[`docs/phase-1-local-rag.md`](../../docs/phase-1-local-rag.md).
 
 ## Public API
 

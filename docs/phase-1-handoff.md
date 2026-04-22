@@ -33,6 +33,8 @@ Expected status:
 - RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
 - RAG ask returns the same retrieval output shape for a direct local file path.
 
+See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and limits.
+
 ## Phase 1 implementation issues
 
 1. [x] Implement the RAG chunking contract.

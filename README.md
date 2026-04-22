@@ -509,6 +509,9 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 - Next focus: decide whether to build the API/web upload surface or continue backend-quality work such as reranking and retrieval observability
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
+The local RAG usage guide is documented in
+[`docs/phase-1-local-rag.md`](./docs/phase-1-local-rag.md).
+
 ### Local RAG commands
 
 Run a registered dataset through ETL, chunking, embeddings, in-memory vector
