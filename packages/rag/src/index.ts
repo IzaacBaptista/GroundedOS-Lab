@@ -21,3 +21,11 @@ export {
   type EmbeddingProvider,
   type EmbeddingVector,
 } from "./embeddings";
+
+export {
+  InMemoryVectorStore,
+  type VectorMetadataFilter,
+  type VectorSearchQuery,
+  type VectorSearchResult,
+  type VectorStore,
+} from "./vector-store";

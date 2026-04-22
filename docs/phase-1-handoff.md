@@ -41,7 +41,7 @@ Expected status:
    - Keep outputs deterministic in tests
    - Package: `packages/rag`
 
-3. [ ] Add an in-memory vector store for local development.
+3. [x] Add an in-memory vector store for local development.
    - Support insert, similarity search, and metadata filtering
    - Avoid external database requirements for the first RAG test
    - Package: `packages/rag`

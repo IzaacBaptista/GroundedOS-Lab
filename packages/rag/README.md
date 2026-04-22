@@ -12,13 +12,13 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-In Progress - Phase 1 chunking and deterministic local embeddings implemented. Vector storage, retrieval, re-ranking and context assembly remain planned.
+In Progress - Phase 1 chunking, deterministic local embeddings and in-memory vector storage implemented. Retrieval flow, re-ranking and context assembly remain planned.
 
 ## Current implementation
 
 The first Phase 1 slices expose deterministic character-based chunking through
-`chunkDocument()` and a local deterministic embedding provider through
-`embedChunks()`.
+`chunkDocument()`, a local deterministic embedding provider through
+`embedChunks()`, and local similarity search through `InMemoryVectorStore`.
 
 ```ts
 import { chunkDocument } from "@groundedos/rag";
@@ -59,6 +59,24 @@ const embeddedChunks = await embedChunks(
 );
 ```
 
+The in-memory vector store supports insert, cosine similarity search, `topK`
+limits and exact-match filtering over flat chunk metadata such as `documentId`,
+`sectionId`, `modality`, `page`, `sourceType`, `originalFilename` and
+`embeddingProvider`.
+
+```ts
+import { InMemoryVectorStore } from "@groundedos/rag";
+
+const store = new InMemoryVectorStore();
+store.insert(embeddedChunks);
+
+const results = store.search({
+  embedding: embeddedChunks[0].embedding,
+  topK: 3,
+  filter: { modality: "text" },
+});
+```
+
 ## Public API
 
 | Export | Purpose |
@@ -70,3 +88,5 @@ const embeddedChunks = await embedChunks(
 | `EmbeddingProvider` | Interface for local or remote embedding providers |
 | `DeterministicEmbeddingProvider` | Local deterministic provider for tests and development |
 | `EmbeddedChunk` | Retrieval chunk plus embedding vector and embedding metadata |
+| `InMemoryVectorStore` | Local vector store with insert, similarity search and metadata filtering |
+| `VectorSearchResult` | Search result containing an embedded chunk and cosine similarity score |
