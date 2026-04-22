@@ -11,4 +11,4 @@ This folder contains documentation for the GroundedOS Lab project. At present, i
 
 ## Status
 
-🟡 In Progress — see [concepts/](./concepts/README.md) for the concept index, [study-tracks/](./study-tracks/README.md) for guided learning routes, and [phase-1-handoff.md](./phase-1-handoff.md) for the current implementation handoff.
+🟡 In Progress — see [concepts/](./concepts/README.md) for the concept index, [study-tracks/](./study-tracks/README.md) for guided learning routes, [phase-1-handoff.md](./phase-1-handoff.md) for the current implementation handoff, and [phase-1-dev-mode-output.md](./phase-1-dev-mode-output.md) for the Dev Mode retrieval output contract.

@@ -441,8 +441,8 @@ groundedos-lab/
 
 **✅ Success Criteria:**
 - [ ] User can upload a document and ask a question grounded in its content
-- [ ] Retrieved chunks are visible in Dev Mode with relevance scores
-- [ ] `packages/rag` has integration tests covering the full retrieval flow
+- [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
+- [x] `packages/rag` has integration tests covering the full retrieval flow
 
 ### Phase 2 — Quality
 
@@ -504,7 +504,8 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 ### Current focus
 
-- Start Phase 1 with the RAG chunking contract
+- Phase 1 local RAG foundation is implemented through chunking, deterministic embeddings, in-memory vector search, retrieval flow and Dev Mode output contract
+- Next focus: decide whether to build the upload/chat app surface or continue backend-quality work such as reranking and retrieval observability
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 ---

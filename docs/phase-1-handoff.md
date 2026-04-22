@@ -31,27 +31,27 @@ Expected status:
 
 ## Phase 1 implementation issues
 
-1. Implement the RAG chunking contract.
+1. [x] Implement the RAG chunking contract.
    - Input: `NormalizedDocument.content.sections`
    - Output: stable retrieval chunks with `documentId`, `sectionId`, offsets, text, and metadata
    - Package: `packages/rag`
 
-2. Add embedding interfaces and a local stub provider.
+2. [x] Add embedding interfaces and a local stub provider.
    - Define an embedding model contract before wiring a real provider
    - Keep outputs deterministic in tests
    - Package: `packages/rag`
 
-3. Add an in-memory vector store for local development.
+3. [x] Add an in-memory vector store for local development.
    - Support insert, similarity search, and metadata filtering
    - Avoid external database requirements for the first RAG test
    - Package: `packages/rag`
 
-4. Build the first retrieval flow.
+4. [x] Build the first retrieval flow.
    - Ingest document → chunk sections → embed chunks → retrieve candidates
    - Cover the full flow with integration tests
    - Packages: `packages/etl`, `packages/rag`
 
-5. Document Dev Mode retrieval output shape.
+5. [x] Document Dev Mode retrieval output shape.
    - Include retrieved chunk IDs, relevance scores, document origin, and offsets
    - Keep this as a data contract before building UI
    - Packages: `packages/rag`, future `apps/web`
