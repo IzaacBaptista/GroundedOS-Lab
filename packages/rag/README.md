@@ -12,12 +12,13 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-In Progress - Phase 1 chunking implemented. Embeddings, vector storage, retrieval, re-ranking and context assembly remain planned.
+In Progress - Phase 1 chunking and deterministic local embeddings implemented. Vector storage, retrieval, re-ranking and context assembly remain planned.
 
 ## Current implementation
 
-The first Phase 1 slice exposes deterministic character-based chunking through
-`chunkDocument()`.
+The first Phase 1 slices expose deterministic character-based chunking through
+`chunkDocument()` and a local deterministic embedding provider through
+`embedChunks()`.
 
 ```ts
 import { chunkDocument } from "@groundedos/rag";
@@ -41,6 +42,23 @@ Defaults:
 
 Chunking is section-local: chunks do not cross `DocumentSection` boundaries.
 
+Embeddings are local and deterministic by default, intended for tests and the
+first retrieval pipeline wiring. They are not a semantic quality baseline.
+
+```ts
+import {
+  DeterministicEmbeddingProvider,
+  chunkDocument,
+  embedChunks,
+} from "@groundedos/rag";
+
+const chunks = chunkDocument(normalizedDocument);
+const embeddedChunks = await embedChunks(
+  chunks,
+  new DeterministicEmbeddingProvider({ dimensions: 16 })
+);
+```
+
 ## Public API
 
 | Export | Purpose |
@@ -48,3 +66,7 @@ Chunking is section-local: chunks do not cross `DocumentSection` boundaries.
 | `chunkDocument(document, options?)` | Convert normalized document sections into retrieval chunks |
 | `RetrievalChunk` | Stable chunk shape for retrieval and Dev Mode diagnostics |
 | `ChunkDocumentOptions` | Optional chunk size and overlap settings |
+| `embedChunks(chunks, provider)` | Attach embedding vectors to retrieval chunks |
+| `EmbeddingProvider` | Interface for local or remote embedding providers |
+| `DeterministicEmbeddingProvider` | Local deterministic provider for tests and development |
+| `EmbeddedChunk` | Retrieval chunk plus embedding vector and embedding metadata |

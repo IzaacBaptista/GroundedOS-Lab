@@ -12,3 +12,12 @@ export {
   type RetrievalChunk,
   type RetrievalChunkMetadata,
 } from "./chunking";
+
+export {
+  DeterministicEmbeddingProvider,
+  embedChunks,
+  type DeterministicEmbeddingProviderOptions,
+  type EmbeddedChunk,
+  type EmbeddingProvider,
+  type EmbeddingVector,
+} from "./embeddings";
