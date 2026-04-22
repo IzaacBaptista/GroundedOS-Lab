@@ -1,7 +1,7 @@
 # Phase 1 Local RAG Usage
 
 Phase 1 now has a local, executable RAG foundation. It runs without external
-model APIs, production vector databases, API servers or web UI.
+model APIs, production vector databases or web UI.
 
 ## Commands
 
@@ -61,18 +61,31 @@ The output includes:
 - Package tests use deterministic stub providers; they are not semantic quality
   baselines.
 - The vector store is in memory only.
-- There is no API upload endpoint or web UI yet.
+- The API is local-development only; it has no auth, persistence or
+  observability yet.
+- There is no web UI yet.
 - There is no reranking, token accounting, latency tracing or model routing yet.
 
 ## Next Step
 
-The local package and CLI layer are ready to be wrapped by an API surface. The
-first API surface is available with:
+The local package and CLI layer are wrapped by the first API surface:
 
 ```bash
 npm run api:dev
 ```
 
-It exposes `GET /health` and JSON-only `POST /rag/ask` for inline text content.
-The next implementation target is multipart upload support for local files and
-PDFs.
+It exposes `GET /health` and `POST /rag/ask` for inline JSON text plus
+multipart text/PDF uploads.
+
+Example multipart upload:
+
+```bash
+curl -X POST http://localhost:3001/rag/ask \
+  -F file=@datasets/samples/phase-0-smoke.txt \
+  -F type=text \
+  -F query="What does this command verify?" \
+  -F topK=1
+```
+
+The next implementation target is a web upload surface or stricter API
+contract hardening.
