@@ -1,7 +1,7 @@
 # Phase 1 Local RAG Usage
 
 Phase 1 now has a local, executable RAG foundation. It runs without external
-model APIs, production vector databases or web UI.
+model APIs or production vector databases.
 
 ## Commands
 
@@ -61,12 +61,14 @@ The output includes:
 - Package tests use deterministic stub providers; they are not semantic quality
   baselines.
 - The vector store is in memory only.
-- The API is local-development only; it has no auth, persistence or
-  observability yet.
-- There is no web UI yet.
+- The API is local-development only; it has no auth or observability yet.
+- The API can persist local JSON indexes under `.groundedos/indexes/`, but there
+  is no production vector database yet.
+- The web surface is local-development only; it has no saved question history or
+  production build pipeline yet.
 - There is no reranking, token accounting, latency tracing or model routing yet.
 
-## Next Step
+## Local API And Web
 
 The local package and CLI layer are wrapped by the first API surface:
 
@@ -74,8 +76,20 @@ The local package and CLI layer are wrapped by the first API surface:
 npm run api:dev
 ```
 
-It exposes `GET /health` and `POST /rag/ask` for inline JSON text plus
-multipart text/PDF uploads.
+It exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
+`GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
+multipart text/PDF uploads, persisted local indexes and basic index management.
+
+Start the web surface in another terminal:
+
+```bash
+npm run web:dev
+```
+
+It serves `http://localhost:3000` and proxies `/api/*` to the local API.
+Use `Index` to persist the current source, then `Ask` to query the saved local
+index. The indexed-document selector can refresh, select and delete local
+indexes.
 
 Example multipart upload:
 
@@ -87,5 +101,30 @@ curl -X POST http://localhost:3001/rag/ask \
   -F topK=1
 ```
 
-The next implementation target is a web upload surface or stricter API
-contract hardening.
+Example persisted index flow:
+
+```bash
+curl -X POST http://localhost:3001/rag/index \
+  -H 'content-type: application/json' \
+  -d '{
+    "type": "text",
+    "content": "GroundedOS Lab smoke test.\n\nThis command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
+    "title": "Smoke Test",
+    "documentId": "smoke-text-001"
+  }'
+
+curl -X POST http://localhost:3001/rag/ask \
+  -H 'content-type: application/json' \
+  -d '{
+    "documentId": "smoke-text-001",
+    "query": "What does this command verify?",
+    "topK": 1
+  }'
+
+curl http://localhost:3001/rag/indexes
+
+curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
+```
+
+The next implementation target is stricter API contract hardening or semantic
+embedding providers.

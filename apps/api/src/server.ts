@@ -11,6 +11,12 @@ import {
   ApiRequestError,
   askRag,
   askRagFromFile,
+  deletePersistedRagIndex,
+  indexRag,
+  indexRagFromFile,
+  listPersistedRagIndexes,
+  type RagIndexFileRequest,
+  type RagIndexRequest,
   type RagAskFileRequest,
   type RagAskRequest,
 } from "./rag-service";
@@ -18,7 +24,11 @@ import {
 const DEFAULT_PORT = 3001;
 const MAX_UPLOAD_BYTES = 5_000_000;
 
-export function createApiServer(): FastifyInstance {
+export type ApiServerOptions = {
+  indexDir?: string;
+};
+
+export function createApiServer(options: ApiServerOptions = {}): FastifyInstance {
   const app = Fastify({
     logger: false,
   });
@@ -43,9 +53,19 @@ export function createApiServer(): FastifyInstance {
     };
   });
 
+  app.get("/rag/indexes", async () => {
+    return await listPersistedRagIndexes(options.indexDir);
+  });
+
+  app.delete("/rag/indexes/:documentId", async (request) => {
+    const params = request.params as { documentId?: string };
+
+    return await deletePersistedRagIndex(params.documentId ?? "", options.indexDir);
+  });
+
   app.post("/rag/ask", async (request, _reply) => {
     if (request.isMultipart()) {
-      return await handleMultipartRagAsk(request);
+      return await handleMultipartRagAsk(request, options.indexDir);
     }
 
     const contentType = request.headers["content-type"];
@@ -57,13 +77,34 @@ export function createApiServer(): FastifyInstance {
       );
     }
 
-    return await askRag(request.body as RagAskRequest);
+    return await askRag(
+      withIndexDir(request.body, options.indexDir) as RagAskRequest
+    );
+  });
+
+  app.post("/rag/index", async (request, _reply) => {
+    if (request.isMultipart()) {
+      return await handleMultipartRagIndex(request, options.indexDir);
+    }
+
+    const contentType = request.headers["content-type"];
+
+    if (!contentType?.includes("application/json")) {
+      throw new ApiRequestError(
+        "Content-Type must be application/json or multipart/form-data.",
+        415
+      );
+    }
+
+    return await indexRag(
+      withIndexDir(request.body, options.indexDir) as RagIndexRequest
+    );
   });
 
   return app;
 }
 
-async function handleMultipartRagAsk(request: FastifyRequest) {
+async function handleMultipartRagAsk(request: FastifyRequest, indexDir: string | undefined) {
   const fields: Record<string, string> = {};
   let upload:
     | {
@@ -109,6 +150,58 @@ async function handleMultipartRagAsk(request: FastifyRequest) {
       title: fields.title,
       documentId: fields.documentId,
       metadata: parseMetadata(fields.metadata),
+      indexDir,
+    });
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function handleMultipartRagIndex(request: FastifyRequest, indexDir: string | undefined) {
+  const fields: Record<string, string> = {};
+  let upload:
+    | {
+        buffer: Buffer;
+        filename: string;
+      }
+    | undefined;
+
+  for await (const part of request.parts()) {
+    if (part.type === "file") {
+      if (upload) {
+        throw new ApiRequestError("Only one file upload is supported.");
+      }
+
+      upload = {
+        buffer: await part.toBuffer(),
+        filename: sanitizeFilename(part.filename || "upload.txt"),
+      };
+      continue;
+    }
+
+    if (part.type === "field") {
+      fields[part.fieldname] = String(part.value ?? "");
+    }
+  }
+
+  if (!upload) {
+    throw new ApiRequestError("file upload is required.");
+  }
+
+  const tempDir = await mkdtemp(join(tmpdir(), "groundedos-api-upload-"));
+  const tempFilePath = join(tempDir, upload.filename);
+
+  try {
+    await writeFile(tempFilePath, upload.buffer);
+
+    return await indexRagFromFile({
+      filePath: tempFilePath,
+      originalFilename: upload.filename,
+      type: fields.type as RagIndexFileRequest["type"],
+      title: fields.title,
+      documentId: fields.documentId,
+      metadata: parseMetadata(fields.metadata),
+      indexDir,
     });
   } finally {
     await rm(tempDir, { recursive: true, force: true });
@@ -172,6 +265,17 @@ function parseMetadata(value: string | undefined): Record<string, unknown> | und
 
     throw new ApiRequestError("metadata must be valid JSON.");
   }
+}
+
+function withIndexDir(body: unknown, indexDir: string | undefined): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return body;
+  }
+
+  return {
+    ...body,
+    indexDir,
+  };
 }
 
 function sanitizeFilename(filename: string): string {

@@ -12,8 +12,8 @@ the local AI pipeline.
 
 ## Status
 
-In Progress - minimal local RAG API is implemented for inline JSON text and
-multipart file upload.
+In Progress - local RAG API is implemented for inline JSON text, multipart file
+upload, persisted local document indexes, and basic index management.
 
 ## Local usage
 
@@ -34,7 +34,8 @@ Returns a basic service health response.
 #### `POST /rag/ask`
 
 Runs the local Phase 1 RAG pipeline against inline text content or an uploaded
-text/PDF file.
+text/PDF file. It can also ask against a previously persisted index by
+`documentId`.
 
 JSON inline text:
 
@@ -64,6 +65,18 @@ JSON request body:
 
 Response includes `document`, `answer`, `index`, and `devMode`.
 
+Persisted index ask:
+
+```bash
+curl -X POST http://localhost:3001/rag/ask \
+  -H 'content-type: application/json' \
+  -d '{
+    "documentId": "smoke-text-001",
+    "query": "What does this command verify?",
+    "topK": 1
+  }'
+```
+
 Multipart file upload:
 
 ```bash
@@ -86,9 +99,58 @@ Multipart fields:
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | JSON object string with additional metadata passed into ETL. |
 
+#### `POST /rag/index`
+
+Indexes inline text or a text/PDF upload and persists the embedded chunks under
+`.groundedos/indexes/`.
+
+JSON inline text:
+
+```bash
+curl -X POST http://localhost:3001/rag/index \
+  -H 'content-type: application/json' \
+  -d '{
+    "type": "text",
+    "content": "GroundedOS Lab smoke test.\n\nThis command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
+    "title": "Inline API Test",
+    "documentId": "smoke-text-001"
+  }'
+```
+
+Multipart file upload:
+
+```bash
+curl -X POST http://localhost:3001/rag/index \
+  -F file=@datasets/samples/phase-0-smoke.txt \
+  -F type=text \
+  -F documentId=smoke-text-001
+```
+
+Response includes `document`, `index`, and `storage.indexPath`.
+
+#### `GET /rag/indexes`
+
+Lists persisted local indexes.
+
+```bash
+curl http://localhost:3001/rag/indexes
+```
+
+Response includes `count` and `indexes`, where each item contains `createdAt`,
+`document`, `index`, and `storage`.
+
+#### `DELETE /rag/indexes/:documentId`
+
+Deletes one persisted local index.
+
+```bash
+curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
+```
+
 ## Current limits
 
 - Multipart uploads are limited to one file and 5 MB.
+- Persisted indexes are local JSON files under `.groundedos/indexes/`.
 - The answer is extractive and based on the top retrieved chunk.
 - Retrieval uses a deterministic local lexical embedding provider.
-- No auth, persistence, observability or production vector database yet.
+- No auth, observability or production vector database yet.

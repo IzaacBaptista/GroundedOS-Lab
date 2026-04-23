@@ -16,7 +16,8 @@
     "rag:smoke": "tsx scripts/rag-smoke.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "web:dev": "npm --workspace @groundedos/web run dev"
   },
   "engines": {
     "node": ">=20"
