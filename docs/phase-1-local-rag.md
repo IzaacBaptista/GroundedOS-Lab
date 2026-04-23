@@ -50,16 +50,23 @@ The output includes:
 - retrieved chunk IDs, scores, source metadata and offsets
 - Dev Mode retrieval output matching
   [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md)
-- index metadata such as chunk count, embedding provider and vector dimensions
+- index metadata such as chunk count, embedding provider, vector dimensions and
+  embedding model metadata when available
 
 ## Current Limits
 
 - The CLI answer is extractive: it quotes the top retrieved chunk instead of
   calling an LLM.
-- `rag:smoke` and `rag:ask` use a deterministic lexical provider for local
-  retrieval reproducibility.
-- Package tests use deterministic stub providers; they are not semantic quality
-  baselines.
+- `rag:smoke` and `rag:ask` use deterministic providers for local retrieval
+  reproducibility.
+- The API defaults to `api-lexical` and can opt into `local-hash` or `ollama`
+  for new inline/upload asks and persisted indexes.
+- `local-hash` is a deterministic token/ngram hashing provider, not a real
+  semantic embedding model quality baseline.
+- `ollama` is the first real local semantic provider. It requires a running
+  Ollama server and a local embedding model.
+- Full install and setup steps live in
+  [`ollama-setup.md`](./ollama-setup.md).
 - The vector store is in memory only.
 - The API is local-development only; it has no auth or observability yet.
 - The API can persist local JSON indexes under `.groundedos/indexes/`, but there
@@ -79,6 +86,22 @@ npm run api:dev
 It exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
 `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
 multipart text/PDF uploads, persisted local indexes and basic index management.
+Inline/upload requests accept
+`embeddingProvider: "api-lexical" | "local-hash" | "ollama"`.
+Persisted-index asks use the provider saved with that index.
+
+To try Ollama manually:
+
+```bash
+ollama pull embeddinggemma
+
+GROUNDEDOS_OLLAMA_EMBED_MODEL=embeddinggemma \
+GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS=768 \
+npm run api:dev
+```
+
+For a full install tutorial, including OS-specific setup and troubleshooting,
+see [`ollama-setup.md`](./ollama-setup.md).
 
 Start the web surface in another terminal:
 
@@ -110,7 +133,8 @@ curl -X POST http://localhost:3001/rag/index \
     "type": "text",
     "content": "GroundedOS Lab smoke test.\n\nThis command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
     "title": "Smoke Test",
-    "documentId": "smoke-text-001"
+    "documentId": "smoke-text-001",
+    "embeddingProvider": "local-hash"
   }'
 
 curl -X POST http://localhost:3001/rag/ask \
@@ -126,5 +150,6 @@ curl http://localhost:3001/rag/indexes
 curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 ```
 
-The next implementation target is stricter API contract hardening or semantic
-embedding providers.
+The next implementation target is either API contract hardening around provider
+config/errors or adding a second semantic provider such as OpenAI or Hugging
+Face for local-vs-cloud comparison.

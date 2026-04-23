@@ -8,13 +8,14 @@ grounded retrieval workflows.
 - Accept inline text or local text/PDF file input
 - Index documents through the local API and ask against the active persisted index
 - List, select, refresh and delete persisted local indexes
+- Select the local embedding provider for new inline/upload requests
 - Display grounded answers, citations and retrieved chunks
 - Expose the raw Dev Mode JSON returned by the API
 
 ## Status
 
 In Progress - Phase 1 local RAG upload and persisted-index surface is
-implemented.
+implemented, including provider selection for new indexes and ephemeral asks.
 
 ## Local usage
 
@@ -32,6 +33,8 @@ npm run web:dev
 
 The web server listens on `PORT` or `3000` by default and proxies `/api/*` to
 `API_BASE_URL` or `http://localhost:3001`.
+Reference environment values live in
+[`apps/web/.env.example`](./.env.example).
 
 ## Current limits
 
@@ -40,3 +43,5 @@ The web server listens on `PORT` or `3000` by default and proxies `/api/*` to
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Answers remain extractive and deterministic, matching the Phase 1 API.
+- The `ollama` provider requires a running local Ollama server and an embedding
+  model configured in the API environment.

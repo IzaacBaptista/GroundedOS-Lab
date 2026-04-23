@@ -38,6 +38,8 @@ type RetrievalDevModeResult = {
   embedding: {
     provider: string;
     dimensions: number;
+    model?: string;
+    normalized?: boolean;
   };
 };
 ```
@@ -67,8 +69,10 @@ type RetrievalDevModeResult = {
         "offsetBasis": "document"
       },
       "embedding": {
-        "provider": "deterministic-local",
-        "dimensions": 16
+        "provider": "local-hash",
+        "dimensions": 256,
+        "model": "local-hash-v1",
+        "normalized": true
       }
     }
   ]
@@ -85,6 +89,8 @@ type RetrievalDevModeResult = {
   offsets are absolute inside `NormalizedDocument.content.fullText`;
   `offsetBasis: "section"` means they are relative to the source section.
 - `embedding` identifies the provider and vector dimensions used for retrieval.
+  Newer providers may also include model name and whether vectors are
+  normalized.
 
 ## Non-goals
 

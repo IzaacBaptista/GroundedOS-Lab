@@ -8,6 +8,7 @@ const elements = {
   clearButton: document.getElementById("clearButton"),
   devModeJson: document.getElementById("devModeJson"),
   emptyState: document.getElementById("emptyState"),
+  embeddingProviderSelect: document.getElementById("embeddingProviderSelect"),
   fileInput: document.getElementById("fileInput"),
   fileTitle: document.getElementById("fileTitle"),
   fileType: document.getElementById("fileType"),
@@ -44,6 +45,7 @@ elements.fileInput.addEventListener("change", () => {
 });
 elements.fileType.addEventListener("change", clearActiveIndex);
 elements.fileTitle.addEventListener("input", clearActiveIndex);
+elements.embeddingProviderSelect.addEventListener("change", clearActiveIndex);
 elements.textContent.addEventListener("input", clearActiveIndex);
 elements.textTitle.addEventListener("input", clearActiveIndex);
 
@@ -136,6 +138,8 @@ async function handleIndex() {
       documentId: output.document.documentId,
       title: output.document.title,
       chunkCount: output.index.chunkCount,
+      embeddingProvider: output.index.embeddingProvider,
+      embeddingModel: output.index.embeddingModel,
       indexPath: output.storage.indexPath,
     };
     renderIndexStatus();
@@ -252,6 +256,7 @@ async function askWithFile(query, topK) {
   form.append("type", elements.fileType.value);
   form.append("query", query);
   form.append("topK", String(topK));
+  form.append("embeddingProvider", getEmbeddingProvider());
 
   if (title) {
     form.append("title", title);
@@ -279,6 +284,7 @@ async function askWithText(query, topK) {
       content,
       query,
       topK,
+      embeddingProvider: getEmbeddingProvider(),
       title: title || undefined,
     }),
   });
@@ -309,6 +315,7 @@ async function indexFile() {
 
   form.append("file", file);
   form.append("type", elements.fileType.value);
+  form.append("embeddingProvider", getEmbeddingProvider());
 
   if (title) {
     form.append("title", title);
@@ -334,6 +341,7 @@ async function indexText() {
     body: JSON.stringify({
       type: "text",
       content,
+      embeddingProvider: getEmbeddingProvider(),
       title: title || undefined,
     }),
   });
@@ -371,7 +379,7 @@ function renderResult(output) {
     output.answer && output.answer.text ? output.answer.text : "No answer returned.";
   elements.resultMeta.textContent = `${index.chunkCount ?? 0} chunks | ${
     index.embeddingProvider ?? "unknown provider"
-  }`;
+  }${index.embeddingModel && index.embeddingModel.model ? ` | ${index.embeddingModel.model}` : ""}`;
   elements.citationCount.textContent = String(citations.length);
   elements.chunkCount.textContent = String(results.length);
   elements.devModeJson.textContent = JSON.stringify(output, null, 2);
@@ -478,6 +486,10 @@ function getSourceMode() {
   return selected ? selected.value : "file";
 }
 
+function getEmbeddingProvider() {
+  return elements.embeddingProviderSelect.value || "api-lexical";
+}
+
 function clearForm() {
   elements.form.reset();
   elements.fileTitle.value = "";
@@ -507,7 +519,9 @@ function renderIndexStatus() {
   }
 
   elements.indexStatus.textContent =
-    `Indexed: ${activeIndex.title} | ${activeIndex.chunkCount} chunks | ${activeIndex.documentId}`;
+    `Indexed: ${activeIndex.title} | ${activeIndex.chunkCount} chunks | ${
+      activeIndex.embeddingProvider || "unknown provider"
+    } | ${activeIndex.documentId}`;
   elements.indexStatus.classList.add("index-status--active");
   elements.deleteIndexButton.disabled = false;
 }
@@ -536,7 +550,7 @@ function renderIndexSelect(selectedDocumentId) {
     const option = document.createElement("option");
     option.value = item.document.documentId;
     option.textContent =
-      `${item.document.title} | ${item.index.chunkCount} chunks`;
+      `${item.document.title} | ${item.index.chunkCount} chunks | ${item.index.embeddingProvider}`;
     elements.indexSelect.append(option);
   }
 
@@ -561,6 +575,8 @@ function setActiveIndexFromListItem(item) {
     documentId: item.document.documentId,
     title: item.document.title,
     chunkCount: item.index.chunkCount,
+    embeddingProvider: item.index.embeddingProvider,
+    embeddingModel: item.index.embeddingModel,
     indexPath: item.storage.indexPath,
   };
   elements.indexSelect.value = item.document.documentId;

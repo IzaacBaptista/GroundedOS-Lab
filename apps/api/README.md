@@ -13,7 +13,8 @@ the local AI pipeline.
 ## Status
 
 In Progress - local RAG API is implemented for inline JSON text, multipart file
-upload, persisted local document indexes, and basic index management.
+upload, persisted local document indexes, basic index management, and selectable
+local embedding providers, including an opt-in Ollama semantic provider.
 
 ## Local usage
 
@@ -24,6 +25,8 @@ npm run api:dev
 ```
 
 The server listens on `PORT` or `3001` by default.
+Reference environment values live in
+[`apps/api/.env.example`](./.env.example).
 
 ### Endpoints
 
@@ -62,6 +65,7 @@ JSON request body:
 | `title` | No | Optional document title for metadata and Dev Mode output. |
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | Additional object metadata passed into ETL. |
+| `embeddingProvider` | No | `"api-lexical"`, `"local-hash"` or `"ollama"`. Defaults to `"api-lexical"`. |
 
 Response includes `document`, `answer`, `index`, and `devMode`.
 
@@ -76,6 +80,9 @@ curl -X POST http://localhost:3001/rag/ask \
     "topK": 1
   }'
 ```
+
+When asking by `documentId`, the API uses the embedding provider saved with the
+persisted index and ignores any `embeddingProvider` in the request body.
 
 Multipart file upload:
 
@@ -98,6 +105,7 @@ Multipart fields:
 | `title` | No | Optional document title for metadata and Dev Mode output. |
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | JSON object string with additional metadata passed into ETL. |
+| `embeddingProvider` | No | `"api-lexical"`, `"local-hash"` or `"ollama"`. Defaults to `"api-lexical"`. |
 
 #### `POST /rag/index`
 
@@ -113,7 +121,8 @@ curl -X POST http://localhost:3001/rag/index \
     "type": "text",
     "content": "GroundedOS Lab smoke test.\n\nThis command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
     "title": "Inline API Test",
-    "documentId": "smoke-text-001"
+    "documentId": "smoke-text-001",
+    "embeddingProvider": "local-hash"
   }'
 ```
 
@@ -123,10 +132,36 @@ Multipart file upload:
 curl -X POST http://localhost:3001/rag/index \
   -F file=@datasets/samples/phase-0-smoke.txt \
   -F type=text \
-  -F documentId=smoke-text-001
+  -F documentId=smoke-text-001 \
+  -F embeddingProvider=local-hash
 ```
 
-Response includes `document`, `index`, and `storage.indexPath`.
+Response includes `document`, `index`, and `storage.indexPath`. `index`
+contains `embeddingProvider`, `embeddingDimensions`, and, for new indexes,
+`embeddingModel` with provider/model/dimension metadata.
+
+### Ollama embeddings
+
+`embeddingProvider: "ollama"` uses a local Ollama server and calls
+`POST /api/embed`. It is opt-in and requires Ollama plus an embedding model to
+be available locally:
+
+```bash
+ollama pull embeddinggemma
+```
+
+Optional environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `GROUNDEDOS_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `GROUNDEDOS_OLLAMA_EMBED_MODEL` | `embeddinggemma` | Embedding model name |
+| `GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS` | `768` | Expected vector dimensions saved with the index |
+| `GROUNDEDOS_OLLAMA_KEEP_ALIVE` | unset | Optional Ollama keep-alive value |
+| `GROUNDEDOS_OLLAMA_REQUEST_TIMEOUT_MS` | package default | Request timeout override |
+
+For a full install and verification tutorial, see
+[`docs/ollama-setup.md`](../../docs/ollama-setup.md).
 
 #### `GET /rag/indexes`
 
@@ -152,5 +187,9 @@ curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 - Multipart uploads are limited to one file and 5 MB.
 - Persisted indexes are local JSON files under `.groundedos/indexes/`.
 - The answer is extractive and based on the top retrieved chunk.
-- Retrieval uses a deterministic local lexical embedding provider.
+- Retrieval uses `"api-lexical"` by default. `"local-hash"` is available as an
+  opt-in deterministic token/ngram hashing provider.
+- `"ollama"` is available as an opt-in local semantic embedding provider, but it
+  requires a running Ollama server and a pulled embedding model.
+- OpenAI and Hugging Face providers are not wired yet.
 - No auth, observability or production vector database yet.

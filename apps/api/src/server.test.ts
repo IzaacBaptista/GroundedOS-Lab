@@ -103,17 +103,20 @@ describe("api server", () => {
           "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
         title: "Persisted HTTP Test",
         documentId: "persisted-http-test",
+        embeddingProvider: "local-hash",
       },
     });
     const indexBody = indexResponse.json() as {
       storage: { persisted: boolean; indexPath: string };
-      index: { chunkCount: number };
+      index: { chunkCount: number; embeddingProvider: string; embeddingModel?: { model: string } };
     };
 
     expect(indexResponse.statusCode).toBe(200);
     expect(indexBody.storage.persisted).toBe(true);
     expect(indexBody.storage.indexPath).toContain("groundedos-api-server-test-");
     expect(indexBody.index.chunkCount).toBe(2);
+    expect(indexBody.index.embeddingProvider).toBe("local-hash");
+    expect(indexBody.index.embeddingModel?.model).toBe("local-hash-v1");
 
     const askResponse = await app.inject({
       method: "POST",
@@ -126,11 +129,13 @@ describe("api server", () => {
     });
     const askBody = askResponse.json() as {
       answer: { grounded: boolean; text: string };
+      index: { embeddingProvider: string };
       storage?: { persisted: boolean };
       devMode: { results: Array<{ chunkId: string }> };
     };
 
     expect(askResponse.statusCode).toBe(200);
+    expect(askBody.index.embeddingProvider).toBe("local-hash");
     expect(askBody.storage?.persisted).toBe(true);
     expect(askBody.answer.grounded).toBe(true);
     expect(askBody.answer.text).toContain("Beta retrieval notes explain vector search.");

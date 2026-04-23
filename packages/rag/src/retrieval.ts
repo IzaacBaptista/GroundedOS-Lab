@@ -69,6 +69,8 @@ export interface RetrievalDevModeResult {
   embedding: {
     provider: string;
     dimensions: number;
+    model?: string;
+    normalized?: boolean;
   };
 }
 
@@ -163,6 +165,8 @@ export function createRetrievalDevOutput(
       embedding: {
         provider: result.chunk.embeddingMetadata.provider,
         dimensions: result.chunk.embeddingMetadata.dimensions,
+        model: result.chunk.embeddingMetadata.model,
+        normalized: result.chunk.embeddingMetadata.normalized,
       },
     })),
   };

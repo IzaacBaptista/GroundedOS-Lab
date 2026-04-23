@@ -15,11 +15,24 @@ export {
 
 export {
   DeterministicEmbeddingProvider,
+  LocalHashEmbeddingsProvider,
+  OllamaEmbeddingsProvider,
+  createEmbeddingProviderRegistry,
+  embeddingProviderToSemantic,
   embedChunks,
+  semanticToEmbeddingProvider,
   type DeterministicEmbeddingProviderOptions,
+  type EmbedTextInput,
+  type EmbedTextResult,
   type EmbeddedChunk,
+  type EmbeddingModelInfo,
   type EmbeddingProvider,
+  type EmbeddingProviderId,
+  type EmbeddingProviderRegistry,
   type EmbeddingVector,
+  type LocalHashEmbeddingsProviderOptions,
+  type OllamaEmbeddingsProviderOptions,
+  type SemanticEmbeddingsProvider,
 } from "./embeddings";
 
 export {
