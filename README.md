@@ -86,15 +86,13 @@ Planned / target integrations:
 ## 🏗️ Architecture
 
 ```text
+--------------------------------
+| Session / Request Manager    |  ← lifecycle owner for the entire request
+--------------------------------
+   ↓
 User Input
    ↓
 Prompt / Context Engineering
-   ↓
-Model Routing
-   ↓
---------------------------------
-| Semantic Cache (optional)     |
---------------------------------
    ↓
 (Adaptive RAG Decision)
    ↓
@@ -107,6 +105,12 @@ Model Routing
 | - Re-ranking                 |
 --------------------------------
    ↓
+--------------------------------
+| Semantic Cache (optional)    |  ← operates on (query + retrieved context)
+--------------------------------
+   ↓
+Model Routing                      ← context-informed: considers retrieved content,
+   ↓                                 context length, cost and reasoning requirements
 Multi-Agent Orchestration
    ↓
 Tool Calling Layer
@@ -126,6 +130,11 @@ Response + Data Lineage
 | → Memory Update              |
 --------------------------------
 ```
+
+> **Architecture notes**
+> - **Session / Request Manager** owns the full request lifecycle. It is the component that will manage state across multiple tool calls in agent flows.
+> - **RAG before Model Routing**: retrieved context (volume, domain, complexity) informs which model to use. Routing before retrieval loses this signal.
+> - **Semantic Cache after RAG**: the cache key is `(query, retrieved_context)`, not the raw query alone. Caching the raw query produces false hits when different retrievals produce the same query string but different contexts.
 
 ---
 
@@ -259,6 +268,9 @@ Use this repository as a structured learning path:
 * Want a guided learning path by topic?
   → Explore the [📘 Guided Study Tracks](./docs/study-tracks/README.md)
 
+* Want to understand *why* the system is built the way it is?
+  → Read the [Architecture Decision Records](./docs/adr/README.md)
+
 As the project evolves, this section will map each concept directly to code implementations.
 
 ---
@@ -314,6 +326,36 @@ Start here:
 * PII sanitization
 * Output validation
 * Grounding enforcement
+
+---
+
+## 🔒 Security
+
+### Authentication & Authorization
+
+The project currently runs without authentication (local-first, development only). Before any public deployment or multi-user access, the following must be in place:
+
+* **API authentication** — all API endpoints require a bearer token or session cookie. No anonymous access to indexes or agent state.
+* **Index ownership** — persisted indexes are scoped to a user or session identifier; one user cannot read or delete another user's indexes.
+* **Role boundaries** — Lab Mode features (Jailbreak Playground, prompt A/B tests) are restricted to authenticated users with explicit opt-in.
+
+This strategy is tracked as a Phase 6 success criterion. Implementation decisions will be recorded in [`docs/adr/`](./docs/adr/).
+
+### Jailbreak Playground security model
+
+The Jailbreak Playground (`experiments/jailbreak-defense/`) is a red-teaming surface that deliberately tests adversarial inputs. Before it is exposed beyond local development:
+
+* All playground inputs are logged with the authenticated user identifier — no anonymous red-teaming.
+* Playground outputs (successful jailbreaks, bypass patterns) are never exposed publicly; results are stored in `datasets/` with access controls.
+* External contributors must review the security policy in `experiments/jailbreak-defense/README.md` before submitting new attack patterns.
+
+### Multimodality (image & audio)
+
+Image and audio extractors are registered stubs. They will re-enter the roadmap when:
+
+1. A concrete use case is identified (e.g. PDF-with-images ingestion, audio transcription for meeting notes).
+2. The relevant privacy and content-moderation implications for user-uploaded media are documented.
+3. A Phase milestone explicitly includes multimodal success criteria.
 
 ---
 
@@ -395,6 +437,8 @@ groundedos-lab/
 
   docs/
     concepts/           ← One file per AI concept, linked to code
+    adr/                ← Architecture Decision Records (why the system is built this way)
+    study-tracks/       ← Guided learning routes by topic
   
   datasets/   ← Raw, processed and synthetic datasets registry
   infra/      ← Docker, Compose, K8s, environment configs
@@ -407,11 +451,11 @@ groundedos-lab/
 > ⚠️ The tech stack below describes the **intended target architecture**. Tooling configuration (package.json, turbo.json, etc.) will be added before Phase 0 coding begins.
 
 * Frontend: Next.js + TypeScript
-* Backend: Node.js (Fastify/Nest)
+* Backend: Node.js (**Fastify**) — chosen for its low-overhead, plugin-first model that fits an experimental platform where flexibility matters more than an opinionated full-stack framework. See [ADR-001](./docs/adr/ADR-001-backend-framework.md).
 * Workers: Python (ML pipelines)
 * Database: PostgreSQL
-* Vector DB: pgvector / Qdrant
-* Queue: Redis + BullMQ
+* Vector DB: **pgvector** for local development (no extra service required); migrate to **Qdrant** when vector search becomes a performance bottleneck or when approximate-nearest-neighbour index tuning is needed. See [ADR-002](./docs/adr/ADR-002-vector-database.md) for the full decision criteria.
+* Queue: Redis + BullMQ — the defined **API → Worker communication boundary**. The Node.js API publishes jobs to BullMQ queues; Python workers consume them via the `bullmq` Python client or a thin HTTP adapter. See [ADR-003](./docs/adr/ADR-003-api-worker-communication.md).
 * Observability: OpenTelemetry + Grafana
 * AI: Local (Ollama, planned) + OpenAI / Anthropic (optional, planned)
 
@@ -445,17 +489,29 @@ groundedos-lab/
 - [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
 - [x] `packages/rag` has integration tests covering the full retrieval flow
 
-### Phase 2 — Quality
+### Phase 2 — Retrieval Quality
 
-* Hybrid search
+* Hybrid search (dense + sparse)
 * Re-ranking
-* Memory
 * Observability
 
 **✅ Success Criteria:**
-- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline
-- [ ] Re-ranking is applied and token usage / latency per stage is logged
-- [ ] Conversation memory persists across sessions
+- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline on the Phase 0 smoke dataset (measure: top-3 recall)
+- [ ] Re-ranking is applied and token usage / latency per stage is logged per request
+- [ ] Retrieval observability spans (chunk count, scores, latency) appear in the Dev Mode output
+
+> **Note:** Persistent memory between sessions is a separate product and infrastructure concern (storage, user identity, privacy) and is tracked in Phase 3, not here. Mixing it with retrieval quality improvements would cause one to delay the other.
+
+### Phase 2b — Persistent Memory
+
+* Conversation memory across sessions
+* Storage backend for memory entries
+* Memory read/write contracts
+
+**✅ Success Criteria:**
+- [ ] Conversation memory persists and is retrievable across independent API restarts using a documented storage contract
+- [ ] Memory entries are associated with a session identifier; no cross-session leakage
+- [ ] Memory scope, retention policy and privacy implications are documented in [`packages/memory/README.md`](./packages/memory/README.md)
 
 ### Phase 3 — Intelligence
 
@@ -466,9 +522,9 @@ groundedos-lab/
 * Self-reflection / validation layer
 
 **✅ Success Criteria:**
-- [ ] At least one end-to-end agent flow is runnable (tool call → LLM → response)
-- [ ] Guardrails block at least prompt injection and PII leakage
-- [ ] Evals report automated scores (faithfulness, relevance) for a baseline dataset
+- [ ] At least one end-to-end agent flow is runnable: a `document-qa` agent that retrieves from a persisted index, calls a summarization tool, and returns a grounded answer with source attribution
+- [ ] Guardrails block prompt injection (tested against ≥ 5 injection patterns) and strip PII before logging
+- [ ] Evals report automated faithfulness and answer-relevance scores for the Phase 0 smoke dataset using a documented scoring rubric
 
 ### Phase 4 — Lab
 
@@ -478,9 +534,9 @@ groundedos-lab/
 * Model routing
 
 **✅ Success Criteria:**
-- [ ] A/B prompt test runs automatically and reports winner with statistical summary
-- [ ] Benchmark compares at least two models (local + cloud) on latency, cost and quality
-- [ ] Embedding visualization renders in the web app
+- [ ] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval)
+- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline
+- [ ] Embedding visualization renders in the web app with cluster labels for at least one indexed dataset
 
 ### Phase 5 — Advanced ML
 
@@ -490,9 +546,22 @@ groundedos-lab/
 * Distillation
 
 **✅ Success Criteria:**
-- [ ] Each `experiments/` folder contains a reproducible notebook or script
-- [ ] Benchmark scores compare base model vs tuned variant
-- [ ] Results are logged and stored in `datasets/`
+- [ ] Each `experiments/` folder contains a reproducible notebook or script with a documented environment setup (Python version, dependencies)
+- [ ] Benchmark scores compare base model vs tuned or quantized variant on at least one task-specific metric (e.g. BLEU, F1, or faithfulness)
+- [ ] Results are logged and stored in `datasets/` with the input dataset, hyperparameters and output metrics recorded
+
+### Phase 6 — Infrastructure & Deploy
+
+* Docker and docker-compose for local full-stack environment
+* CI pipeline (lint, typecheck, test on every PR)
+* Environment configuration and secrets management
+* Staging deployment (optional cloud target)
+
+**✅ Success Criteria:**
+- [ ] `docker-compose up` starts the full local stack (API, web, worker, Redis, Postgres) with one command
+- [ ] GitHub Actions CI runs lint, typecheck and tests on every PR and blocks merge on failure
+- [ ] `.env.example` files for all apps are complete and document every required variable
+- [ ] Authentication strategy is documented (who can access which endpoints) even if not yet implemented — see [Security](#-security)
 
 ---
 
@@ -620,7 +689,8 @@ Contributions at all levels are welcome: documentation, experiments, package imp
 
 | Type | Where | Notes |
 |---|---|---|
-| AI concept documentation | `docs/concepts/` | Follow the template in the folder's `README.md` |
+| AI concept documentation | `docs/concepts/` | Follow the template in [`docs/concepts/README.md`](./docs/concepts/README.md) |
+| Architecture decision | `docs/adr/` | Write an ADR before implementing a hard-to-reverse decision |
 | Package implementation | `packages/<name>/` | Start with the `README.md` in that package |
 | Experiment | `experiments/<name>/` | Include a reproducible notebook or script |
 | Dataset | `datasets/` | Include metadata (source, license, size) |

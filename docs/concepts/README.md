@@ -11,6 +11,40 @@ Every concept file must describe:
 - **Where it is used** — the specific packages or experiments in this project that apply it
 - **Trade-offs** — known limitations, costs or design tensions
 
+## Concept file template
+
+Copy the block below when creating a new concept file. Every heading is required.
+
+```markdown
+# <Concept Name>
+
+## What it is
+
+<One- or two-sentence definition. Be precise — avoid jargon where possible.>
+
+## Why it matters
+
+<Explain the role this concept plays in real AI systems and why a builder needs to understand it.>
+
+## Where it is used
+
+| Package / Location | How it uses the concept |
+|---|---|
+| [`packages/<name>`](../../packages/<name>/README.md) | <One-line description of the usage.> |
+
+## Trade-offs
+
+| Trade-off | Detail |
+|---|---|
+| **<Trade-off label>** | <Concrete explanation of the cost, limitation or design tension.> |
+```
+
+Rules:
+- Keep each file self-contained. A reader should not need to open other files to understand the concept.
+- Link packages and experiments using relative paths from `docs/concepts/`.
+- List at least one trade-off. "No trade-offs" is almost never true.
+- Do not duplicate another concept's content — cross-link instead.
+
 ## Responsibilities
 
 - Document foundational AI concepts (LLM, RAG, Agents, Embeddings, etc.)
