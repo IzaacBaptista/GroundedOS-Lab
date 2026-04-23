@@ -59,10 +59,12 @@ The output includes:
   calling an LLM.
 - `rag:smoke` and `rag:ask` use deterministic providers for local retrieval
   reproducibility.
-- The API defaults to `api-lexical` and can opt into `local-hash` for new
-  inline/upload asks and persisted indexes.
+- The API defaults to `api-lexical` and can opt into `local-hash` or `ollama`
+  for new inline/upload asks and persisted indexes.
 - `local-hash` is a deterministic token/ngram hashing provider, not a real
   semantic embedding model quality baseline.
+- `ollama` is the first real local semantic provider. It requires a running
+  Ollama server and a local embedding model.
 - The vector store is in memory only.
 - The API is local-development only; it has no auth or observability yet.
 - The API can persist local JSON indexes under `.groundedos/indexes/`, but there
@@ -82,8 +84,19 @@ npm run api:dev
 It exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
 `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
 multipart text/PDF uploads, persisted local indexes and basic index management.
-Inline/upload requests accept `embeddingProvider: "api-lexical" | "local-hash"`.
+Inline/upload requests accept
+`embeddingProvider: "api-lexical" | "local-hash" | "ollama"`.
 Persisted-index asks use the provider saved with that index.
+
+To try Ollama manually:
+
+```bash
+ollama pull embeddinggemma
+
+GROUNDEDOS_OLLAMA_EMBED_MODEL=embeddinggemma \
+GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS=768 \
+npm run api:dev
+```
 
 Start the web surface in another terminal:
 
@@ -132,6 +145,6 @@ curl http://localhost:3001/rag/indexes
 curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 ```
 
-The next implementation target is a real semantic embedding provider such as
-Ollama, OpenAI or Hugging Face, or stricter API contract hardening around the
-current local providers.
+The next implementation target is either API contract hardening around provider
+config/errors or adding a second semantic provider such as OpenAI or Hugging
+Face for local-vs-cloud comparison.

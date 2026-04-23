@@ -74,7 +74,7 @@ describe("askRag", () => {
         query: "x",
         embeddingProvider: "semantic-placeholder" as unknown as "api-lexical",
       })
-    ).rejects.toThrow('embeddingProvider must be "api-lexical" or "local-hash".');
+    ).rejects.toThrow('embeddingProvider must be "api-lexical", "local-hash" or "ollama".');
   });
 
   it("uses typed request errors for validation failures", async () => {
@@ -255,6 +255,55 @@ describe("persisted RAG indexes", () => {
     }
   });
 
+  it("can index and ask with the Ollama provider when configured", async () => {
+    const originalFetch = globalThis.fetch;
+    const indexDir = await createTempIndexDir();
+
+    globalThis.fetch = createFakeOllamaFetch();
+
+    try {
+      const indexed = await indexRag({
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Ollama API Test",
+        documentId: "ollama-api-test",
+        embeddingProvider: "ollama",
+        indexDir,
+      });
+
+      expect(indexed.index).toMatchObject({
+        chunkCount: 2,
+        embeddingProvider: "ollama",
+        embeddingDimensions: 768,
+        embeddingModel: {
+          provider: "ollama",
+          model: "embeddinggemma",
+          dimensions: 768,
+          normalized: true,
+        },
+      });
+
+      const output = await askRag({
+        documentId: "ollama-api-test",
+        query: "What explains vector search?",
+        topK: 1,
+        embeddingProvider: "api-lexical",
+        indexDir,
+      });
+
+      expect(output.index).toMatchObject({
+        embeddingProvider: "ollama",
+        embeddingDimensions: 768,
+      });
+      expect(output.answer.grounded).toBe(true);
+      expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(indexDir, { recursive: true, force: true });
+    }
+  });
+
   it("lists and deletes persisted indexes", async () => {
     const indexDir = await createTempIndexDir();
 
@@ -334,4 +383,39 @@ describe("persisted RAG indexes", () => {
 
 async function createTempIndexDir(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "groundedos-api-index-test-"));
+}
+
+function createFakeOllamaFetch(): typeof fetch {
+  return (async (_url, init) => {
+    const body = JSON.parse(String(init?.body)) as {
+      input?: string | string[];
+      dimensions?: number;
+    };
+    const inputs = Array.isArray(body.input) ? body.input : [body.input ?? ""];
+    const dimensions = body.dimensions ?? 768;
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          model: "embeddinggemma",
+          embeddings: inputs.map((input) => createFakeOllamaVector(input, dimensions)),
+        };
+      },
+    } as Response;
+  }) as typeof fetch;
+}
+
+function createFakeOllamaVector(input: string, dimensions: number): number[] {
+  const vector = Array.from({ length: dimensions }, () => 0);
+  const normalized = input.toLowerCase();
+
+  if (normalized.includes("vector") || normalized.includes("retrieval")) {
+    vector[0] = 1;
+    return vector;
+  }
+
+  vector[1] = 1;
+  return vector;
 }

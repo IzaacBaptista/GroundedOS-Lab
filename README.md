@@ -510,11 +510,11 @@ To move from architecture scaffold to runnable foundation, the active plan is do
   `POST /rag/ask`, `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId`
   for inline JSON text, multipart text/PDF uploads, persisted local indexes and
   basic index management. Inline/upload requests can use `api-lexical`
-  (default) or `local-hash` embedding providers
+  (default), `local-hash` or opt-in `ollama` embedding providers
 - A first local web surface is available through `npm run web:dev`, including
   saved-index management and provider selection for new local requests
-- Next focus: harden the API contract or wire a real semantic provider such as
-  Ollama, OpenAI or Hugging Face
+- Next focus: harden the provider/API contract or add a cloud semantic provider
+  for local-vs-cloud comparison
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in
@@ -548,6 +548,8 @@ The first API slice exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
 `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
 multipart text/PDF uploads, selectable local embedding providers and persisted
 local indexes under `.groundedos/indexes/`.
+`ollama` requires a running local Ollama server and an embedding model such as
+`embeddinggemma`.
 
 Run the local web surface in another terminal:
 

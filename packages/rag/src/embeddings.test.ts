@@ -4,6 +4,7 @@ import type { RetrievalChunk } from "./chunking";
 import {
   DeterministicEmbeddingProvider,
   LocalHashEmbeddingsProvider,
+  OllamaEmbeddingsProvider,
   createEmbeddingProviderRegistry,
   embedChunks,
   semanticToEmbeddingProvider,
@@ -128,17 +129,102 @@ describe("LocalHashEmbeddingsProvider", () => {
   });
 });
 
+describe("OllamaEmbeddingsProvider", () => {
+  it("posts batch inputs to Ollama and returns vectors with model metadata", async () => {
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const provider = new OllamaEmbeddingsProvider({
+      baseUrl: "http://localhost:11434/",
+      model: "embeddinggemma",
+      dimensions: 3,
+      fetchFn: async (url, init) => {
+        requests.push({
+          url: String(url),
+          body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+        });
+
+        return createJsonResponse({
+          model: "embeddinggemma",
+          embeddings: [
+            [1, 0, 0],
+            [0, 1, 0],
+          ],
+        });
+      },
+    });
+
+    const results = await provider.embedMany([
+      { text: "first retrieval text" },
+      { text: "second retrieval text" },
+    ]);
+
+    expect(requests).toEqual([
+      {
+        url: "http://localhost:11434/api/embed",
+        body: {
+          model: "embeddinggemma",
+          input: ["first retrieval text", "second retrieval text"],
+          truncate: true,
+          dimensions: 3,
+        },
+      },
+    ]);
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      vector: [1, 0, 0],
+      model: {
+        provider: "ollama",
+        model: "embeddinggemma",
+        dimensions: 3,
+        normalized: true,
+      },
+    });
+  });
+
+  it("rejects Ollama HTTP errors with a clear message", async () => {
+    const provider = new OllamaEmbeddingsProvider({
+      dimensions: 3,
+      fetchFn: async () => createTextResponse(404, "model not found"),
+    });
+
+    await expect(provider.embedOne({ text: "hello" })).rejects.toThrow(
+      "[rag/embeddings] ollama embed request failed with status 404: model not found"
+    );
+  });
+
+  it("rejects Ollama embeddings with unexpected dimensions", async () => {
+    const provider = new OllamaEmbeddingsProvider({
+      dimensions: 3,
+      fetchFn: async () =>
+        createJsonResponse({
+          embeddings: [[1, 0]],
+        }),
+    });
+
+    await expect(provider.embedOne({ text: "hello" })).rejects.toThrow(
+      "[rag/embeddings] ollama embedding at index 0 has 2 dimensions; expected 3."
+    );
+  });
+});
+
 describe("EmbeddingProviderRegistry", () => {
   it("returns known providers and rejects unknown providers", () => {
     const registry = createEmbeddingProviderRegistry([
       new LocalHashEmbeddingsProvider({ dimensions: 16 }),
+      new OllamaEmbeddingsProvider({
+        dimensions: 3,
+        fetchFn: async () => createJsonResponse({ embeddings: [] }),
+      }),
     ]);
 
     expect(registry.get("local-hash").getModelInfo()).toMatchObject({
       provider: "local-hash",
       dimensions: 16,
     });
-    expect(registry.list()).toHaveLength(1);
+    expect(registry.get("ollama").getModelInfo()).toMatchObject({
+      provider: "ollama",
+      dimensions: 3,
+    });
+    expect(registry.list()).toHaveLength(2);
     expect(() => registry.get("missing" as EmbeddingProviderId)).toThrow(
       '[rag/embeddings] unknown embedding provider "missing".'
     );
@@ -268,4 +354,24 @@ function cosineSimilarity(left: EmbeddingVector, right: EmbeddingVector): number
   }
 
   return dotProduct / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude));
+}
+
+function createJsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    async json() {
+      return body;
+    },
+  } as Response;
+}
+
+function createTextResponse(status: number, body: string): Response {
+  return {
+    ok: false,
+    status,
+    async text() {
+      return body;
+    },
+  } as Response;
 }

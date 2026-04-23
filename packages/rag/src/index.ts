@@ -16,6 +16,7 @@ export {
 export {
   DeterministicEmbeddingProvider,
   LocalHashEmbeddingsProvider,
+  OllamaEmbeddingsProvider,
   createEmbeddingProviderRegistry,
   embeddingProviderToSemantic,
   embedChunks,
@@ -30,6 +31,7 @@ export {
   type EmbeddingProviderRegistry,
   type EmbeddingVector,
   type LocalHashEmbeddingsProviderOptions,
+  type OllamaEmbeddingsProviderOptions,
   type SemanticEmbeddingsProvider,
 } from "./embeddings";
 

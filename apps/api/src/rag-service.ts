@@ -7,6 +7,7 @@ import {
   buildRetrievalIndex,
   InMemoryVectorStore,
   LocalHashEmbeddingsProvider,
+  OllamaEmbeddingsProvider,
   retrieveForDevMode,
   semanticToEmbeddingProvider,
   type EmbeddingModelInfo,
@@ -27,11 +28,17 @@ import {
 
 const DEFAULT_TOP_K = 3;
 const EMBEDDING_DIMENSIONS = 64;
+const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
+const DEFAULT_OLLAMA_EMBEDDING_MODEL = "embeddinggemma";
+const DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS = 768;
 
 export { ApiRequestError } from "./errors";
 
 type SupportedApiModality = Extract<DocumentModality, "text" | "pdf">;
-type ApiEmbeddingProviderId = Extract<EmbeddingProviderId, "api-lexical" | "local-hash">;
+type ApiEmbeddingProviderId = Extract<
+  EmbeddingProviderId,
+  "api-lexical" | "local-hash" | "ollama"
+>;
 
 const DEFAULT_API_EMBEDDING_PROVIDER: ApiEmbeddingProviderId = "api-lexical";
 const API_LEXICAL_MODEL_INFO: EmbeddingModelInfo = {
@@ -675,12 +682,17 @@ function createIndexSummary(index: RetrievalIndex): RagIndexSummary {
   };
 }
 
-function createApiEmbeddingProvider(providerId: ApiEmbeddingProviderId): EmbeddingProvider {
+function createApiEmbeddingProvider(
+  providerId: ApiEmbeddingProviderId,
+  modelInfo?: EmbeddingModelInfo
+): EmbeddingProvider {
   switch (providerId) {
     case "api-lexical":
       return new ApiLexicalEmbeddingProvider();
     case "local-hash":
       return semanticToEmbeddingProvider(new LocalHashEmbeddingsProvider());
+    case "ollama":
+      return semanticToEmbeddingProvider(createOllamaEmbeddingsProvider(modelInfo));
   }
 }
 
@@ -689,7 +701,7 @@ function createApiEmbeddingProviderFromIndex(
   documentId: string
 ): EmbeddingProvider {
   const providerId = parseStoredEmbeddingProvider(index.embeddingProvider, documentId);
-  const provider = createApiEmbeddingProvider(providerId);
+  const provider = createApiEmbeddingProvider(providerId, index.embeddingModel);
 
   if (index.embeddingDimensions !== provider.dimensions) {
     throw new ApiRequestError(
@@ -708,18 +720,18 @@ function normalizeEmbeddingProvider(
     return DEFAULT_API_EMBEDDING_PROVIDER;
   }
 
-  if (providerId === "api-lexical" || providerId === "local-hash") {
+  if (providerId === "api-lexical" || providerId === "local-hash" || providerId === "ollama") {
     return providerId;
   }
 
-  throw new ApiRequestError('embeddingProvider must be "api-lexical" or "local-hash".');
+  throw new ApiRequestError('embeddingProvider must be "api-lexical", "local-hash" or "ollama".');
 }
 
 function parseStoredEmbeddingProvider(
   providerId: string,
   documentId: string
 ): ApiEmbeddingProviderId {
-  if (providerId === "api-lexical" || providerId === "local-hash") {
+  if (providerId === "api-lexical" || providerId === "local-hash" || providerId === "ollama") {
     return providerId;
   }
 
@@ -727,6 +739,46 @@ function parseStoredEmbeddingProvider(
     `Persisted RAG index "${documentId}" uses unsupported embedding provider "${providerId}".`,
     500
   );
+}
+
+function createOllamaEmbeddingsProvider(modelInfo?: EmbeddingModelInfo): OllamaEmbeddingsProvider {
+  return new OllamaEmbeddingsProvider({
+    baseUrl: process.env.GROUNDEDOS_OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL,
+    model:
+      modelInfo?.model ??
+      process.env.GROUNDEDOS_OLLAMA_EMBED_MODEL ??
+      DEFAULT_OLLAMA_EMBEDDING_MODEL,
+    dimensions:
+      modelInfo?.dimensions ??
+      parseOptionalPositiveInteger(
+        process.env.GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS,
+        "GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS"
+      ) ??
+      DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS,
+    keepAlive: process.env.GROUNDEDOS_OLLAMA_KEEP_ALIVE,
+    requestTimeoutMs:
+      parseOptionalPositiveInteger(
+        process.env.GROUNDEDOS_OLLAMA_REQUEST_TIMEOUT_MS,
+        "GROUNDEDOS_OLLAMA_REQUEST_TIMEOUT_MS"
+      ) ?? undefined,
+  });
+}
+
+function parseOptionalPositiveInteger(
+  value: string | undefined,
+  name: string
+): number | undefined {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ApiRequestError(`${name} must be a positive integer.`, 500);
+  }
+
+  return parsed;
 }
 
 function validateOptionalString(value: string | undefined, fieldName: string): void {

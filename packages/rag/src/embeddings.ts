@@ -6,10 +6,19 @@ const DEFAULT_DETERMINISTIC_PROVIDER_NAME = "deterministic-local";
 const DEFAULT_LOCAL_HASH_DIMENSIONS = 256;
 const DEFAULT_LOCAL_HASH_MODEL = "local-hash-v1";
 const DEFAULT_LOCAL_HASH_MAX_INPUT_CHARS = 12_000;
+const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
+const DEFAULT_OLLAMA_EMBEDDING_MODEL = "embeddinggemma";
+const DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS = 768;
+const DEFAULT_OLLAMA_MAX_INPUT_CHARS = 12_000;
+const DEFAULT_OLLAMA_REQUEST_TIMEOUT_MS = 30_000;
 
 export type EmbeddingVector = number[];
 
-export type EmbeddingProviderId = "local-hash" | "api-lexical" | "semantic-placeholder";
+export type EmbeddingProviderId =
+  | "local-hash"
+  | "api-lexical"
+  | "ollama"
+  | "semantic-placeholder";
 
 export interface EmbeddingModelInfo {
   provider: EmbeddingProviderId;
@@ -67,6 +76,17 @@ export interface LocalHashEmbeddingsProviderOptions {
   dimensions?: number;
   model?: string;
   maxInputChars?: number;
+}
+
+export interface OllamaEmbeddingsProviderOptions {
+  baseUrl?: string;
+  model?: string;
+  dimensions?: number;
+  maxInputChars?: number;
+  truncate?: boolean;
+  keepAlive?: string;
+  requestTimeoutMs?: number;
+  fetchFn?: typeof fetch;
 }
 
 export interface EmbeddingProviderRegistry {
@@ -155,6 +175,138 @@ export class LocalHashEmbeddingsProvider implements SemanticEmbeddingsProvider {
     }
 
     return await Promise.all(inputs.map((input) => this.embedOne(input)));
+  }
+}
+
+export class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvider {
+  readonly id = "ollama" as const;
+  private readonly baseUrl: string;
+  private readonly model: string;
+  private readonly dimensions: number;
+  private readonly maxInputChars: number;
+  private readonly truncate: boolean;
+  private readonly keepAlive: string | undefined;
+  private readonly requestTimeoutMs: number;
+  private readonly fetchFn: typeof fetch;
+
+  constructor(options: OllamaEmbeddingsProviderOptions = {}) {
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_OLLAMA_BASE_URL);
+    this.model = options.model ?? DEFAULT_OLLAMA_EMBEDDING_MODEL;
+    this.dimensions = options.dimensions ?? DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS;
+    this.maxInputChars = options.maxInputChars ?? DEFAULT_OLLAMA_MAX_INPUT_CHARS;
+    this.truncate = options.truncate ?? true;
+    this.keepAlive = options.keepAlive;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_OLLAMA_REQUEST_TIMEOUT_MS;
+    this.fetchFn = options.fetchFn ?? fetch;
+
+    if (this.model.trim().length === 0) {
+      throw new Error(`${ERROR_PREFIX} model name must not be empty.`);
+    }
+
+    validateDimensions(this.dimensions);
+
+    if (!Number.isInteger(this.maxInputChars) || this.maxInputChars <= 0) {
+      throw new Error(`${ERROR_PREFIX} maxInputChars must be a positive integer.`);
+    }
+
+    if (!Number.isInteger(this.requestTimeoutMs) || this.requestTimeoutMs <= 0) {
+      throw new Error(`${ERROR_PREFIX} requestTimeoutMs must be a positive integer.`);
+    }
+
+    if (typeof this.fetchFn !== "function") {
+      throw new Error(`${ERROR_PREFIX} fetchFn must be a function.`);
+    }
+  }
+
+  getModelInfo(): EmbeddingModelInfo {
+    return {
+      provider: this.id,
+      model: this.model,
+      dimensions: this.dimensions,
+      normalized: true,
+      maxInputChars: this.maxInputChars,
+    };
+  }
+
+  async embedOne(input: EmbedTextInput): Promise<EmbedTextResult> {
+    const [result] = await this.embedMany([input]);
+
+    if (!result) {
+      throw new Error(`${ERROR_PREFIX} ollama returned no embedding.`);
+    }
+
+    return result;
+  }
+
+  async embedMany(inputs: EmbedTextInput[]): Promise<EmbedTextResult[]> {
+    if (!Array.isArray(inputs)) {
+      throw new Error(`${ERROR_PREFIX} embedMany inputs must be an array.`);
+    }
+
+    if (inputs.length === 0) {
+      return [];
+    }
+
+    const texts = inputs.map((input) => {
+      if (!input || typeof input.text !== "string") {
+        throw new Error(`${ERROR_PREFIX} embed input text must be a string.`);
+      }
+
+      return input.text.slice(0, this.maxInputChars);
+    });
+    const response = await this.requestEmbeddings(texts);
+    const embeddings = validateOllamaEmbeddingResponse(response, inputs.length, this.dimensions);
+    const modelInfo = this.getModelInfo();
+
+    return embeddings.map((vector, index) => ({
+      vector,
+      model: modelInfo,
+      usage: {
+        estimatedChars: inputs[index]?.text.length ?? 0,
+      },
+    }));
+  }
+
+  private async requestEmbeddings(texts: string[]): Promise<unknown> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, this.requestTimeoutMs);
+
+    try {
+      const response = await this.fetchFn(`${this.baseUrl}/api/embed`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: this.model,
+          input: texts,
+          truncate: this.truncate,
+          dimensions: this.dimensions,
+          keep_alive: this.keepAlive,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const message = await readResponseText(response);
+
+        throw new Error(
+          `${ERROR_PREFIX} ollama embed request failed with status ${response.status}${message ? `: ${message}` : "."}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`${ERROR_PREFIX} ollama embed request timed out.`);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
 
@@ -388,6 +540,48 @@ function validateEmbeddings(
   });
 }
 
+function validateOllamaEmbeddingResponse(
+  response: unknown,
+  expectedCount: number,
+  expectedDimensions: number
+): EmbeddingVector[] {
+  if (!response || typeof response !== "object") {
+    throw new Error(`${ERROR_PREFIX} ollama embed response must be an object.`);
+  }
+
+  const embeddings = (response as { embeddings?: unknown }).embeddings;
+
+  if (!Array.isArray(embeddings)) {
+    throw new Error(`${ERROR_PREFIX} ollama embed response must include embeddings.`);
+  }
+
+  if (embeddings.length !== expectedCount) {
+    throw new Error(
+      `${ERROR_PREFIX} ollama returned ${embeddings.length} embeddings for ${expectedCount} inputs.`
+    );
+  }
+
+  return embeddings.map((embedding, index) => {
+    if (!Array.isArray(embedding)) {
+      throw new Error(`${ERROR_PREFIX} ollama embedding at index ${index} must be an array.`);
+    }
+
+    if (embedding.length !== expectedDimensions) {
+      throw new Error(
+        `${ERROR_PREFIX} ollama embedding at index ${index} has ${embedding.length} dimensions; expected ${expectedDimensions}.`
+      );
+    }
+
+    if (embedding.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
+      throw new Error(
+        `${ERROR_PREFIX} ollama embedding at index ${index} contains a non-finite value.`
+      );
+    }
+
+    return embedding as EmbeddingVector;
+  });
+}
+
 function createDeterministicEmbedding(text: string, dimensions: number): EmbeddingVector {
   const vector = Array.from({ length: dimensions }, () => 0);
   const normalizedText = text.normalize("NFKC").toLowerCase();
@@ -494,10 +688,37 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
+function normalizeBaseUrl(baseUrl: string): string {
+  if (typeof baseUrl !== "string" || baseUrl.trim().length === 0) {
+    throw new Error(`${ERROR_PREFIX} baseUrl must not be empty.`);
+  }
+
+  try {
+    const parsed = new URL(baseUrl.trim());
+
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    throw new Error(`${ERROR_PREFIX} baseUrl must be a valid URL.`);
+  }
+}
+
+async function readResponseText(response: Response): Promise<string> {
+  try {
+    return (await response.text()).trim();
+  } catch {
+    return "";
+  }
+}
+
 function toEmbeddingProviderId(providerName: string): EmbeddingProviderId {
   return isEmbeddingProviderId(providerName) ? providerName : "semantic-placeholder";
 }
 
 function isEmbeddingProviderId(value: string): value is EmbeddingProviderId {
-  return value === "local-hash" || value === "api-lexical" || value === "semantic-placeholder";
+  return (
+    value === "local-hash" ||
+    value === "api-lexical" ||
+    value === "ollama" ||
+    value === "semantic-placeholder"
+  );
 }

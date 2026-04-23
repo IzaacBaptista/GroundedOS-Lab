@@ -41,3 +41,5 @@ The web server listens on `PORT` or `3000` by default and proxies `/api/*` to
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Answers remain extractive and deterministic, matching the Phase 1 API.
+- The `ollama` provider requires a running local Ollama server and an embedding
+  model configured in the API environment.

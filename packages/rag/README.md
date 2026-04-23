@@ -71,10 +71,16 @@ tokens and token bigrams into a fixed 256-dimensional L2-normalized vector by
 default. It is deterministic and dependency-free, but still not a semantic
 quality baseline like a real embedding model.
 
+`OllamaEmbeddingsProvider` is the first real semantic provider. It calls
+Ollama's local `/api/embed` endpoint, uses `embeddinggemma` with 768 dimensions
+by default, and remains opt-in so tests and local smoke flows stay deterministic
+without requiring an external service.
+
 ```ts
 import {
   DeterministicEmbeddingProvider,
   LocalHashEmbeddingsProvider,
+  OllamaEmbeddingsProvider,
   chunkDocument,
   embedChunks,
   semanticToEmbeddingProvider,
@@ -90,6 +96,15 @@ const localHashProvider = semanticToEmbeddingProvider(
   new LocalHashEmbeddingsProvider()
 );
 const localHashChunks = await embedChunks(chunks, localHashProvider);
+
+const ollamaProvider = semanticToEmbeddingProvider(
+  new OllamaEmbeddingsProvider({
+    baseUrl: "http://localhost:11434",
+    model: "embeddinggemma",
+    dimensions: 768,
+  })
+);
+const semanticChunks = await embedChunks(chunks, ollamaProvider);
 ```
 
 The in-memory vector store supports insert, cosine similarity search, `topK`
@@ -150,6 +165,7 @@ The local CLI usage guide is documented in
 | `SemanticEmbeddingsProvider` | Higher-level embedding provider contract with model metadata |
 | `EmbeddingModelInfo` | Provider/model/dimension metadata for compatibility and Dev Mode output |
 | `LocalHashEmbeddingsProvider` | Local deterministic token/ngram hashing provider |
+| `OllamaEmbeddingsProvider` | Opt-in local semantic embedding provider using Ollama `/api/embed` |
 | `semanticToEmbeddingProvider(provider)` | Adapt a semantic provider to the existing retrieval pipeline |
 | `embeddingProviderToSemantic(provider, modelInfo?)` | Wrap a legacy provider with the semantic provider contract |
 | `createEmbeddingProviderRegistry(providers?)` | Create a small provider registry for semantic providers |
