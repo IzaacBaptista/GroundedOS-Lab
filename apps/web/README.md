@@ -8,13 +8,14 @@ grounded retrieval workflows.
 - Accept inline text or local text/PDF file input
 - Index documents through the local API and ask against the active persisted index
 - List, select, refresh and delete persisted local indexes
+- Select the local embedding provider for new inline/upload requests
 - Display grounded answers, citations and retrieved chunks
 - Expose the raw Dev Mode JSON returned by the API
 
 ## Status
 
 In Progress - Phase 1 local RAG upload and persisted-index surface is
-implemented.
+implemented, including provider selection for new indexes and ephemeral asks.
 
 ## Local usage
 

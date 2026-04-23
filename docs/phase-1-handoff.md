@@ -34,8 +34,8 @@ Expected status:
 - Smoke ingestion returns `documentId: "smoke-text-001"` and two text sections.
 - RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
 - RAG ask returns the same retrieval output shape for a direct local file path.
-- The local API exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`, `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text, multipart text/PDF upload, persisted local indexes, and basic index management.
-- The local web surface serves `http://localhost:3000`, proxies `/api/*` to the API, and supports `Index`, saved-index selection, `Ask`, refresh, and delete.
+- The local API exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`, `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text, multipart text/PDF upload, persisted local indexes, selectable local embedding providers, and basic index management.
+- The local web surface serves `http://localhost:3000`, proxies `/api/*` to the API, and supports `Index`, saved-index selection, provider selection for new requests, `Ask`, refresh, and delete.
 
 See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and limits.
 
@@ -49,6 +49,8 @@ See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and
 2. [x] Add embedding interfaces and a local stub provider.
    - Define an embedding model contract before wiring a real provider
    - Keep outputs deterministic in tests
+   - Include `SemanticEmbeddingsProvider`, adapters, registry and the
+     deterministic `LocalHashEmbeddingsProvider`
    - Package: `packages/rag`
 
 3. [x] Add an in-memory vector store for local development.
@@ -80,6 +82,7 @@ See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and
 
 - No production vector database yet.
 - No chat UI yet.
-- No model-provider routing yet.
+- No model-provider routing yet; API provider selection is limited to local
+  deterministic embedding providers.
 - No agent orchestration yet.
 - No image or audio extraction beyond current stubs.

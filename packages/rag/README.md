@@ -12,15 +12,17 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-In Progress - Phase 1 chunking, deterministic local embeddings, in-memory vector storage, first retrieval flow and Dev Mode retrieval output contract implemented. Re-ranking and context assembly remain planned.
+In Progress - Phase 1 chunking, deterministic local embeddings, semantic
+embedding provider interfaces, in-memory vector storage, first retrieval flow
+and Dev Mode retrieval output contract implemented. Re-ranking and context
+assembly remain planned.
 
 ## Current implementation
 
 The first Phase 1 slices expose deterministic character-based chunking through
-`chunkDocument()`, a local deterministic embedding provider through
-`embedChunks()`, local similarity search through `InMemoryVectorStore`, and
-end-to-end local retrieval through `buildRetrievalIndex()` and
-`retrieveFromIndex()`.
+`chunkDocument()`, embedding contracts and local deterministic providers,
+local similarity search through `InMemoryVectorStore`, and end-to-end local
+retrieval through `buildRetrievalIndex()` and `retrieveFromIndex()`.
 
 From the repository root, the complete local pipeline can be exercised with:
 
@@ -57,13 +59,25 @@ Defaults:
 Chunking is section-local: chunks do not cross `DocumentSection` boundaries.
 
 Embeddings are local and deterministic by default, intended for tests and the
-first retrieval pipeline wiring. They are not a semantic quality baseline.
+first retrieval pipeline wiring. The package now has two compatible layers:
+
+- `EmbeddingProvider`, the existing low-level interface used by the retrieval
+  pipeline.
+- `SemanticEmbeddingsProvider`, the provider contract that exposes model
+  metadata, per-input results and future provider compatibility.
+
+`LocalHashEmbeddingsProvider` is the first semantic-style provider. It hashes
+tokens and token bigrams into a fixed 256-dimensional L2-normalized vector by
+default. It is deterministic and dependency-free, but still not a semantic
+quality baseline like a real embedding model.
 
 ```ts
 import {
   DeterministicEmbeddingProvider,
+  LocalHashEmbeddingsProvider,
   chunkDocument,
   embedChunks,
+  semanticToEmbeddingProvider,
 } from "@groundedos/rag";
 
 const chunks = chunkDocument(normalizedDocument);
@@ -71,6 +85,11 @@ const embeddedChunks = await embedChunks(
   chunks,
   new DeterministicEmbeddingProvider({ dimensions: 16 })
 );
+
+const localHashProvider = semanticToEmbeddingProvider(
+  new LocalHashEmbeddingsProvider()
+);
+const localHashChunks = await embedChunks(chunks, localHashProvider);
 ```
 
 The in-memory vector store supports insert, cosine similarity search, `topK`
@@ -128,6 +147,12 @@ The local CLI usage guide is documented in
 | `embedChunks(chunks, provider)` | Attach embedding vectors to retrieval chunks |
 | `EmbeddingProvider` | Interface for local or remote embedding providers |
 | `DeterministicEmbeddingProvider` | Local deterministic provider for tests and development |
+| `SemanticEmbeddingsProvider` | Higher-level embedding provider contract with model metadata |
+| `EmbeddingModelInfo` | Provider/model/dimension metadata for compatibility and Dev Mode output |
+| `LocalHashEmbeddingsProvider` | Local deterministic token/ngram hashing provider |
+| `semanticToEmbeddingProvider(provider)` | Adapt a semantic provider to the existing retrieval pipeline |
+| `embeddingProviderToSemantic(provider, modelInfo?)` | Wrap a legacy provider with the semantic provider contract |
+| `createEmbeddingProviderRegistry(providers?)` | Create a small provider registry for semantic providers |
 | `EmbeddedChunk` | Retrieval chunk plus embedding vector and embedding metadata |
 | `InMemoryVectorStore` | Local vector store with insert, similarity search and metadata filtering |
 | `VectorSearchResult` | Search result containing an embedded chunk and cosine similarity score |

@@ -37,8 +37,8 @@ export function createApiServer(options: ApiServerOptions = {}): FastifyInstance
     limits: {
       fileSize: MAX_UPLOAD_BYTES,
       files: 1,
-      fields: 6,
-      parts: 8,
+      fields: 8,
+      parts: 10,
     },
   });
 
@@ -150,6 +150,7 @@ async function handleMultipartRagAsk(request: FastifyRequest, indexDir: string |
       title: fields.title,
       documentId: fields.documentId,
       metadata: parseMetadata(fields.metadata),
+      embeddingProvider: fields.embeddingProvider as RagAskFileRequest["embeddingProvider"],
       indexDir,
     });
   } finally {
@@ -201,6 +202,7 @@ async function handleMultipartRagIndex(request: FastifyRequest, indexDir: string
       title: fields.title,
       documentId: fields.documentId,
       metadata: parseMetadata(fields.metadata),
+      embeddingProvider: fields.embeddingProvider as RagIndexFileRequest["embeddingProvider"],
       indexDir,
     });
   } finally {

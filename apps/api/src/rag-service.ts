@@ -6,8 +6,12 @@ import { ingest } from "@groundedos/etl";
 import {
   buildRetrievalIndex,
   InMemoryVectorStore,
+  LocalHashEmbeddingsProvider,
   retrieveForDevMode,
+  semanticToEmbeddingProvider,
+  type EmbeddingModelInfo,
   type EmbeddingProvider,
+  type EmbeddingProviderId,
   type EmbeddingVector,
   type RetrievalIndex,
   type RetrievalDevModeOutput,
@@ -27,6 +31,15 @@ const EMBEDDING_DIMENSIONS = 64;
 export { ApiRequestError } from "./errors";
 
 type SupportedApiModality = Extract<DocumentModality, "text" | "pdf">;
+type ApiEmbeddingProviderId = Extract<EmbeddingProviderId, "api-lexical" | "local-hash">;
+
+const DEFAULT_API_EMBEDDING_PROVIDER: ApiEmbeddingProviderId = "api-lexical";
+const API_LEXICAL_MODEL_INFO: EmbeddingModelInfo = {
+  provider: "api-lexical",
+  model: "api-lexical-v1",
+  dimensions: EMBEDDING_DIMENSIONS,
+  normalized: true,
+};
 
 export type RagAskRequest = {
   type?: DocumentModality;
@@ -37,6 +50,7 @@ export type RagAskRequest = {
   documentId?: string;
   metadata?: Record<string, unknown>;
   indexDir?: string;
+  embeddingProvider?: ApiEmbeddingProviderId;
 };
 
 export type RagAskFileRequest = {
@@ -49,6 +63,7 @@ export type RagAskFileRequest = {
   documentId?: string;
   metadata?: Record<string, unknown>;
   indexDir?: string;
+  embeddingProvider?: ApiEmbeddingProviderId;
 };
 
 export type RagIndexRequest = {
@@ -58,6 +73,7 @@ export type RagIndexRequest = {
   documentId?: string;
   metadata?: Record<string, unknown>;
   indexDir?: string;
+  embeddingProvider?: ApiEmbeddingProviderId;
 };
 
 export type RagIndexFileRequest = {
@@ -68,6 +84,7 @@ export type RagIndexFileRequest = {
   documentId?: string;
   metadata?: Record<string, unknown>;
   indexDir?: string;
+  embeddingProvider?: ApiEmbeddingProviderId;
 };
 
 export type RagDocumentSummary = {
@@ -82,6 +99,7 @@ export type RagIndexSummary = {
   chunkCount: number;
   embeddingProvider: string;
   embeddingDimensions: number;
+  embeddingModel?: EmbeddingModelInfo;
 };
 
 export type RagAskResponse = {
@@ -131,6 +149,7 @@ export type GroundedAnswer = {
 class ApiLexicalEmbeddingProvider implements EmbeddingProvider {
   readonly name = "api-lexical";
   readonly dimensions = EMBEDDING_DIMENSIONS;
+  readonly modelInfo = API_LEXICAL_MODEL_INFO;
 
   async embedTexts(texts: string[]): Promise<EmbeddingVector[]> {
     return texts.map((text) => this.embedText(text));
@@ -180,7 +199,12 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
       checksum,
     },
   });
-  const ragOutput = await runLocalRag(document, normalizedRequest.query, normalizedRequest.topK);
+  const ragOutput = await runLocalRag(
+    document,
+    normalizedRequest.query,
+    normalizedRequest.topK,
+    normalizedRequest.embeddingProvider
+  );
 
   return {
     document: {
@@ -216,7 +240,12 @@ export async function askRagFromFile(
       originalFilename: normalizedRequest.originalFilename,
     },
   });
-  const ragOutput = await runLocalRag(document, normalizedRequest.query, normalizedRequest.topK);
+  const ragOutput = await runLocalRag(
+    document,
+    normalizedRequest.query,
+    normalizedRequest.topK,
+    normalizedRequest.embeddingProvider
+  );
 
   return {
     document: {
@@ -248,8 +277,9 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
       checksum,
     },
   });
+  const provider = createApiEmbeddingProvider(normalizedRequest.embeddingProvider);
   const index = await buildRetrievalIndex(document, {
-    embeddingProvider: new ApiLexicalEmbeddingProvider(),
+    embeddingProvider: provider,
   });
   const documentSummary: RagDocumentSummary = {
     documentId,
@@ -299,8 +329,9 @@ export async function indexRagFromFile(
       originalFilename: normalizedRequest.originalFilename,
     },
   });
+  const provider = createApiEmbeddingProvider(normalizedRequest.embeddingProvider);
   const index = await buildRetrievalIndex(document, {
-    embeddingProvider: new ApiLexicalEmbeddingProvider(),
+    embeddingProvider: provider,
   });
   const documentSummary: RagDocumentSummary = {
     documentId,
@@ -334,17 +365,10 @@ export async function askPersistedRag(
 ): Promise<RagAskResponse> {
   const normalizedRequest = normalizePersistedAskRequest(request);
   const saved = await loadRagIndex(normalizedRequest.documentId, normalizedRequest.indexDir);
-  const provider = new ApiLexicalEmbeddingProvider();
-
-  if (
-    saved.record.index.embeddingProvider !== provider.name ||
-    saved.record.index.embeddingDimensions !== provider.dimensions
-  ) {
-    throw new ApiRequestError(
-      `Persisted RAG index "${normalizedRequest.documentId}" uses unsupported embedding provider "${saved.record.index.embeddingProvider}".`,
-      500
-    );
-  }
+  const provider = createApiEmbeddingProviderFromIndex(
+    saved.record.index,
+    normalizedRequest.documentId
+  );
 
   const store = new InMemoryVectorStore();
   store.insert(saved.record.embeddedChunks);
@@ -396,7 +420,7 @@ export async function deletePersistedRagIndex(
 }
 
 function normalizeRequest(request: RagAskRequest): Required<
-  Pick<RagAskRequest, "content" | "query" | "topK">
+  Pick<RagAskRequest, "content" | "query" | "topK" | "embeddingProvider">
 > &
   Pick<RagAskRequest, "title" | "documentId" | "metadata"> {
   if (!request || typeof request !== "object") {
@@ -444,6 +468,7 @@ function normalizeRequest(request: RagAskRequest): Required<
     content: request.content,
     query: request.query.trim(),
     topK,
+    embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
     title: request.title,
     documentId: request.documentId,
     metadata: request.metadata,
@@ -451,7 +476,7 @@ function normalizeRequest(request: RagAskRequest): Required<
 }
 
 function normalizeIndexRequest(request: RagIndexRequest): Required<
-  Pick<RagIndexRequest, "content">
+  Pick<RagIndexRequest, "content" | "embeddingProvider">
 > &
   Pick<RagIndexRequest, "title" | "documentId" | "metadata" | "indexDir"> {
   if (!request || typeof request !== "object") {
@@ -476,6 +501,7 @@ function normalizeIndexRequest(request: RagIndexRequest): Required<
 
   return {
     content: request.content,
+    embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
     title: request.title,
     documentId: request.documentId,
     metadata: request.metadata,
@@ -484,7 +510,7 @@ function normalizeIndexRequest(request: RagIndexRequest): Required<
 }
 
 function normalizeFileRequest(request: RagAskFileRequest): Required<
-  Pick<RagAskFileRequest, "filePath" | "query" | "topK" | "type">
+  Pick<RagAskFileRequest, "filePath" | "query" | "topK" | "type" | "embeddingProvider">
 > &
   Pick<RagAskFileRequest, "title" | "documentId" | "metadata" | "originalFilename"> {
   if (!request || typeof request !== "object") {
@@ -531,6 +557,7 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
     query: request.query.trim(),
     topK,
     type,
+    embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
     title: request.title,
     documentId: request.documentId,
     metadata: request.metadata,
@@ -539,7 +566,7 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
 }
 
 function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
-  Pick<RagIndexFileRequest, "filePath" | "type">
+  Pick<RagIndexFileRequest, "filePath" | "type" | "embeddingProvider">
 > &
   Pick<RagIndexFileRequest, "title" | "documentId" | "metadata" | "originalFilename" | "indexDir"> {
   if (!request || typeof request !== "object") {
@@ -563,6 +590,7 @@ function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
   return {
     filePath: request.filePath,
     type,
+    embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
     title: request.title,
     documentId: request.documentId,
     metadata: request.metadata,
@@ -604,10 +632,12 @@ function normalizePersistedAskRequest(
 async function runLocalRag(
   document: Awaited<ReturnType<typeof ingest>>,
   query: string,
-  topK: number
+  topK: number,
+  embeddingProviderId: ApiEmbeddingProviderId
 ): Promise<Pick<RagAskResponse, "answer" | "index" | "devMode">> {
+  const provider = createApiEmbeddingProvider(embeddingProviderId);
   const index = await buildRetrievalIndex(document, {
-    embeddingProvider: new ApiLexicalEmbeddingProvider(),
+    embeddingProvider: provider,
   });
   const devMode = await retrieveForDevMode(index, query, {
     topK,
@@ -641,7 +671,62 @@ function createIndexSummary(index: RetrievalIndex): RagIndexSummary {
     chunkCount: index.embeddedChunks.length,
     embeddingProvider: index.embeddingProvider.name,
     embeddingDimensions: index.embeddingProvider.dimensions,
+    embeddingModel: index.embeddingProvider.modelInfo,
   };
+}
+
+function createApiEmbeddingProvider(providerId: ApiEmbeddingProviderId): EmbeddingProvider {
+  switch (providerId) {
+    case "api-lexical":
+      return new ApiLexicalEmbeddingProvider();
+    case "local-hash":
+      return semanticToEmbeddingProvider(new LocalHashEmbeddingsProvider());
+  }
+}
+
+function createApiEmbeddingProviderFromIndex(
+  index: RagIndexSummary,
+  documentId: string
+): EmbeddingProvider {
+  const providerId = parseStoredEmbeddingProvider(index.embeddingProvider, documentId);
+  const provider = createApiEmbeddingProvider(providerId);
+
+  if (index.embeddingDimensions !== provider.dimensions) {
+    throw new ApiRequestError(
+      `Persisted RAG index "${documentId}" uses ${index.embeddingDimensions} dimensions for provider "${index.embeddingProvider}", but this runtime expects ${provider.dimensions}.`,
+      500
+    );
+  }
+
+  return provider;
+}
+
+function normalizeEmbeddingProvider(
+  providerId: ApiEmbeddingProviderId | undefined
+): ApiEmbeddingProviderId {
+  if (providerId === undefined) {
+    return DEFAULT_API_EMBEDDING_PROVIDER;
+  }
+
+  if (providerId === "api-lexical" || providerId === "local-hash") {
+    return providerId;
+  }
+
+  throw new ApiRequestError('embeddingProvider must be "api-lexical" or "local-hash".');
+}
+
+function parseStoredEmbeddingProvider(
+  providerId: string,
+  documentId: string
+): ApiEmbeddingProviderId {
+  if (providerId === "api-lexical" || providerId === "local-hash") {
+    return providerId;
+  }
+
+  throw new ApiRequestError(
+    `Persisted RAG index "${documentId}" uses unsupported embedding provider "${providerId}".`,
+    500
+  );
 }
 
 function validateOptionalString(value: string | undefined, fieldName: string): void {

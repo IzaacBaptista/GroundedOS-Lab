@@ -13,7 +13,8 @@ the local AI pipeline.
 ## Status
 
 In Progress - local RAG API is implemented for inline JSON text, multipart file
-upload, persisted local document indexes, and basic index management.
+upload, persisted local document indexes, basic index management, and selectable
+local embedding providers.
 
 ## Local usage
 
@@ -62,6 +63,7 @@ JSON request body:
 | `title` | No | Optional document title for metadata and Dev Mode output. |
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | Additional object metadata passed into ETL. |
+| `embeddingProvider` | No | `"api-lexical"` or `"local-hash"`. Defaults to `"api-lexical"`. |
 
 Response includes `document`, `answer`, `index`, and `devMode`.
 
@@ -76,6 +78,9 @@ curl -X POST http://localhost:3001/rag/ask \
     "topK": 1
   }'
 ```
+
+When asking by `documentId`, the API uses the embedding provider saved with the
+persisted index and ignores any `embeddingProvider` in the request body.
 
 Multipart file upload:
 
@@ -98,6 +103,7 @@ Multipart fields:
 | `title` | No | Optional document title for metadata and Dev Mode output. |
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | JSON object string with additional metadata passed into ETL. |
+| `embeddingProvider` | No | `"api-lexical"` or `"local-hash"`. Defaults to `"api-lexical"`. |
 
 #### `POST /rag/index`
 
@@ -113,7 +119,8 @@ curl -X POST http://localhost:3001/rag/index \
     "type": "text",
     "content": "GroundedOS Lab smoke test.\n\nThis command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
     "title": "Inline API Test",
-    "documentId": "smoke-text-001"
+    "documentId": "smoke-text-001",
+    "embeddingProvider": "local-hash"
   }'
 ```
 
@@ -123,10 +130,13 @@ Multipart file upload:
 curl -X POST http://localhost:3001/rag/index \
   -F file=@datasets/samples/phase-0-smoke.txt \
   -F type=text \
-  -F documentId=smoke-text-001
+  -F documentId=smoke-text-001 \
+  -F embeddingProvider=local-hash
 ```
 
-Response includes `document`, `index`, and `storage.indexPath`.
+Response includes `document`, `index`, and `storage.indexPath`. `index`
+contains `embeddingProvider`, `embeddingDimensions`, and, for new indexes,
+`embeddingModel` with provider/model/dimension metadata.
 
 #### `GET /rag/indexes`
 
@@ -152,5 +162,8 @@ curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 - Multipart uploads are limited to one file and 5 MB.
 - Persisted indexes are local JSON files under `.groundedos/indexes/`.
 - The answer is extractive and based on the top retrieved chunk.
-- Retrieval uses a deterministic local lexical embedding provider.
+- Retrieval uses `"api-lexical"` by default. `"local-hash"` is available as an
+  opt-in deterministic token/ngram hashing provider.
+- Real semantic providers such as Ollama, OpenAI or Hugging Face are not wired
+  yet.
 - No auth, observability or production vector database yet.
