@@ -25,6 +25,8 @@ npm run api:dev
 ```
 
 The server listens on `PORT` or `3001` by default.
+Reference environment values live in
+[`apps/api/.env.example`](./.env.example).
 
 ### Endpoints
 
@@ -157,6 +159,9 @@ Optional environment variables:
 | `GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS` | `768` | Expected vector dimensions saved with the index |
 | `GROUNDEDOS_OLLAMA_KEEP_ALIVE` | unset | Optional Ollama keep-alive value |
 | `GROUNDEDOS_OLLAMA_REQUEST_TIMEOUT_MS` | package default | Request timeout override |
+
+For a full install and verification tutorial, see
+[`docs/ollama-setup.md`](../../docs/ollama-setup.md).
 
 #### `GET /rag/indexes`
 

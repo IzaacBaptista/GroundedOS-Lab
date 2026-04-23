@@ -33,6 +33,8 @@ npm run web:dev
 
 The web server listens on `PORT` or `3000` by default and proxies `/api/*` to
 `API_BASE_URL` or `http://localhost:3001`.
+Reference environment values live in
+[`apps/web/.env.example`](./.env.example).
 
 ## Current limits
 

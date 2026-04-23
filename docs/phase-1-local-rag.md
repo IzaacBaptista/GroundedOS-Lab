@@ -65,6 +65,8 @@ The output includes:
   semantic embedding model quality baseline.
 - `ollama` is the first real local semantic provider. It requires a running
   Ollama server and a local embedding model.
+- Full install and setup steps live in
+  [`ollama-setup.md`](./ollama-setup.md).
 - The vector store is in memory only.
 - The API is local-development only; it has no auth or observability yet.
 - The API can persist local JSON indexes under `.groundedos/indexes/`, but there
@@ -97,6 +99,9 @@ GROUNDEDOS_OLLAMA_EMBED_MODEL=embeddinggemma \
 GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS=768 \
 npm run api:dev
 ```
+
+For a full install tutorial, including OS-specific setup and troubleshooting,
+see [`ollama-setup.md`](./ollama-setup.md).
 
 Start the web surface in another terminal:
 
