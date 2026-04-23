@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "fs/promises";
 import { join, relative } from "path";
 import type { EmbeddedChunk } from "@groundedos/rag";
 
@@ -21,6 +21,16 @@ export type SavedRagIndex = {
   record: PersistedRagIndex;
   indexPath: string;
   relativeIndexPath: string;
+};
+
+export type PersistedRagIndexListItem = {
+  createdAt: string;
+  document: RagDocumentSummary;
+  index: RagIndexSummary;
+  storage: {
+    persisted: true;
+    indexPath: string;
+  };
 };
 
 export function resolveIndexDir(indexDir?: string): string {
@@ -83,12 +93,89 @@ export async function loadRagIndex(
   }
 }
 
+export async function listRagIndexes(indexDir?: string): Promise<PersistedRagIndexListItem[]> {
+  const resolvedIndexDir = resolveIndexDir(indexDir);
+
+  try {
+    const entries = await readdir(resolvedIndexDir, {
+      withFileTypes: true,
+    });
+    const indexFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => join(resolvedIndexDir, entry.name));
+    const items = await Promise.all(indexFiles.map(readIndexListItem));
+
+    return items.sort((left, right) => {
+      const createdAtOrder = right.createdAt.localeCompare(left.createdAt);
+
+      if (createdAtOrder !== 0) {
+        return createdAtOrder;
+      }
+
+      return left.document.documentId.localeCompare(right.document.documentId);
+    });
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return [];
+    }
+
+    if (error instanceof ApiRequestError) {
+      throw error;
+    }
+
+    throw new ApiRequestError("Failed to list persisted RAG indexes.", 500);
+  }
+}
+
+export async function deleteRagIndex(
+  documentId: string,
+  indexDir?: string
+): Promise<PersistedRagIndexListItem> {
+  const saved = await loadRagIndex(documentId, indexDir);
+
+  try {
+    await unlink(saved.indexPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      throw new ApiRequestError(
+        `No persisted RAG index found for documentId "${documentId}".`,
+        404
+      );
+    }
+
+    throw new ApiRequestError(`Failed to delete persisted RAG index "${documentId}".`, 500);
+  }
+
+  return toListItem(saved.record, saved.relativeIndexPath);
+}
+
+async function readIndexListItem(indexPath: string): Promise<PersistedRagIndexListItem> {
+  const raw = await readFile(indexPath, "utf-8");
+  const record = JSON.parse(raw) as PersistedRagIndex;
+
+  validatePersistedRagIndex(record, record.document?.documentId ?? "unknown");
+
+  return toListItem(record, relative(process.cwd(), indexPath));
+}
+
 function createIndexPath(documentId: string, indexDir: string): string {
   return join(indexDir, `${hashDocumentId(documentId)}.json`);
 }
 
 function hashDocumentId(documentId: string): string {
   return createHash("sha256").update(documentId).digest("hex").slice(0, 32);
+}
+
+function toListItem(record: PersistedRagIndex, indexPath: string): PersistedRagIndexListItem {
+  return {
+    createdAt: record.createdAt,
+    document: record.document,
+    index: record.index,
+    storage: {
+      persisted: true,
+      indexPath,
+    },
+  };
 }
 
 function validatePersistedRagIndex(record: PersistedRagIndex, documentId: string): void {

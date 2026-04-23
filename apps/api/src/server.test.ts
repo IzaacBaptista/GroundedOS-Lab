@@ -139,6 +139,64 @@ describe("api server", () => {
     );
   });
 
+  it("serves GET and DELETE /rag/indexes", async () => {
+    const indexDir = await createTempIndexDir();
+    const app = createTestServer(indexDir);
+
+    await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      payload: {
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Managed HTTP Test",
+        documentId: "managed-http-test",
+      },
+    });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/rag/indexes",
+    });
+    const listBody = listResponse.json() as {
+      count: number;
+      indexes: Array<{ document: { documentId: string; title: string } }>;
+    };
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listBody.count).toBe(1);
+    expect(listBody.indexes[0]?.document).toMatchObject({
+      documentId: "managed-http-test",
+      title: "Managed HTTP Test",
+    });
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: "/rag/indexes/managed-http-test",
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(deleteResponse.json()).toMatchObject({
+      deleted: true,
+      index: {
+        document: {
+          documentId: "managed-http-test",
+        },
+      },
+    });
+
+    const emptyListResponse = await app.inject({
+      method: "GET",
+      url: "/rag/indexes",
+    });
+
+    expect(emptyListResponse.json()).toEqual({
+      count: 0,
+      indexes: [],
+    });
+  });
+
   it("returns validation errors as JSON", async () => {
     const app = createTestServer();
     const response = await app.inject({

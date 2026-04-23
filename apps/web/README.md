@@ -7,6 +7,7 @@ grounded retrieval workflows.
 
 - Accept inline text or local text/PDF file input
 - Index documents through the local API and ask against the active persisted index
+- List, select, refresh and delete persisted local indexes
 - Display grounded answers, citations and retrieved chunks
 - Expose the raw Dev Mode JSON returned by the API
 

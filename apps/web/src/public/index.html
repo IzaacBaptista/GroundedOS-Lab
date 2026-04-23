@@ -37,6 +37,19 @@
             </label>
           </div>
 
+          <div class="index-tools">
+            <label class="field">
+              <span>Indexed documents</span>
+              <select id="indexSelect">
+                <option value="">No indexed documents</option>
+              </select>
+            </label>
+            <div class="index-tools__actions">
+              <button id="refreshIndexesButton" class="secondary-button" type="button">Refresh</button>
+              <button id="deleteIndexButton" class="secondary-button" type="button" disabled>Delete</button>
+            </div>
+          </div>
+
           <div class="mode-panel" data-mode-panel="file">
             <label class="field">
               <span>File</span>

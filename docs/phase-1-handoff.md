@@ -34,8 +34,8 @@ Expected status:
 - Smoke ingestion returns `documentId: "smoke-text-001"` and two text sections.
 - RAG smoke returns a grounded answer, retrieved chunks, relevance scores, source metadata, and offsets.
 - RAG ask returns the same retrieval output shape for a direct local file path.
-- The local API exposes `GET /health`, `POST /rag/index`, and `POST /rag/ask` for inline JSON text, multipart text/PDF upload, and persisted local indexes.
-- The local web surface serves `http://localhost:3000`, proxies `/api/*` to the API, and supports `Index` then `Ask` against the active persisted document.
+- The local API exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`, `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text, multipart text/PDF upload, persisted local indexes, and basic index management.
+- The local web surface serves `http://localhost:3000`, proxies `/api/*` to the API, and supports `Index`, saved-index selection, `Ask`, refresh, and delete.
 
 See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and limits.
 
@@ -69,6 +69,11 @@ See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and
 6. [x] Add local persisted RAG indexes.
    - Persist embedded chunks as local JSON under `.groundedos/indexes/`
    - Support `POST /rag/index` and `POST /rag/ask` by `documentId`
+   - Packages: `apps/api`, `apps/web`
+
+7. [x] Add local RAG index management.
+   - List persisted indexes with document metadata and storage paths
+   - Delete persisted indexes by `documentId`
    - Packages: `apps/api`, `apps/web`
 
 ## Explicit non-goals for the first Phase 1 slice

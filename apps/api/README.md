@@ -13,7 +13,7 @@ the local AI pipeline.
 ## Status
 
 In Progress - local RAG API is implemented for inline JSON text, multipart file
-upload, and persisted local document indexes.
+upload, persisted local document indexes, and basic index management.
 
 ## Local usage
 
@@ -127,6 +127,25 @@ curl -X POST http://localhost:3001/rag/index \
 ```
 
 Response includes `document`, `index`, and `storage.indexPath`.
+
+#### `GET /rag/indexes`
+
+Lists persisted local indexes.
+
+```bash
+curl http://localhost:3001/rag/indexes
+```
+
+Response includes `count` and `indexes`, where each item contains `createdAt`,
+`document`, `index`, and `storage`.
+
+#### `DELETE /rag/indexes/:documentId`
+
+Deletes one persisted local index.
+
+```bash
+curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
+```
 
 ## Current limits
 

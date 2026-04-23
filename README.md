@@ -507,8 +507,9 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 - Phase 1 local RAG foundation is executable through `npm run rag:smoke` and `npm run rag:ask`
 - A local API is available through `npm run api:dev` with `POST /rag/index`
-  and `POST /rag/ask` for inline JSON text, multipart text/PDF uploads and
-  persisted local indexes
+  `POST /rag/ask`, `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId`
+  for inline JSON text, multipart text/PDF uploads, persisted local indexes and
+  basic index management
 - A first local web surface is available through `npm run web:dev`
 - Next focus: harden the API contract or introduce semantic embedding providers
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
@@ -540,9 +541,10 @@ Run the local API:
 npm run api:dev
 ```
 
-The first API slice exposes `GET /health`, `POST /rag/index`, and
-`POST /rag/ask` for inline JSON text, multipart text/PDF uploads and persisted
-local indexes under `.groundedos/indexes/`.
+The first API slice exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
+`GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
+multipart text/PDF uploads and persisted local indexes under
+`.groundedos/indexes/`.
 
 Run the local web surface in another terminal:
 
@@ -551,8 +553,8 @@ npm run web:dev
 ```
 
 The web server listens on `http://localhost:3000` and proxies requests to the
-local API. Use `Index` to persist the current source, then `Ask` to query that
-saved local index by `documentId`.
+local API. Use `Index` to persist the current source, select saved indexes from
+the list, then `Ask` to query that saved local index by `documentId`.
 
 ---
 

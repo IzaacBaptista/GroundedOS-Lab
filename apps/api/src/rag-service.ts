@@ -13,7 +13,13 @@ import {
   type RetrievalDevModeOutput,
 } from "@groundedos/rag";
 import { ApiRequestError } from "./errors";
-import { loadRagIndex, saveRagIndex } from "./rag-index-store";
+import {
+  deleteRagIndex,
+  listRagIndexes,
+  loadRagIndex,
+  saveRagIndex,
+  type PersistedRagIndexListItem,
+} from "./rag-index-store";
 
 const DEFAULT_TOP_K = 3;
 const EMBEDDING_DIMENSIONS = 64;
@@ -97,6 +103,16 @@ export type RagIndexResponse = {
     persisted: true;
     indexPath: string;
   };
+};
+
+export type RagIndexListResponse = {
+  count: number;
+  indexes: PersistedRagIndexListItem[];
+};
+
+export type RagIndexDeleteResponse = {
+  deleted: true;
+  index: PersistedRagIndexListItem;
 };
 
 export type GroundedAnswer = {
@@ -351,6 +367,31 @@ export async function askPersistedRag(
       indexPath: saved.relativeIndexPath,
     },
     ...ragOutput,
+  };
+}
+
+export async function listPersistedRagIndexes(indexDir?: string): Promise<RagIndexListResponse> {
+  const indexes = await listRagIndexes(indexDir);
+
+  return {
+    count: indexes.length,
+    indexes,
+  };
+}
+
+export async function deletePersistedRagIndex(
+  documentId: string,
+  indexDir?: string
+): Promise<RagIndexDeleteResponse> {
+  if (typeof documentId !== "string" || documentId.trim().length === 0) {
+    throw new ApiRequestError("documentId must be a non-empty string.");
+  }
+
+  const index = await deleteRagIndex(documentId.trim(), indexDir);
+
+  return {
+    deleted: true,
+    index,
   };
 }
 

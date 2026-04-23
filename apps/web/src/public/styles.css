@@ -229,6 +229,23 @@ h3 {
   gap: 12px;
 }
 
+.index-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.index-tools .field {
+  margin-bottom: 0;
+}
+
+.index-tools__actions {
+  display: flex;
+  gap: 8px;
+}
+
 input,
 select,
 textarea {
@@ -481,6 +498,7 @@ pre {
 
 @media (max-width: 560px) {
   .field-grid,
+  .index-tools,
   .run-row {
     grid-template-columns: 1fr;
   }
@@ -497,6 +515,11 @@ pre {
   }
 
   .action-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .index-tools__actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }

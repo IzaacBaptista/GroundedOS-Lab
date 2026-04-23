@@ -11,8 +11,10 @@ import {
   ApiRequestError,
   askRag,
   askRagFromFile,
+  deletePersistedRagIndex,
   indexRag,
   indexRagFromFile,
+  listPersistedRagIndexes,
   type RagIndexFileRequest,
   type RagIndexRequest,
   type RagAskFileRequest,
@@ -49,6 +51,16 @@ export function createApiServer(options: ApiServerOptions = {}): FastifyInstance
       status: "ok",
       service: "groundedos-api",
     };
+  });
+
+  app.get("/rag/indexes", async () => {
+    return await listPersistedRagIndexes(options.indexDir);
+  });
+
+  app.delete("/rag/indexes/:documentId", async (request) => {
+    const params = request.params as { documentId?: string };
+
+    return await deletePersistedRagIndex(params.documentId ?? "", options.indexDir);
   });
 
   app.post("/rag/ask", async (request, _reply) => {

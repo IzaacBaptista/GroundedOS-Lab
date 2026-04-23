@@ -76,8 +76,9 @@ The local package and CLI layer are wrapped by the first API surface:
 npm run api:dev
 ```
 
-It exposes `GET /health`, `POST /rag/index`, and `POST /rag/ask` for inline
-JSON text, multipart text/PDF uploads and persisted local indexes.
+It exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
+`GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
+multipart text/PDF uploads, persisted local indexes and basic index management.
 
 Start the web surface in another terminal:
 
@@ -87,7 +88,8 @@ npm run web:dev
 
 It serves `http://localhost:3000` and proxies `/api/*` to the local API.
 Use `Index` to persist the current source, then `Ask` to query the saved local
-index.
+index. The indexed-document selector can refresh, select and delete local
+indexes.
 
 Example multipart upload:
 
@@ -118,6 +120,10 @@ curl -X POST http://localhost:3001/rag/ask \
     "query": "What does this command verify?",
     "topK": 1
   }'
+
+curl http://localhost:3001/rag/indexes
+
+curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 ```
 
 The next implementation target is stricter API contract hardening or semantic

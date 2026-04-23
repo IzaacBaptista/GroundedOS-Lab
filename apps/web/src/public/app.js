@@ -14,10 +14,13 @@ const elements = {
   form: document.getElementById("ragForm"),
   formMessage: document.getElementById("formMessage"),
   indexButton: document.getElementById("indexButton"),
+  indexSelect: document.getElementById("indexSelect"),
   indexStatus: document.getElementById("indexStatus"),
+  deleteIndexButton: document.getElementById("deleteIndexButton"),
   modeInputs: Array.from(document.querySelectorAll("input[name='sourceMode']")),
   modePanels: Array.from(document.querySelectorAll("[data-mode-panel]")),
   queryInput: document.getElementById("queryInput"),
+  refreshIndexesButton: document.getElementById("refreshIndexesButton"),
   resultMeta: document.getElementById("resultMeta"),
   resultView: document.getElementById("resultView"),
   submitButton: document.getElementById("submitButton"),
@@ -27,10 +30,14 @@ const elements = {
 };
 
 let activeIndex = undefined;
+let persistedIndexes = [];
 
 elements.form.addEventListener("submit", handleSubmit);
 elements.clearButton.addEventListener("click", clearForm);
 elements.indexButton.addEventListener("click", handleIndex);
+elements.indexSelect.addEventListener("change", handleIndexSelection);
+elements.refreshIndexesButton.addEventListener("click", loadIndexes);
+elements.deleteIndexButton.addEventListener("click", handleDeleteIndex);
 elements.fileInput.addEventListener("change", () => {
   syncFileFields();
   clearActiveIndex();
@@ -50,6 +57,7 @@ for (const input of elements.modeInputs) {
 syncMode();
 renderIndexStatus();
 checkApiHealth();
+loadIndexes();
 
 async function checkApiHealth() {
   setHealth("checking", "API checking");
@@ -131,6 +139,7 @@ async function handleIndex() {
       indexPath: output.storage.indexPath,
     };
     renderIndexStatus();
+    await loadIndexes(output.document.documentId);
     setMessage(`Indexed ${output.index.chunkCount} chunks.`);
     await checkApiHealth();
   } catch (error) {
@@ -142,6 +151,91 @@ async function handleIndex() {
     elements.submitButton.disabled = false;
     elements.indexButton.textContent = "Index";
   }
+}
+
+async function loadIndexes(selectedDocumentId) {
+  try {
+    const response = await fetch("/api/rag/indexes");
+    const body = await response.json().catch(() => undefined);
+
+    if (!response.ok) {
+      const message = body && body.error && body.error.message
+        ? body.error.message
+        : `Index list failed with status ${response.status}.`;
+      throw new Error(message);
+    }
+
+    persistedIndexes = Array.isArray(body.indexes) ? body.indexes : [];
+    renderIndexSelect(selectedDocumentId);
+    await checkApiHealth();
+  } catch (error) {
+    persistedIndexes = [];
+    renderIndexSelect();
+    setMessage(error instanceof Error ? error.message : "Failed to load indexes.", true);
+    await checkApiHealth();
+  }
+}
+
+function handleIndexSelection() {
+  const documentId = elements.indexSelect.value;
+
+  if (!documentId) {
+    clearActiveIndex();
+    return;
+  }
+
+  const selected = persistedIndexes.find((item) => item.document.documentId === documentId);
+
+  if (!selected) {
+    clearActiveIndex();
+    return;
+  }
+
+  setActiveIndexFromListItem(selected);
+  setMessage(`Selected ${selected.document.title}.`);
+}
+
+async function handleDeleteIndex() {
+  if (!activeIndex) {
+    return;
+  }
+
+  const documentId = activeIndex.documentId;
+
+  elements.deleteIndexButton.disabled = true;
+  elements.indexButton.disabled = true;
+  elements.submitButton.disabled = true;
+  setMessage("");
+
+  try {
+    await deleteIndex(documentId);
+    clearActiveIndex();
+    await loadIndexes();
+    setMessage(`Deleted index ${documentId}.`);
+  } catch (error) {
+    setMessage(error instanceof Error ? error.message : "Delete failed.", true);
+    await checkApiHealth();
+  } finally {
+    elements.indexButton.disabled = false;
+    elements.submitButton.disabled = false;
+    renderIndexStatus();
+  }
+}
+
+async function deleteIndex(documentId) {
+  const response = await fetch(`/api/rag/indexes/${encodeURIComponent(documentId)}`, {
+    method: "DELETE",
+  });
+  const body = await response.json().catch(() => undefined);
+
+  if (!response.ok) {
+    const message = body && body.error && body.error.message
+      ? body.error.message
+      : `Delete failed with status ${response.status}.`;
+    throw new Error(message);
+  }
+
+  return body;
 }
 
 async function askWithFile(query, topK) {
@@ -398,6 +492,9 @@ function clearForm() {
 
 function clearActiveIndex() {
   activeIndex = undefined;
+  if (elements.indexSelect.value) {
+    elements.indexSelect.value = "";
+  }
   renderIndexStatus();
 }
 
@@ -405,12 +502,69 @@ function renderIndexStatus() {
   if (!activeIndex) {
     elements.indexStatus.textContent = "No indexed document.";
     elements.indexStatus.classList.remove("index-status--active");
+    elements.deleteIndexButton.disabled = true;
     return;
   }
 
   elements.indexStatus.textContent =
     `Indexed: ${activeIndex.title} | ${activeIndex.chunkCount} chunks | ${activeIndex.documentId}`;
   elements.indexStatus.classList.add("index-status--active");
+  elements.deleteIndexButton.disabled = false;
+}
+
+function renderIndexSelect(selectedDocumentId) {
+  elements.indexSelect.replaceChildren();
+  const nextSelectedDocumentId = selectedDocumentId || activeIndex?.documentId;
+
+  if (!persistedIndexes.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No indexed documents";
+    elements.indexSelect.append(option);
+    elements.indexSelect.disabled = true;
+    elements.deleteIndexButton.disabled = true;
+    clearActiveIndex();
+    return;
+  }
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = "Select an index";
+  elements.indexSelect.append(emptyOption);
+
+  for (const item of persistedIndexes) {
+    const option = document.createElement("option");
+    option.value = item.document.documentId;
+    option.textContent =
+      `${item.document.title} | ${item.index.chunkCount} chunks`;
+    elements.indexSelect.append(option);
+  }
+
+  elements.indexSelect.disabled = false;
+
+  if (nextSelectedDocumentId) {
+    elements.indexSelect.value = nextSelectedDocumentId;
+    const selected = persistedIndexes.find(
+      (item) => item.document.documentId === nextSelectedDocumentId
+    );
+
+    if (selected) {
+      setActiveIndexFromListItem(selected);
+    } else if (activeIndex) {
+      clearActiveIndex();
+    }
+  }
+}
+
+function setActiveIndexFromListItem(item) {
+  activeIndex = {
+    documentId: item.document.documentId,
+    title: item.document.title,
+    chunkCount: item.index.chunkCount,
+    indexPath: item.storage.indexPath,
+  };
+  elements.indexSelect.value = item.document.documentId;
+  renderIndexStatus();
 }
 
 function setHealth(status, label) {

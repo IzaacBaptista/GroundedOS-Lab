@@ -3,7 +3,14 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 
-import { ApiRequestError, askRag, askRagFromFile, indexRag } from "./rag-service";
+import {
+  ApiRequestError,
+  askRag,
+  askRagFromFile,
+  deletePersistedRagIndex,
+  indexRag,
+  listPersistedRagIndexes,
+} from "./rag-service";
 
 describe("askRag", () => {
   it("answers a grounded question against inline text", async () => {
@@ -131,6 +138,63 @@ describe("persisted RAG indexes", () => {
       expect(output.devMode.results[0]?.chunkId).toBe(
         "persisted-api-test:section-2:chunk-1"
       );
+    } finally {
+      await rm(indexDir, { recursive: true, force: true });
+    }
+  });
+
+  it("lists and deletes persisted indexes", async () => {
+    const indexDir = await createTempIndexDir();
+
+    try {
+      await indexRag({
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Listed API Test",
+        documentId: "listed-api-test",
+        indexDir,
+      });
+
+      const listed = await listPersistedRagIndexes(indexDir);
+
+      expect(listed.count).toBe(1);
+      expect(listed.indexes[0]).toMatchObject({
+        document: {
+          documentId: "listed-api-test",
+          title: "Listed API Test",
+        },
+        index: {
+          chunkCount: 2,
+        },
+        storage: {
+          persisted: true,
+        },
+      });
+
+      const deleted = await deletePersistedRagIndex("listed-api-test", indexDir);
+
+      expect(deleted).toMatchObject({
+        deleted: true,
+        index: {
+          document: {
+            documentId: "listed-api-test",
+          },
+        },
+      });
+      await expect(
+        askRag({
+          documentId: "listed-api-test",
+          query: "What explains vector search?",
+          indexDir,
+        })
+      ).rejects.toMatchObject({
+        statusCode: 404,
+      });
+      await expect(listPersistedRagIndexes(indexDir)).resolves.toEqual({
+        count: 0,
+        indexes: [],
+      });
     } finally {
       await rm(indexDir, { recursive: true, force: true });
     }
