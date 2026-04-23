@@ -2,10 +2,92 @@
 
 > Build, evaluate and understand grounded AI systems — from RAG pipelines to multi-agent orchestration.
 
-**An open-source platform to build, study and evaluate grounded AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
+**A practical learning laboratory for AI Engineering: RAG, agents, evals, observability and safety — built incrementally from a working local foundation.**
 
 > ⚠️ This project is a learning and experimentation platform for modern AI systems.
 > It intentionally exposes internal mechanics such as RAG pipelines, agent orchestration, evaluation, observability and safety layers.
+
+---
+
+## ⚡ Start Here
+
+> **New here? Pick the path that fits your goal:**
+
+| I want to… | Go to |
+|---|---|
+| **Try the working RAG pipeline right now** | [▶ What works today](#-what-works-today) |
+| **Run it in 5 minutes** | [⚙ Quick start](#-quick-start) |
+| **Understand what we're building and why** | [🎯 Objectives](#-objectives) |
+| **See the architecture** | [🏗 Architecture](#-architecture) |
+| **Learn AI concepts behind the code** | [📖 Concepts](./docs/concepts/README.md) |
+| **Follow a guided learning path** | [📘 Study Tracks](./docs/study-tracks/README.md) |
+| **Understand key design decisions** | [📐 ADRs](./docs/adr/README.md) |
+| **Contribute** | [🤝 Contributing](#-contributing) |
+
+---
+
+## ✅ What Works Today
+
+> This section tracks what is **actually runnable**, not what is planned.
+> Planned work lives in the [Roadmap](#-roadmap).
+
+### Phase 0 — Data Foundation ✅ Complete
+
+- Uniform Document Schema (`SourceDocument`, `NormalizedDocument`) in `packages/core`
+- ETL pipeline ingests **text** and **PDF** files → `NormalizedDocument` with sections and lineage
+- Image and audio extractors exist as registered stubs (return `NOT_IMPLEMENTED`)
+- Sample dataset registered in `datasets/registry.json` with checksum and metadata
+- `npm run ingest:smoke` runs the full ETL pipeline locally
+
+### Phase 1 — Core RAG ✅ Complete
+
+- **Upload a document** (inline text or text/PDF file) via API or CLI
+- **Index** it: chunk → embed → store in local in-memory or persisted index (`.groundedos/indexes/`)
+- **Ask** a grounded question: retrieve top-K chunks → extractive answer → Dev Mode output
+- **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider
+- **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
+- **Index management** API: list, delete persisted indexes
+
+### What is NOT yet implemented
+
+| Feature | Planned phase |
+|---|---|
+| Hybrid search (dense + sparse) | Phase 2 |
+| Re-ranking | Phase 2 |
+| Full observability (OpenTelemetry spans) | Phase 2 |
+| Persistent conversation memory | Phase 2b |
+| Agents and tool calling | Phase 3 |
+| Guardrails (beyond stubs) | Phase 3 |
+| Automated evals (faithfulness, relevance) | Phase 3 |
+| Docker / CI / auth | Phase 6 |
+| Python workers | Phase 3+ |
+| Cloud LLM providers (OpenAI, Anthropic) | Phase 3+ |
+| LoRA / fine-tuning / quantization | Phase 5 |
+
+---
+
+## ⚙️ Quick Start
+
+> Requirements: Node.js ≥ 18, npm ≥ 8
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Ask a question against the sample dataset (no config needed)
+npm run rag:smoke -- --dataset phase-0-smoke-text --query "What does this command verify?"
+
+# 3. Ask against your own file
+npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "Your question"
+
+# 4. Start the local API server (port 3001)
+npm run api:dev
+
+# 5. Start the web interface (port 3000) in another terminal
+npm run web:dev
+```
+
+Both CLI commands print a JSON response with the query, a grounded answer, retrieved chunk IDs, scores, source metadata and offsets. See [docs/phase-1-local-rag.md](./docs/phase-1-local-rag.md) for the full usage guide.
 
 ---
 
@@ -13,27 +95,60 @@
 
 ---
 
-## 🚀 Overview
+## 🎯 Objectives
 
-GroundedOS Lab is a **product + laboratory + engineering platform** designed to help developers:
+GroundedOS Lab has one primary goal and two secondary ones. **Order matters** — if there is ever a conflict, the primary goal wins.
 
-* Build real AI-powered applications
-* Understand how modern AI systems work internally
-* Evaluate quality, cost and performance
-* Experiment safely with cutting-edge techniques
+1. **Primary — practical learning laboratory**
+   A hands-on environment where developers build each component of a grounded AI system from scratch, observe its internals and understand why it works. Every feature exists to teach something, not to ship a product.
 
-This is not just a chatbot.
-This is a **complete system for grounded AI**.
+2. **Secondary — architecture reference**
+   A structured, documented monorepo that shows how RAG, agents, evals, observability and safety fit together in a real codebase. Decisions are recorded in [ADRs](./docs/adr/README.md) so the reasoning is visible.
+
+3. **Tertiary — usable product**
+   Once the learning foundation is solid, the system should also work as a usable local AI assistant. This is never the reason to add complexity; it is the outcome of doing 1 and 2 well.
 
 ---
 
-## 🎯 Goals
+## 🔁 Core Product Loop
 
-* Deliver a **usable AI assistant**
-* Expose **internal mechanics of LLM systems**
-* Enable **experimentation and benchmarking**
-* Serve as a **learning platform**
-* Demonstrate **production-ready architecture**
+Every feature in this project orbits a single observable loop:
+
+```text
+Upload document
+   ↓
+Index (chunk → embed → store)
+   ↓
+Ask a question
+   ↓
+Retrieve relevant chunks
+   ↓
+Generate a grounded answer
+   ↓
+Show sources + Dev Mode metadata
+   ↓
+Evaluate quality (faithfulness, relevance, latency, cost)
+   ↓
+Trace the full request
+```
+
+This loop is **already runnable** (Phases 0–1). Everything else — agents, re-ranking, guardrails, fine-tuning — is an extension that makes one step of this loop better or more observable. Build and understand the loop first.
+
+---
+
+## ⚡ Local-First Philosophy
+
+GroundedOS Lab runs **locally first**, with optional cloud integration as the project evolves.
+
+* Enable local model execution for experimentation
+* Compare local vs cloud performance
+* Reduce or eliminate dependency on paid APIs during experimentation
+
+Planned / target integrations:
+
+* Local Transformers (quantized models)
+* Ollama-based local execution (opt-in, already available for embeddings)
+* OpenAI / Anthropic APIs (optional, Phase 3+)
 
 ---
 
@@ -85,6 +200,26 @@ Planned / target integrations:
 
 ## 🏗️ Architecture
 
+The architecture is described at three levels of maturity. Not everything in the Target or Experimental views exists yet — see [What works today](#-what-works-today) for the running baseline.
+
+### Current Architecture (Phases 0–1, runnable today)
+
+```text
+User Input (CLI or HTTP)
+   ↓
+apps/api (Fastify)  or  CLI script
+   ↓
+packages/etl  →  NormalizedDocument
+   ↓
+packages/rag  →  Chunks + Embeddings + In-Memory Vector Search
+   ↓
+Extractive Answer + Dev Mode Output (chunks, scores, offsets, metadata)
+```
+
+This is the working loop. It produces observable output — retrieved chunks with scores and source attribution — on every request.
+
+### Target Architecture (Phases 2–4, planned)
+
 ```text
 --------------------------------
 | Session / Request Manager    |  ← lifecycle owner for the entire request
@@ -135,6 +270,22 @@ Response + Data Lineage
 > - **Session / Request Manager** owns the full request lifecycle. It is the component that will manage state across multiple tool calls in agent flows.
 > - **RAG before Model Routing**: retrieved context (volume, domain, complexity) informs which model to use. Routing before retrieval loses this signal.
 > - **Semantic Cache after RAG**: the cache key is `(query, retrieved_context)`, not the raw query alone. Caching the raw query produces false hits when different retrievals produce the same query string but different contexts.
+
+### Experimental Architecture (Phase 5, separate from the core loop)
+
+The `experiments/` folder holds independent experiments that are **not part of the request path**. They produce artifacts (fine-tuned weights, quantized models) that can later feed into Model Routing as new provider options.
+
+```text
+experiments/
+  fine-tuning/    ← offline training runs, produce weights
+  lora/           ← LoRA adapter training
+  quantization/   ← quantize models for local inference
+  distillation/   ← teacher → student model compression
+  jailbreak-defense/  ← red-teaming, produces attack fixtures for packages/safety
+  bias-tests/     ← produces eval fixtures for packages/evals
+```
+
+These experiments orbit the core loop — they make it better — but they are never prerequisites for the core loop to run.
 
 ---
 
@@ -250,28 +401,29 @@ GroundedOS Lab is built for:
 
 Use this repository as a structured learning path:
 
-* Want the big-picture introduction?
-  → Start with [🚀 Overview](#-overview)
+* **New here? Start in 5 minutes:**
+  → [⚡ Quick Start](#-quick-start) and [✅ What works today](#-what-works-today)
 
-* Want to understand the platform goals and learning focus?
-  → Review the introduction at the top of this document
+* **Want to understand what we're building?**
+  → [🎯 Objectives](#-objectives) and [🔁 Core Product Loop](#-core-product-loop)
 
-* Interested in the hands-on module concepts?
+* **Interested in the hands-on module concepts?**
   → Jump to [🔬 Laboratory Modules](#-laboratory-modules)
 
-* Looking for evals, agents, guardrails, routing, or prompt experimentation?
+* **Looking for evals, agents, guardrails, routing, or prompt experimentation?**
   → Browse the [`packages/`](./packages/) and [`experiments/`](./experiments/) folders — each has its own `README.md`
 
-* Want to understand AI concepts behind the system?
+* **Want to understand AI concepts behind the system?**
   → Start at [`docs/concepts/`](./docs/concepts/)
 
-* Want a guided learning path by topic?
+* **Want a guided learning path by topic?**
   → Explore the [📘 Guided Study Tracks](./docs/study-tracks/README.md)
 
-* Want to understand *why* the system is built the way it is?
+* **Want to understand *why* the system is built the way it is?**
   → Read the [Architecture Decision Records](./docs/adr/README.md)
 
-As the project evolves, this section will map each concept directly to code implementations.
+* **Want to know how quality is measured?**
+  → Read the [Evaluation Strategy](./docs/evaluation-strategy.md)
 
 ---
 
@@ -446,18 +598,33 @@ groundedos-lab/
 
 ---
 
-## ⚙️ Tech Stack (Planned)
+## ⚙️ Tech Stack
 
-> ⚠️ The tech stack below describes the **intended target architecture**. Tooling configuration (package.json, turbo.json, etc.) will be added before Phase 0 coding begins.
+### Minimal stack (what you need to run it today)
 
-* Frontend: Next.js + TypeScript
-* Backend: Node.js (**Fastify**) — chosen for its low-overhead, plugin-first model that fits an experimental platform where flexibility matters more than an opinionated full-stack framework. See [ADR-001](./docs/adr/ADR-001-backend-framework.md).
-* Workers: Python (ML pipelines)
-* Database: PostgreSQL
-* Vector DB: **pgvector** for local development (no extra service required); migrate to **Qdrant** when vector search becomes a performance bottleneck or when approximate-nearest-neighbour index tuning is needed. See [ADR-002](./docs/adr/ADR-002-vector-database.md) for the full decision criteria.
-* Queue: Redis + BullMQ — the defined **API → Worker communication boundary**. The Node.js API publishes jobs to BullMQ queues; Python workers consume them via the `bullmq` Python client or a thin HTTP adapter. See [ADR-003](./docs/adr/ADR-003-api-worker-communication.md).
-* Observability: OpenTelemetry + Grafana
-* AI: Local (Ollama, planned) + OpenAI / Anthropic (optional, planned)
+No external services required for Phases 0–1:
+
+| Layer | What | Note |
+|---|---|---|
+| API server | Node.js + **Fastify** | Runs with `npm run api:dev`. See [ADR-001](./docs/adr/ADR-001-backend-framework.md). |
+| Web | Next.js + TypeScript | Runs with `npm run web:dev` |
+| Storage | Local JSON files (`.groundedos/`) | No database required yet |
+| Embeddings | `api-lexical` (built-in) | Default, no server. `local-hash` and `ollama` are opt-in. |
+| Vector search | In-memory (packages/rag) | No external vector DB required yet |
+| Logging | Structured console output | No tracing server required yet |
+
+### Target stack (planned additions, phased in)
+
+| Layer | What | When | Notes |
+|---|---|---|---|
+| Database | PostgreSQL | Phase 2+ | Persistent indexes and memory |
+| Vector DB | **pgvector** → **Qdrant** | Phase 2+ | pgvector first, migrate when needed. See [ADR-002](./docs/adr/ADR-002-vector-database.md). |
+| Queue | Redis + BullMQ | Phase 3+ | API → Worker communication boundary. See [ADR-003](./docs/adr/ADR-003-api-worker-communication.md). |
+| Workers | Python (ML pipelines) | Phase 3+ | Consume BullMQ jobs for compute-heavy tasks |
+| Observability | OpenTelemetry + Grafana | Phase 2+ | Distributed tracing, cost per stage |
+| AI providers | OpenAI / Anthropic (optional) | Phase 3+ | Cloud LLM option alongside local Ollama |
+| Containers | Docker + docker-compose | Phase 6 | Full local stack in one command |
+| CI | GitHub Actions | Phase 6 | Lint, typecheck, test on every PR |
 
 ---
 
@@ -488,6 +655,7 @@ groundedos-lab/
 - [x] Local RAG smoke command can ask a question against a registered dataset
 - [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
 - [x] `packages/rag` has integration tests covering the full retrieval flow
+- [ ] Phase 1 baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json` — see [Evaluation Strategy](./docs/evaluation-strategy.md)
 
 ### Phase 2 — Retrieval Quality
 
@@ -523,8 +691,10 @@ groundedos-lab/
 
 **✅ Success Criteria:**
 - [ ] At least one end-to-end agent flow is runnable: a `document-qa` agent that retrieves from a persisted index, calls a summarization tool, and returns a grounded answer with source attribution
-- [ ] Guardrails block prompt injection (tested against ≥ 5 injection patterns) and strip PII before logging
-- [ ] Evals report automated faithfulness and answer-relevance scores for the Phase 0 smoke dataset using a documented scoring rubric
+- [ ] Guardrails implement all six risks in the [threat matrix](./docs/concepts/guardrails.md#threat-matrix) with test fixtures
+- [ ] Evals report automated faithfulness and answer-relevance scores against the golden dataset using the [Evaluation Strategy](./docs/evaluation-strategy.md)
+- [ ] All six provider contracts from [ADR-005](./docs/adr/ADR-005-provider-contracts.md) have at least one concrete implementation each
+- [ ] Phase 3 baseline metrics recorded in `datasets/golden/baselines/phase-3-baseline.json`
 
 ### Phase 4 — Lab
 
