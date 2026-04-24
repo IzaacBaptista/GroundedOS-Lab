@@ -32,11 +32,11 @@ Each entry in the golden dataset is a JSON object:
   "question": "What does the smoke command verify?",
   "document_ref": "phase-0-smoke-text",
   "expected_answer_contains": ["ETL dispatcher", "NormalizedDocument"],
-  "expected_chunk_ids": ["smoke-text-001:section-1:chunk-1"],
+  "expected_chunk_ids": ["smoke-text-001:section-2:chunk-1"],
   "expected_sources": [
     {
       "documentId": "smoke-text-001",
-      "sectionId": "section-1"
+      "sectionId": "section-2"
     }
   ],
   "notes": "Phase 0 baseline question. Answer must cite the ETL dispatcher."
@@ -55,13 +55,16 @@ Each entry in the golden dataset is a JSON object:
 
 ### Phase 0–1 baseline entries
 
-The Phase 0 smoke dataset provides the first golden entries. These cover:
+The Phase 0 smoke dataset provides the first golden entry. It covers:
+
+- Retrieval from a multi-section document where the relevant answer is in a later section
+
+Future golden entries should add:
 
 - Direct factual retrieval from a single-section document
-- Multi-section retrieval where the answer spans two chunks
 - Edge case: question with no relevant content in the document (expected: no answer, not hallucination)
 
-Location: `datasets/golden/phase-0-baseline.json` *(to be created in Phase 3 when the eval framework is wired)*
+Location: `datasets/golden/phase-0-baseline.json`
 
 ---
 
@@ -122,7 +125,7 @@ Before any phase improvement is declared complete, its success criteria must be 
 
 ### Current baseline
 
-Phase 1 baseline: *not yet measured* — will be recorded before Phase 2 work begins.
+Phase 1 metric baseline: *not yet measured* — will be recorded at `datasets/golden/baselines/phase-1-baseline.json` before Phase 2 work begins.
 
 ---
 

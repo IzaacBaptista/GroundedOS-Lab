@@ -39,7 +39,7 @@
 - Sample dataset registered in `datasets/registry.json` with checksum and metadata
 - `npm run ingest:smoke` runs the full ETL pipeline locally
 
-### Phase 1 — Core RAG ✅ Complete
+### Phase 1 — Core RAG 🟡 Runnable
 
 - **Upload a document** (inline text or text/PDF file) via API or CLI
 - **Index** it: chunk → embed → store in local in-memory or persisted index (`.groundedos/indexes/`)
@@ -47,6 +47,7 @@
 - **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider
 - **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
 - **Index management** API: list, delete persisted indexes
+- Phase 1 is functionally runnable; the remaining closeout item is recording baseline metrics before Phase 2 retrieval-quality work starts.
 
 ### What is NOT yet implemented
 
@@ -149,24 +150,6 @@ Planned / target integrations:
 * Local Transformers (quantized models)
 * Ollama-based local execution (opt-in, already available for embeddings)
 * OpenAI / Anthropic APIs (optional, Phase 3+)
-
----
-
-## ⚡ Local-First Philosophy
-
-GroundedOS Lab is designed to run **locally first**, with optional cloud integration as the project evolves.
-
-Goals:
-
-* Enable local model execution for experimentation
-* Compare local vs cloud performance
-* Reduce or eliminate dependency on paid APIs during experimentation
-
-Planned / target integrations:
-
-* Local Transformers (quantized models)
-* Ollama-based local execution
-* OpenAI / Anthropic APIs (optional, planned)
 
 ---
 
@@ -289,7 +272,9 @@ These experiments orbit the core loop — they make it better — but they are n
 
 ---
 
-## 🧠 Concepts Implemented
+## 🧠 Concepts Covered
+
+Some concepts below are already implemented in the runnable Phase 0-1 loop. Others are documented and roadmapped so contributors can learn the system in the order it will be built. See [What works today](#-what-works-today) for the implementation boundary.
 
 ### 🔹 Core AI
 
@@ -607,7 +592,7 @@ No external services required for Phases 0–1:
 | Layer | What | Note |
 |---|---|---|
 | API server | Node.js + **Fastify** | Runs with `npm run api:dev`. See [ADR-001](./docs/adr/ADR-001-backend-framework.md). |
-| Web | Next.js + TypeScript | Runs with `npm run web:dev` |
+| Web | Node static web server + TypeScript | Runs with `npm run web:dev`; Next.js remains a target option for a later production UI |
 | Storage | Local JSON files (`.groundedos/`) | No database required yet |
 | Embeddings | `api-lexical` (built-in) | Default, no server. `local-hash` and `ollama` are opt-in. |
 | Vector search | In-memory (packages/rag) | No external vector DB required yet |
@@ -655,7 +640,7 @@ No external services required for Phases 0–1:
 - [x] Local RAG smoke command can ask a question against a registered dataset
 - [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
 - [x] `packages/rag` has integration tests covering the full retrieval flow
-- [ ] Phase 1 baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json` — see [Evaluation Strategy](./docs/evaluation-strategy.md)
+- [ ] Phase 1 baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json` before Phase 2 begins — see [Evaluation Strategy](./docs/evaluation-strategy.md)
 
 ### Phase 2 — Retrieval Quality
 
@@ -668,7 +653,7 @@ No external services required for Phases 0–1:
 - [ ] Re-ranking is applied and token usage / latency per stage is logged per request
 - [ ] Retrieval observability spans (chunk count, scores, latency) appear in the Dev Mode output
 
-> **Note:** Persistent memory between sessions is a separate product and infrastructure concern (storage, user identity, privacy) and is tracked in Phase 3, not here. Mixing it with retrieval quality improvements would cause one to delay the other.
+> **Note:** Persistent memory between sessions is a separate product and infrastructure concern (storage, user identity, privacy) and is tracked in Phase 2b, not here. Mixing it with retrieval quality improvements would cause one to delay the other.
 
 ### Phase 2b — Persistent Memory
 

@@ -47,4 +47,4 @@ You do **not** need an ADR for obvious or easily-reversible choices (e.g. adding
 | [ADR-002](./ADR-002-vector-database.md) | Vector database: pgvector → Qdrant migration path | Accepted |
 | [ADR-003](./ADR-003-api-worker-communication.md) | API → Worker communication via BullMQ / Redis | Accepted |
 | [ADR-004](./ADR-004-monorepo-tooling.md) | Monorepo tooling: npm workspaces + Vitest | Accepted |
-| [ADR-005](./ADR-005-provider-contracts.md) | Minimal provider contracts before package extraction | Accepted |
+| [ADR-005](./ADR-005-provider-contracts.md) | Minimal provider contracts before broad package extraction | Accepted |

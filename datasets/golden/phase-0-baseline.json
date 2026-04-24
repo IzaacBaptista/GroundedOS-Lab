@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "description": "Initial golden questions for the Phase 0 smoke dataset. These entries are used to evaluate the local Phase 1 RAG retrieval loop before Phase 2 retrieval-quality work begins.",
+  "entries": [
+    {
+      "id": "gd-001",
+      "question": "What does this command verify?",
+      "document_ref": "phase-0-smoke-text",
+      "expected_answer_contains": [
+        "ETL dispatcher",
+        "NormalizedDocument"
+      ],
+      "expected_chunk_ids": [
+        "smoke-text-001:section-2:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "smoke-text-001",
+          "sectionId": "section-2"
+        }
+      ],
+      "notes": "Phase 0 smoke question. The answer should cite the chunk describing the ETL dispatcher and NormalizedDocument output."
+    }
+  ]
+}
