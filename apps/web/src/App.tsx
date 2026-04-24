@@ -31,11 +31,11 @@ import type {
 } from "./api/types";
 import { useApiHealth } from "./hooks/useApiHealth";
 import { useIndexList } from "./hooks/useIndexList";
-import {
-  ChunksList,
-  CitationsList,
-  DevModeBlock,
-} from "./components/ResultParts";
+import { AnswerPanel } from "./components/AnswerPanel";
+import { ChunksList } from "./components/ResultParts";
+import { ExplainBox } from "./components/shared/ExplainBox";
+import { Pill } from "./components/shared/Pill";
+import { ScoreBar } from "./components/shared/ScoreBar";
 
 type AppState =
   | "idle"
@@ -60,7 +60,7 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "ollama",
 ];
 
-type ResultMode = "answer" | "compare" | "embeddings" | "tradeoffs" | "models";
+type ResultMode = "answer" | "compare" | "embeddings" | "models";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -515,14 +515,6 @@ export default function App() {
   }, [reportModelBenchmarkMessage]);
 
   useEffect(() => {
-    if (outputTab !== "tradeoffs") {
-      return;
-    }
-
-    void loadTradeoffs();
-  }, [outputTab, loadTradeoffs]);
-
-  useEffect(() => {
     if (outputTab !== "embeddings") {
       return;
     }
@@ -895,7 +887,6 @@ function ResultPanel({
   modelBenchmarkMessage,
   modelBenchmarkMessageIsError,
 }: ResultPanelProps) {
-  const citations = result?.answer?.citations ?? [];
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
   const resultMeta = result
@@ -917,13 +908,6 @@ function ResultPanel({
           ? `${modelBenchmark.providers.length} providers | ${modelBenchmark.dataset}`
           : "No benchmark loaded"
         : "No result";
-
-  const showHint =
-    outputTab === "answer" &&
-    hasResult &&
-    (!result?.answer?.grounded ||
-      results.length === 0 ||
-      results.every((item) => !(item.score > 0)));
 
   return (
     <section className="panel output-panel" aria-label="RAG output">
@@ -961,15 +945,6 @@ function ResultPanel({
           Embeddings
         </button>
         <button
-          className={`result-tab${outputTab === "tradeoffs" ? " result-tab--active" : ""}`}
-          type="button"
-          role="tab"
-          aria-selected={outputTab === "tradeoffs"}
-          onClick={() => setOutputTab("tradeoffs")}
-        >
-          Trade-offs
-        </button>
-        <button
           className={`result-tab${outputTab === "models" ? " result-tab--active" : ""}`}
           type="button"
           role="tab"
@@ -980,50 +955,13 @@ function ResultPanel({
         </button>
       </div>
 
-      {outputTab === "answer" && !hasResult && (
-        <div className="empty-state">
-          <div className="empty-state__mark" aria-hidden="true" />
-          <p className="empty-state__message">
-            Index a document on the left, then ask a question to see the
-            grounded answer and Dev Mode output here.
-          </p>
-        </div>
-      )}
-
-      {outputTab === "answer" && hasResult && result && (
-        <div className="result-view">
-          <section className="answer-block">
-            <p>{result.answer?.text ?? "No answer returned."}</p>
-          </section>
-
-          {showHint && (
-            <p className="result-hint">
-              No relevant chunks found. Try rephrasing your query.
-            </p>
-          )}
-
-          <section className="output-section">
-            <div className="section-title">
-              <h3>Citations</h3>
-              <span className="count">{citations.length}</span>
-            </div>
-            <div className="result-list">
-              <CitationsList citations={citations} />
-            </div>
-          </section>
-
-          <section className="output-section">
-            <div className="section-title">
-              <h3>Retrieved Chunks</h3>
-              <span className="count">{results.length}</span>
-            </div>
-            <div className="result-list">
-              <ChunksList results={results} />
-            </div>
-          </section>
-
-          <DevModeBlock payload={result} />
-        </div>
+      {outputTab === "answer" && (
+        <AnswerPanel
+          response={result ?? null}
+          tradeoffs={tradeoffMetrics ?? null}
+          tradeoffsLoading={tradeoffMetricsLoading}
+          onRefreshTradeoffs={onRefreshTradeoffs}
+        />
       )}
 
       {outputTab === "compare" && (
@@ -1093,87 +1031,6 @@ function ResultPanel({
               output={compare.outputB}
             />
           </div>
-        </div>
-      )}
-
-      {outputTab === "tradeoffs" && (
-        <div className="tradeoffs-view">
-          <div className="panel__header">
-            <h3>Request Metrics</h3>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onRefreshTradeoffs}
-              disabled={tradeoffMetricsLoading}
-            >
-              {tradeoffMetricsLoading ? "Refreshing" : "Refresh"}
-            </button>
-          </div>
-
-          <p
-            className={`form-message${tradeoffMessageIsError ? " is-error" : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            {tradeoffMessage}
-          </p>
-
-          {!tradeoffMetrics && !tradeoffMetricsLoading && (
-            <p className="chunk-text">No trade-off metrics available yet.</p>
-          )}
-
-          {tradeoffMetrics && (
-            <>
-              <div className="tradeoffs-grid">
-                <MetricCard label="Requests" value={String(tradeoffMetrics.totals.requests)} />
-                <MetricCard
-                  label="Avg latency"
-                  value={`${tradeoffMetrics.totals.avgLatencyMs.toFixed(2)} ms`}
-                />
-                <MetricCard
-                  label="P95 latency"
-                  value={`${tradeoffMetrics.totals.p95LatencyMs.toFixed(2)} ms`}
-                />
-                <MetricCard
-                  label="Avg cost"
-                  value={`$${tradeoffMetrics.totals.avgCostUsd.toFixed(6)}`}
-                />
-                <MetricCard
-                  label="Grounded rate"
-                  value={formatRate(tradeoffMetrics.totals.groundedRate)}
-                />
-                <MetricCard
-                  label="Cache hit rate"
-                  value={formatRate(tradeoffMetrics.totals.cacheHitRate)}
-                />
-              </div>
-
-              <section className="output-section">
-                <div className="section-title">
-                  <h3>By Provider</h3>
-                  <span className="count">{tradeoffMetrics.providers.length}</span>
-                </div>
-                <div className="result-list">
-                  {tradeoffMetrics.providers.length === 0 ? (
-                    <p className="chunk-text">No provider metrics yet.</p>
-                  ) : (
-                    tradeoffMetrics.providers.map((provider) => (
-                      <article key={provider.provider} className="result-row">
-                        <div className="result-row__meta">
-                          <span>{provider.provider}</span>
-                          <span>{provider.requests} requests</span>
-                          <span>avg {provider.avgLatencyMs.toFixed(2)} ms</span>
-                          <span>p95 {provider.p95LatencyMs.toFixed(2)} ms</span>
-                          <span>{formatRate(provider.groundedRate)} grounded</span>
-                          <span>{formatRate(provider.cacheHitRate)} cache hit</span>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </section>
-            </>
-          )}
         </div>
       )}
 
@@ -1310,16 +1167,28 @@ function ModelBenchmarkView({
 
 function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRun }) {
   const firstQuery = provider.perQuery[0];
+  const statusVariant =
+    provider.status === "completed"
+      ? "green"
+      : provider.status === "error"
+        ? "amber"
+        : "gray";
+  const providerNote =
+    provider.provider === "openai"
+      ? "OpenAI is the cloud baseline for Phase 4. When quota is available, this row shows real latency, answer quality and estimated cost for the cloud run."
+      : provider.provider === "ollama"
+        ? "Ollama is the local model baseline. It usually costs $0.00 locally but can be slower than lexical extraction."
+        : "The local extractive baseline builds an answer from retrieved text without calling an external model.";
 
   return (
     <>
       <div className="provider-status-row">
-        <span className={`status-pill status-pill--${provider.status}`}>
-          {provider.status}
-        </span>
-        <span className="tag">{provider.kind}</span>
-        <span className="tag">{provider.model}</span>
+        <Pill variant={statusVariant}>{provider.status}</Pill>
+        <Pill variant="blue">{provider.kind}</Pill>
+        <Pill variant="gray">{provider.model}</Pill>
       </div>
+
+      <ExplainBox>{providerNote}</ExplainBox>
 
       <div className="tradeoffs-grid">
         <MetricCard label="Requests" value={String(provider.metrics.requestCount)} />
@@ -1330,8 +1199,19 @@ function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRu
         <MetricCard label="Total cost" value={`$${provider.metrics.totalCostUsd.toFixed(6)}`} />
       </div>
 
+      <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+        <ScoreBar
+          score={provider.metrics.avgQuality}
+          maxScore={1}
+          color={provider.metrics.avgQuality > 0.7 ? "#1D9E75" : "#378ADD"}
+        />
+        <ExplainBox>
+          Avg quality combines faithfulness and relevance. A higher score means the provider answered with text that stayed close to the retrieved evidence.
+        </ExplainBox>
+      </div>
+
       {provider.skippedReason && (
-        <p className="result-hint">{provider.skippedReason}</p>
+        <ExplainBox variant="warning">{provider.skippedReason}</ExplainBox>
       )}
 
       {firstQuery?.error && (
@@ -1340,6 +1220,9 @@ function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRu
             <h3>Provider Error</h3>
           </div>
           <pre className="provider-error">{firstQuery.error}</pre>
+          <ExplainBox variant="warning">
+            This is provider-specific output. For OpenAI, `insufficient_quota` means the key was loaded and the API was reached, but billing or quota blocked generation.
+          </ExplainBox>
         </section>
       )}
 
@@ -1352,13 +1235,27 @@ function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRu
           {provider.perQuery.map((query) => (
             <article key={query.id} className="result-row">
               <div className="result-row__meta">
-                <span>{query.id}</span>
-                <span>{query.status}</span>
-                <span>{query.latencyMs.toFixed(2)} ms</span>
-                <span>${query.costUsd.toFixed(6)}</span>
+                <Pill variant="gray">{query.id}</Pill>
+                <Pill variant={query.status === "completed" ? "green" : "amber"}>
+                  {query.status}
+                </Pill>
+                <Pill variant={query.latencyMs > 500 ? "amber" : "blue"}>
+                  {query.latencyMs.toFixed(2)} ms
+                </Pill>
+                <Pill variant={query.costUsd > 0 ? "amber" : "green"}>
+                  ${query.costUsd.toFixed(6)}
+                </Pill>
               </div>
               <p className="chunk-text">{query.question}</p>
               <p className="chunk-text">{query.answer ?? query.error ?? "No output."}</p>
+              {query.evals && (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <ScoreBar score={query.evals.quality} maxScore={1} color="#1D9E75" />
+                  <ExplainBox>
+                    This per-query score explains how well the model answer matched the expected grounded answer for this benchmark row.
+                  </ExplainBox>
+                </div>
+              )}
             </article>
           ))}
         </div>
