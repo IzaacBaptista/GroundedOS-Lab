@@ -149,6 +149,7 @@ type BenchmarkArtifact = {
   successCriteria: {
     atLeastTwoProvidersCompleted: boolean;
     includesLocalProvider: boolean;
+    includesOllamaProvider: boolean;
     includesCloudProvider: boolean;
     phase4ModelBenchmarkPassed: boolean;
     note: string;
@@ -213,6 +214,7 @@ const skippedProviders = providerRuns
   .filter((run) => run.status === "skipped")
   .map((run) => run.provider);
 const includesLocalProvider = completed.some((run) => run.kind === "local");
+const includesOllamaProvider = completed.some((run) => run.provider === "ollama");
 const includesCloudProvider = completed.some((run) => run.kind === "cloud");
 const artifact: BenchmarkArtifact = {
   timestamp: new Date().toISOString(),
@@ -227,10 +229,11 @@ const artifact: BenchmarkArtifact = {
   successCriteria: {
     atLeastTwoProvidersCompleted: completed.length >= 2,
     includesLocalProvider,
+    includesOllamaProvider,
     includesCloudProvider,
-    phase4ModelBenchmarkPassed: completed.length >= 2 && includesLocalProvider,
+    phase4ModelBenchmarkPassed: includesOllamaProvider && includesCloudProvider,
     note:
-      "The roadmap target of local Ollama plus one cloud provider is satisfied only when both configured providers complete. Without external config, this artifact records a local baseline and explicit skips.",
+      "The roadmap target is satisfied only when Ollama generation and one cloud provider both complete. Without external config, this artifact records a local baseline and explicit skips.",
   },
   providers: providerRuns,
   summary: {

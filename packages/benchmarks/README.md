@@ -45,8 +45,14 @@ scaffold)
 npm run benchmark:models
 
 # Ollama generation benchmark.
-GROUNDEDOS_OLLAMA_GENERATE_MODEL=llama3.2 npm run benchmark:models -- --providers local-extractive,ollama
+GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b npm run benchmark:models -- --providers local-extractive,ollama
 
 # OpenAI cloud benchmark using the Responses API.
 OPENAI_API_KEY=... OPENAI_MODEL=gpt-5-mini npm run benchmark:models -- --providers local-extractive,openai
+
+# Roadmap target: Ollama generation plus one cloud provider in the same artifact.
+GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b \
+OPENAI_API_KEY=... \
+OPENAI_MODEL=gpt-5-mini \
+npm run benchmark:models -- --providers local-extractive,ollama,openai
 ```

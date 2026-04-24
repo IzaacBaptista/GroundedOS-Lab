@@ -209,7 +209,7 @@ npm run eval:golden -- --dataset datasets/golden/phase-0-baseline.json
 npm run benchmark:models
 
 # Roadmap target run: local Ollama plus one cloud provider.
-GROUNDEDOS_OLLAMA_GENERATE_MODEL=<ollama-model> \
+GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b \
 OPENAI_API_KEY=<key> \
 OPENAI_MODEL=<model> \
 npm run benchmark:models -- --providers local-extractive,ollama,openai

@@ -764,7 +764,7 @@ and embedding visualization.
 - Keep the local RAG/API/web path healthy as the foundation for experiments:
   `npm run rag:smoke`, `npm run api:dev`, and `npm run web:dev`
 - Run the Phase 4 model/provider benchmark with real providers:
-  `GROUNDEDOS_OLLAMA_GENERATE_MODEL=<ollama-model>` plus `OPENAI_API_KEY=<key>`
+  `GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b` plus `OPENAI_API_KEY=<key>`
   and `npm run benchmark:models -- --providers local-extractive,ollama,openai`
 - Treat `datasets/golden/baselines/phase-4-model-benchmark.json` as incomplete
   until at least one local model provider and one cloud provider complete in the
