@@ -33,6 +33,96 @@ describe("App", () => {
         });
       }
 
+      if (url.endsWith("/api/rag/metrics/model-benchmark")) {
+        return new Response(JSON.stringify({
+          timestamp: "2026-04-24T23:21:46.691Z",
+          phase: "phase-4",
+          dataset: "phase-0-smoke-text",
+          goldenSize: 1,
+          topK: 3,
+          requestedProviders: ["local-extractive", "ollama", "openai"],
+          successCriteria: {
+            phase4ModelBenchmarkPassed: false,
+            includesOllamaProvider: true,
+            includesCloudProvider: false,
+            note: "Cloud provider has not completed yet.",
+          },
+          providers: [
+            {
+              provider: "ollama",
+              kind: "ollama",
+              model: "qwen2.5:0.5b",
+              status: "completed",
+              metrics: {
+                requestCount: 1,
+                avgLatencyMs: 533,
+                p95LatencyMs: 533,
+                avgFaithfulness: 1,
+                avgRelevance: 0.416,
+                avgQuality: 0.708,
+                containsExpectedAnswerRate: 1,
+                avgCostUsd: 0,
+                totalCostUsd: 0,
+              },
+              perQuery: [
+                {
+                  id: "gd-001",
+                  question: "What does this command verify?",
+                  status: "completed",
+                  latencyMs: 533,
+                  answer: "The command verifies the ETL dispatcher.",
+                  expectedAnswerContains: ["ETL dispatcher"],
+                  containsExpectedAnswer: true,
+                  costUsd: 0,
+                  retrievedChunkIds: ["smoke-text-001:section-2:chunk-1"],
+                },
+              ],
+            },
+            {
+              provider: "openai",
+              kind: "cloud",
+              model: "gpt-5-mini",
+              status: "error",
+              metrics: {
+                requestCount: 0,
+                avgLatencyMs: 0,
+                p95LatencyMs: 0,
+                avgFaithfulness: 0,
+                avgRelevance: 0,
+                avgQuality: 0,
+                containsExpectedAnswerRate: 0,
+                avgCostUsd: 0,
+                totalCostUsd: 0,
+              },
+              perQuery: [
+                {
+                  id: "gd-001",
+                  question: "What does this command verify?",
+                  status: "error",
+                  latencyMs: 2062,
+                  error: "OpenAI request failed with status 429: insufficient_quota",
+                  expectedAnswerContains: ["ETL dispatcher"],
+                  containsExpectedAnswer: false,
+                  costUsd: 0,
+                  retrievedChunkIds: ["smoke-text-001:section-2:chunk-1"],
+                },
+              ],
+            },
+          ],
+          summary: {
+            completedProviders: ["ollama"],
+            skippedProviders: [],
+            errorProviders: ["openai"],
+            bestByQuality: "ollama",
+            bestByLatency: "ollama",
+            bestByCost: "ollama",
+          },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
       if (url.endsWith("/api/rag/indexes/visual-test/embedding-map")) {
         return new Response(JSON.stringify({
           document: {
@@ -183,5 +273,19 @@ describe("App", () => {
 
     expect(screen.getAllByText(/section-1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/section-2/i).length).toBeGreaterThan(0);
+  });
+
+  it("shows OpenAI model benchmark details", async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("tab", { name: /models/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/model provider/i)).toBeTruthy();
+    });
+
+    expect(screen.getByDisplayValue("openai")).toBeTruthy();
+    expect(screen.getByText(/gpt-5-mini/i)).toBeTruthy();
+    expect(screen.getAllByText(/insufficient_quota/i).length).toBeGreaterThan(0);
   });
 });

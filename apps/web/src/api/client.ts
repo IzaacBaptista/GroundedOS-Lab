@@ -3,6 +3,7 @@ import type {
   EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
+  ModelBenchmarkResponse,
   RagAskResponse,
   RagIndexDeleteResponse,
   RagIndexListResponse,
@@ -65,6 +66,11 @@ export async function getEmbeddingMap(
 export async function getTradeoffMetrics(): Promise<TradeoffMetricsResponse> {
   const response = await fetch(`${API_PREFIX}/rag/metrics/tradeoffs`);
   return parseResponse<TradeoffMetricsResponse>(response);
+}
+
+export async function getModelBenchmark(): Promise<ModelBenchmarkResponse> {
+  const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark`);
+  return parseResponse<ModelBenchmarkResponse>(response);
 }
 
 export interface AskTextParams {

@@ -1,5 +1,8 @@
 import { Controller, Get, Inject } from "@nestjs/common";
-import type { RagTradeoffMetricsResponse } from "../../rag-service";
+import type {
+  RagModelBenchmarkResponse,
+  RagTradeoffMetricsResponse,
+} from "../../rag-service";
 import { RagMetricsService } from "./rag-metrics.service";
 
 @Controller("rag/metrics")
@@ -9,5 +12,10 @@ export class RagMetricsController {
   @Get("tradeoffs")
   getTradeoffs(): RagTradeoffMetricsResponse {
     return this.ragMetrics.getTradeoffs();
+  }
+
+  @Get("model-benchmark")
+  getModelBenchmark(): Promise<RagModelBenchmarkResponse> {
+    return this.ragMetrics.getModelBenchmark();
   }
 }

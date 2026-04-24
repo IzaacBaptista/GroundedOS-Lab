@@ -161,6 +161,7 @@ type BenchmarkArtifact = {
   summary: {
     completedProviders: string[];
     skippedProviders: string[];
+    errorProviders: string[];
     bestByQuality?: string;
     bestByLatency?: string;
     bestByCost?: string;
@@ -216,6 +217,9 @@ const completedProviders = completed.map((run) => run.provider);
 const skippedProviders = providerRuns
   .filter((run) => run.status === "skipped")
   .map((run) => run.provider);
+const errorProviders = providerRuns
+  .filter((run) => run.status === "error")
+  .map((run) => run.provider);
 const includesLocalProvider = completed.some((run) => run.kind === "local");
 const includesOllamaProvider = completed.some((run) => run.provider === "ollama");
 const includesCloudProvider = completed.some((run) => run.kind === "cloud");
@@ -242,6 +246,7 @@ const artifact: BenchmarkArtifact = {
   summary: {
     completedProviders,
     skippedProviders,
+    errorProviders,
     bestByQuality: bestProvider(completed, "avgQuality", "desc"),
     bestByLatency: bestProvider(completed, "avgLatencyMs", "asc"),
     bestByCost: bestProvider(completed, "avgCostUsd", "asc"),

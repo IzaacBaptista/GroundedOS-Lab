@@ -258,6 +258,79 @@ export type RagEmbeddingMapResponse = {
 
 export type RagTradeoffMetricsResponse = TradeoffMetricsSummary;
 
+export type RagModelBenchmarkStatus = "completed" | "skipped" | "error";
+
+export type RagModelBenchmarkQueryRun = {
+  id: string;
+  question: string;
+  status: RagModelBenchmarkStatus;
+  latencyMs: number;
+  answer?: string;
+  error?: string;
+  expectedAnswerContains: string[];
+  containsExpectedAnswer: boolean;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
+  costUsd: number;
+  evals?: {
+    faithfulness: number;
+    relevance: number;
+    quality: number;
+  };
+  retrievedChunkIds: string[];
+};
+
+export type RagModelBenchmarkProviderRun = {
+  provider: string;
+  kind: "local" | "ollama" | "cloud";
+  model: string;
+  status: RagModelBenchmarkStatus;
+  skippedReason?: string;
+  metrics: {
+    requestCount: number;
+    avgLatencyMs: number;
+    p95LatencyMs: number;
+    avgFaithfulness: number;
+    avgRelevance: number;
+    avgQuality: number;
+    containsExpectedAnswerRate: number;
+    avgCostUsd: number;
+    totalCostUsd: number;
+  };
+  perQuery: RagModelBenchmarkQueryRun[];
+};
+
+export type RagModelBenchmarkResponse = {
+  timestamp: string;
+  version: number;
+  phase: string;
+  description: string;
+  dataset: string;
+  goldenSize: number;
+  topK: number;
+  requestedProviders: string[];
+  successCriteria: {
+    atLeastTwoProvidersCompleted: boolean;
+    includesLocalProvider: boolean;
+    includesOllamaProvider: boolean;
+    includesCloudProvider: boolean;
+    phase4ModelBenchmarkPassed: boolean;
+    note: string;
+  };
+  providers: RagModelBenchmarkProviderRun[];
+  summary: {
+    completedProviders: string[];
+    skippedProviders: string[];
+    errorProviders: string[];
+    bestByQuality?: string;
+    bestByLatency?: string;
+    bestByCost?: string;
+  };
+};
+
 export type RagSessionMemoryResponse = {
   sessionId: string;
   count: number;

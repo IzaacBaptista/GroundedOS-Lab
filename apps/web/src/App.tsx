@@ -12,6 +12,7 @@ import {
   askWithPersisted,
   askWithText,
   getEmbeddingMap,
+  getModelBenchmark,
   getTradeoffMetrics,
   indexFile,
   indexText,
@@ -21,6 +22,8 @@ import type {
   EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
+  ModelBenchmarkProviderRun,
+  ModelBenchmarkResponse,
   PersistedRagIndexListItem,
   RagAskResponse,
   SourceMode,
@@ -57,7 +60,7 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "ollama",
 ];
 
-type ResultMode = "answer" | "compare" | "embeddings" | "tradeoffs";
+type ResultMode = "answer" | "compare" | "embeddings" | "tradeoffs" | "models";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -110,6 +113,12 @@ export default function App() {
   const [embeddingMapLoading, setEmbeddingMapLoading] = useState(false);
   const [embeddingMapMessage, setEmbeddingMapMessage] = useState("");
   const [embeddingMapMessageIsError, setEmbeddingMapMessageIsError] = useState(false);
+  const [modelBenchmark, setModelBenchmark] = useState<ModelBenchmarkResponse | undefined>(
+    undefined
+  );
+  const [modelBenchmarkLoading, setModelBenchmarkLoading] = useState(false);
+  const [modelBenchmarkMessage, setModelBenchmarkMessage] = useState("");
+  const [modelBenchmarkMessageIsError, setModelBenchmarkMessageIsError] = useState(false);
 
   // App state
   const [appState, setAppState] = useState<AppState>("idle");
@@ -148,6 +157,11 @@ export default function App() {
   const reportEmbeddingMapMessage = useCallback((text: string, isError = false) => {
     setEmbeddingMapMessage(text);
     setEmbeddingMapMessageIsError(isError);
+  }, []);
+
+  const reportModelBenchmarkMessage = useCallback((text: string, isError = false) => {
+    setModelBenchmarkMessage(text);
+    setModelBenchmarkMessageIsError(isError);
   }, []);
 
   const setState = useCallback((next: AppState, detail = "") => {
@@ -418,6 +432,7 @@ export default function App() {
       outputB: undefined,
     }));
     setEmbeddingMap(undefined);
+    setModelBenchmark(undefined);
     clearActiveIndex();
     reportMessage("");
     reportCompareMessage(
@@ -425,6 +440,7 @@ export default function App() {
     );
     reportTradeoffMessage("");
     reportEmbeddingMapMessage("");
+    reportModelBenchmarkMessage("");
     setState("idle");
     setOutputTab("answer");
     setSourceMode("file");
@@ -481,6 +497,23 @@ export default function App() {
     }
   }, [activeIndex, reportEmbeddingMapMessage]);
 
+  const loadModelBenchmark = useCallback(async () => {
+    setModelBenchmarkLoading(true);
+
+    try {
+      const benchmark = await getModelBenchmark();
+      setModelBenchmark(benchmark);
+      reportModelBenchmarkMessage("");
+    } catch (error) {
+      reportModelBenchmarkMessage(
+        error instanceof Error ? error.message : "Failed to load model benchmark.",
+        true
+      );
+    } finally {
+      setModelBenchmarkLoading(false);
+    }
+  }, [reportModelBenchmarkMessage]);
+
   useEffect(() => {
     if (outputTab !== "tradeoffs") {
       return;
@@ -496,6 +529,14 @@ export default function App() {
 
     void loadEmbeddingMap();
   }, [outputTab, loadEmbeddingMap]);
+
+  useEffect(() => {
+    if (outputTab !== "models") {
+      return;
+    }
+
+    void loadModelBenchmark();
+  }, [outputTab, loadModelBenchmark]);
 
   const indexStatus = useMemo(() => {
     if (activeIndex) {
@@ -792,6 +833,11 @@ export default function App() {
           onRefreshEmbeddingMap={() => void loadEmbeddingMap()}
           embeddingMapMessage={embeddingMapMessage}
           embeddingMapMessageIsError={embeddingMapMessageIsError}
+          modelBenchmark={modelBenchmark}
+          modelBenchmarkLoading={modelBenchmarkLoading}
+          onRefreshModelBenchmark={() => void loadModelBenchmark()}
+          modelBenchmarkMessage={modelBenchmarkMessage}
+          modelBenchmarkMessageIsError={modelBenchmarkMessageIsError}
         />
       </section>
     </main>
@@ -817,6 +863,11 @@ interface ResultPanelProps {
   onRefreshEmbeddingMap: () => void;
   embeddingMapMessage: string;
   embeddingMapMessageIsError: boolean;
+  modelBenchmark: ModelBenchmarkResponse | undefined;
+  modelBenchmarkLoading: boolean;
+  onRefreshModelBenchmark: () => void;
+  modelBenchmarkMessage: string;
+  modelBenchmarkMessageIsError: boolean;
 }
 
 function ResultPanel({
@@ -838,6 +889,11 @@ function ResultPanel({
   onRefreshEmbeddingMap,
   embeddingMapMessage,
   embeddingMapMessageIsError,
+  modelBenchmark,
+  modelBenchmarkLoading,
+  onRefreshModelBenchmark,
+  modelBenchmarkMessage,
+  modelBenchmarkMessageIsError,
 }: ResultPanelProps) {
   const citations = result?.answer?.citations ?? [];
   const results = result?.devMode?.results ?? [];
@@ -856,7 +912,11 @@ function ResultPanel({
         ? activeIndex
           ? `${activeIndex.chunkCount} chunks | ${activeIndex.embeddingProvider}`
           : "No index selected"
-      : "No result";
+      : outputTab === "models"
+        ? modelBenchmark
+          ? `${modelBenchmark.providers.length} providers | ${modelBenchmark.dataset}`
+          : "No benchmark loaded"
+        : "No result";
 
   const showHint =
     outputTab === "answer" &&
@@ -908,6 +968,15 @@ function ResultPanel({
           onClick={() => setOutputTab("tradeoffs")}
         >
           Trade-offs
+        </button>
+        <button
+          className={`result-tab${outputTab === "models" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "models"}
+          onClick={() => setOutputTab("models")}
+        >
+          Models
         </button>
       </div>
 
@@ -1141,7 +1210,160 @@ function ResultPanel({
           {embeddingMap && <EmbeddingMapView map={embeddingMap} />}
         </div>
       )}
+
+      {outputTab === "models" && (
+        <ModelBenchmarkView
+          benchmark={modelBenchmark}
+          loading={modelBenchmarkLoading}
+          onRefresh={onRefreshModelBenchmark}
+          message={modelBenchmarkMessage}
+          messageIsError={modelBenchmarkMessageIsError}
+        />
+      )}
     </section>
+  );
+}
+
+function ModelBenchmarkView({
+  benchmark,
+  loading,
+  onRefresh,
+  message,
+  messageIsError,
+}: {
+  benchmark: ModelBenchmarkResponse | undefined;
+  loading: boolean;
+  onRefresh: () => void;
+  message: string;
+  messageIsError: boolean;
+}) {
+  const [selectedProvider, setSelectedProvider] = useState("openai");
+  const selected =
+    benchmark?.providers.find((provider) => provider.provider === selectedProvider) ??
+    benchmark?.providers[0];
+
+  useEffect(() => {
+    if (!benchmark || benchmark.providers.some((provider) => provider.provider === selectedProvider)) {
+      return;
+    }
+
+    setSelectedProvider(benchmark.providers[0]?.provider ?? "openai");
+  }, [benchmark, selectedProvider]);
+
+  return (
+    <div className="models-view">
+      <div className="panel__header">
+        <h3>Model Benchmark</h3>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onRefresh}
+          disabled={loading}
+        >
+          {loading ? "Refreshing" : "Refresh"}
+        </button>
+      </div>
+
+      <p
+        className={`form-message${messageIsError ? " is-error" : ""}`}
+        role="status"
+        aria-live="polite"
+      >
+        {message}
+      </p>
+
+      {!benchmark && !loading && (
+        <p className="chunk-text">No model benchmark available yet.</p>
+      )}
+
+      {benchmark && (
+        <>
+          <div className="benchmark-summary">
+            <MetricCard
+              label="Phase 4"
+              value={benchmark.successCriteria.phase4ModelBenchmarkPassed ? "Passed" : "Pending"}
+            />
+            <MetricCard label="Dataset" value={benchmark.dataset} />
+            <MetricCard label="Golden rows" value={String(benchmark.goldenSize)} />
+          </div>
+
+          <label className="field field--benchmark-provider">
+            <span>Model provider</span>
+            <select
+              value={selected?.provider ?? ""}
+              onChange={(event) => setSelectedProvider(event.target.value)}
+            >
+              {benchmark.providers.map((provider) => (
+                <option key={provider.provider} value={provider.provider}>
+                  {provider.provider}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {selected && <ModelProviderDetails provider={selected} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRun }) {
+  const firstQuery = provider.perQuery[0];
+
+  return (
+    <>
+      <div className="provider-status-row">
+        <span className={`status-pill status-pill--${provider.status}`}>
+          {provider.status}
+        </span>
+        <span className="tag">{provider.kind}</span>
+        <span className="tag">{provider.model}</span>
+      </div>
+
+      <div className="tradeoffs-grid">
+        <MetricCard label="Requests" value={String(provider.metrics.requestCount)} />
+        <MetricCard label="Avg latency" value={`${provider.metrics.avgLatencyMs.toFixed(2)} ms`} />
+        <MetricCard label="P95 latency" value={`${provider.metrics.p95LatencyMs.toFixed(2)} ms`} />
+        <MetricCard label="Avg quality" value={provider.metrics.avgQuality.toFixed(3)} />
+        <MetricCard label="Expected hit" value={formatRate(provider.metrics.containsExpectedAnswerRate)} />
+        <MetricCard label="Total cost" value={`$${provider.metrics.totalCostUsd.toFixed(6)}`} />
+      </div>
+
+      {provider.skippedReason && (
+        <p className="result-hint">{provider.skippedReason}</p>
+      )}
+
+      {firstQuery?.error && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Provider Error</h3>
+          </div>
+          <pre className="provider-error">{firstQuery.error}</pre>
+        </section>
+      )}
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Queries</h3>
+          <span className="count">{provider.perQuery.length}</span>
+        </div>
+        <div className="result-list">
+          {provider.perQuery.map((query) => (
+            <article key={query.id} className="result-row">
+              <div className="result-row__meta">
+                <span>{query.id}</span>
+                <span>{query.status}</span>
+                <span>{query.latencyMs.toFixed(2)} ms</span>
+                <span>${query.costUsd.toFixed(6)}</span>
+              </div>
+              <p className="chunk-text">{query.question}</p>
+              <p className="chunk-text">{query.answer ?? query.error ?? "No output."}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 

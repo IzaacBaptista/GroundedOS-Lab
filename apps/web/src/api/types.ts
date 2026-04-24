@@ -180,6 +180,75 @@ export interface TradeoffMetricsResponse {
   recent: TradeoffRequestSample[];
 }
 
+export type ModelBenchmarkStatus = "completed" | "skipped" | "error";
+
+export interface ModelBenchmarkQueryRun {
+  id: string;
+  question: string;
+  status: ModelBenchmarkStatus;
+  latencyMs: number;
+  answer?: string;
+  error?: string;
+  expectedAnswerContains: string[];
+  containsExpectedAnswer: boolean;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
+  costUsd: number;
+  evals?: {
+    faithfulness: number;
+    relevance: number;
+    quality: number;
+  };
+  retrievedChunkIds: string[];
+}
+
+export interface ModelBenchmarkProviderRun {
+  provider: string;
+  kind: "local" | "ollama" | "cloud";
+  model: string;
+  status: ModelBenchmarkStatus;
+  skippedReason?: string;
+  metrics: {
+    requestCount: number;
+    avgLatencyMs: number;
+    p95LatencyMs: number;
+    avgFaithfulness: number;
+    avgRelevance: number;
+    avgQuality: number;
+    containsExpectedAnswerRate: number;
+    avgCostUsd: number;
+    totalCostUsd: number;
+  };
+  perQuery: ModelBenchmarkQueryRun[];
+}
+
+export interface ModelBenchmarkResponse {
+  timestamp: string;
+  phase: string;
+  dataset: string;
+  goldenSize: number;
+  topK: number;
+  requestedProviders: string[];
+  successCriteria: {
+    phase4ModelBenchmarkPassed: boolean;
+    includesOllamaProvider: boolean;
+    includesCloudProvider: boolean;
+    note: string;
+  };
+  providers: ModelBenchmarkProviderRun[];
+  summary: {
+    completedProviders: string[];
+    skippedProviders: string[];
+    errorProviders: string[];
+    bestByQuality?: string;
+    bestByLatency?: string;
+    bestByCost?: string;
+  };
+}
+
 export interface ApiErrorBody {
   error?: { message?: string };
 }
