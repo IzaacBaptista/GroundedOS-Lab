@@ -40,6 +40,45 @@ describe("web server", () => {
       service: "fake-api",
     });
   });
+
+  it("serves static CSS files with the correct content-type", async () => {
+    const baseUrl = await listen(createWebServer());
+    const response = await fetch(`${baseUrl}/styles.css`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/css");
+  });
+
+  it("returns 404 for a path that does not exist in the public directory", async () => {
+    const baseUrl = await listen(createWebServer());
+    const response = await fetch(`${baseUrl}/does-not-exist.html`);
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: "Static asset not found." },
+    });
+  });
+
+  it("returns 502 when the API is unreachable during proxying", async () => {
+    const webBaseUrl = await listen(
+      createWebServer({ apiBaseUrl: "http://127.0.0.1:1" })
+    );
+    const response = await fetch(`${webBaseUrl}/api/health`);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: expect.stringContaining("not reachable"),
+      },
+    });
+  });
+
+  it("blocks path traversal attempts outside the public directory", async () => {
+    const baseUrl = await listen(createWebServer());
+    const response = await fetch(`${baseUrl}/../package.json`);
+
+    expect(response.status).toBe(404);
+  });
 });
 
 async function listen(server: Server): Promise<string> {

@@ -39,6 +39,18 @@ describe("ingest", () => {
     );
   });
 
+  it("routes image input to the image extractor stub (NOT_IMPLEMENTED)", async () => {
+    await expect(
+      ingest({ type: "image", filePath: "/fake/photo.png" })
+    ).rejects.toThrow("[image-extractor] NOT_IMPLEMENTED");
+  });
+
+  it("routes audio input to the audio extractor stub (NOT_IMPLEMENTED)", async () => {
+    await expect(
+      ingest({ type: "audio", filePath: "/fake/recording.mp3" })
+    ).rejects.toThrow("[audio-extractor] NOT_IMPLEMENTED");
+  });
+
   it("routes PDF file input to the PDF extractor", async () => {
     const dir = await mkdtemp(join(tmpdir(), "groundedos-dispatcher-pdf-"));
     const filePath = join(dir, "sample.pdf");

@@ -221,6 +221,60 @@ describe("api server", () => {
       },
     });
   });
+
+  it("returns 415 when POST /rag/ask has an unsupported Content-Type", async () => {
+    const app = createTestServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/rag/ask",
+      headers: {
+        "content-type": "text/plain",
+      },
+      payload: "raw text body",
+    });
+
+    expect(response.statusCode).toBe(415);
+    expect(response.json()).toMatchObject({
+      error: {
+        message: "Content-Type must be application/json or multipart/form-data.",
+      },
+    });
+  });
+
+  it("returns 415 when POST /rag/index has an unsupported Content-Type", async () => {
+    const app = createTestServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      headers: {
+        "content-type": "text/plain",
+      },
+      payload: "raw text body",
+    });
+
+    expect(response.statusCode).toBe(415);
+    expect(response.json()).toMatchObject({
+      error: {
+        message: "Content-Type must be application/json or multipart/form-data.",
+      },
+    });
+  });
+
+  it("returns 404 when trying to delete a non-existent index", async () => {
+    const indexDir = await createTempIndexDir();
+    const app = createTestServer(indexDir);
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/rag/indexes/does-not-exist",
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: {
+        message: expect.stringContaining("does-not-exist"),
+      },
+    });
+  });
 });
 
 function createTestServer(indexDir?: string): ReturnType<typeof createApiServer> {
