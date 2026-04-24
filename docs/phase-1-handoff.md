@@ -79,6 +79,22 @@ See [`phase-1-local-rag.md`](./phase-1-local-rag.md) for local command usage and
    - Delete persisted indexes by `documentId`
    - Packages: `apps/api`, `apps/web`
 
+## Phase 1 closeout
+
+**Status: ✅ Complete** (2026-04-23, commit `dd14323`)
+
+Baseline metrics recorded at `datasets/golden/baselines/phase-1-baseline.json`:
+
+| Metric | Value |
+|---|---|
+| Recall@3 | 1.0 |
+| Precision@3 | 0.5 |
+| Source hit rate | 1.0 |
+| p95 latency (CLI) | 1014 ms |
+| p95 retrieval latency | < 5 ms |
+
+Phase 2 — Retrieval Quality can now begin. The primary goal is to improve Recall@3 and Precision@3 beyond these values using hybrid search and re-ranking, with retrieval observability spans visible in the Dev Mode output.
+
 ## Explicit non-goals for the first Phase 1 slice
 
 - No production vector database yet.

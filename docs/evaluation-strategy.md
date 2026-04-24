@@ -125,7 +125,15 @@ Before any phase improvement is declared complete, its success criteria must be 
 
 ### Current baseline
 
-Phase 1 metric baseline: *not yet measured* — will be recorded at `datasets/golden/baselines/phase-1-baseline.json` before Phase 2 work begins.
+Phase 1 baseline recorded at `datasets/golden/baselines/phase-1-baseline.json` (commit `dd14323`, 2026-04-23).
+
+| Metric | Value |
+|---|---|
+| Recall@3 | 1.0 |
+| Precision@3 | 0.5 |
+| Source hit rate | 1.0 |
+| p95 latency (CLI) | 1014 ms |
+| p95 retrieval latency | < 5 ms |
 
 ---
 

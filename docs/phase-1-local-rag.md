@@ -153,3 +153,6 @@ curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 The next implementation target is either API contract hardening around provider
 config/errors or adding a second semantic provider such as OpenAI or Hugging
 Face for local-vs-cloud comparison.
+
+For a code-level walkthrough of what happens inside this pipeline, see
+[`phase-1-rag-internals.md`](./phase-1-rag-internals.md).

@@ -1,0 +1,30 @@
+{
+  "phase": 1,
+  "date": "2026-04-23",
+  "commit": "dd14323",
+  "embedding_provider": "rag-smoke-lexical",
+  "topK": 3,
+  "golden_dataset": "datasets/golden/phase-0-baseline.json",
+  "golden_entry_count": 1,
+  "notes": "Single golden entry (gd-001) from the Phase 0 smoke dataset. Precision@3 reflects a 2-chunk index (only 2 chunks exist); K=3 was not fully saturated. Latency figures are CLI wall-clock and include Node.js startup overhead (~800ms). In-process retrieval latency over 2 in-memory chunks is negligible (< 5ms). These figures are the reference baseline before any Phase 2 retrieval-quality improvements (hybrid search, re-ranking).",
+  "metrics": {
+    "recall_at_3": 1.0,
+    "precision_at_3": 0.5,
+    "source_hit_rate": 1.0,
+    "p95_latency_ms": 1014,
+    "p95_retrieval_latency_ms": 5
+  },
+  "per_entry": [
+    {
+      "id": "gd-001",
+      "question": "What does this command verify?",
+      "expected_chunk_ids": ["smoke-text-001:section-2:chunk-1"],
+      "retrieved_top_k": ["smoke-text-001:section-2:chunk-1", "smoke-text-001:section-1:chunk-1"],
+      "top_score": 0.24913643956121995,
+      "recall_at_3": 1.0,
+      "precision_at_3": 0.5,
+      "source_hit": true,
+      "answer_grounded": true
+    }
+  ]
+}

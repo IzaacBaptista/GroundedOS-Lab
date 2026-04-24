@@ -22,6 +22,7 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 | [`phase-1-handoff.md`](./phase-1-handoff.md) | Phase 1 baseline, verified commands and open implementation issues. |
 | [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md) | Phase 1 Dev Mode retrieval output contract (schema + example). |
 | [`phase-1-local-rag.md`](./phase-1-local-rag.md) | Local RAG usage guide (commands, limits, providers). |
+| [`phase-1-rag-internals.md`](./phase-1-rag-internals.md) | End-to-end Phase 1 RAG internals guide mapping concepts to code. |
 | [`ollama-setup.md`](./ollama-setup.md) | Ollama installation and GroundedOS integration guide. |
 
 ## Status

@@ -17,6 +17,7 @@
 |---|---|
 | **Try the working RAG pipeline right now** | [▶ What works today](#-what-works-today) |
 | **Run it in 5 minutes** | [⚙ Quick start](#-quick-start) |
+| **Understand the code end to end** | [📄 Phase 1 RAG internals guide](./docs/phase-1-rag-internals.md) |
 | **Understand what we're building and why** | [🎯 Objectives](#-objectives) |
 | **See the architecture** | [🏗 Architecture](#-architecture) |
 | **Learn AI concepts behind the code** | [📖 Concepts](./docs/concepts/README.md) |
@@ -39,7 +40,7 @@
 - Sample dataset registered in `datasets/registry.json` with checksum and metadata
 - `npm run ingest:smoke` runs the full ETL pipeline locally
 
-### Phase 1 — Core RAG 🟡 Runnable
+### Phase 1 — Core RAG ✅ Complete
 
 - **Upload a document** (inline text or text/PDF file) via API or CLI
 - **Index** it: chunk → embed → store in local in-memory or persisted index (`.groundedos/indexes/`)
@@ -47,7 +48,7 @@
 - **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider
 - **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
 - **Index management** API: list, delete persisted indexes
-- Phase 1 is functionally runnable; the remaining closeout item is recording baseline metrics before Phase 2 retrieval-quality work starts.
+- Phase 1 is **complete**. Baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json`.
 
 ### What is NOT yet implemented
 
@@ -640,7 +641,7 @@ No external services required for Phases 0–1:
 - [x] Local RAG smoke command can ask a question against a registered dataset
 - [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
 - [x] `packages/rag` has integration tests covering the full retrieval flow
-- [ ] Phase 1 baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json` before Phase 2 begins — see [Evaluation Strategy](./docs/evaluation-strategy.md)
+- [x] Phase 1 baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json` before Phase 2 begins — see [Evaluation Strategy](./docs/evaluation-strategy.md)
 
 ### Phase 2 — Retrieval Quality
 

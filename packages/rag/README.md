@@ -151,6 +151,8 @@ The output contract is documented in
 [`docs/phase-1-dev-mode-output.md`](../../docs/phase-1-dev-mode-output.md).
 The local CLI usage guide is documented in
 [`docs/phase-1-local-rag.md`](../../docs/phase-1-local-rag.md).
+The end-to-end internals guide is documented in
+[`docs/phase-1-rag-internals.md`](../../docs/phase-1-rag-internals.md).
 
 ## Public API
 
