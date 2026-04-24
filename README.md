@@ -44,32 +44,42 @@
 
 - **Upload a document** (inline text or text/PDF file) via API or CLI
 - **Index** it: chunk → embed → store in local in-memory or persisted index (`.groundedos/indexes/`)
-- **Ask** a grounded question: retrieve top-K chunks → extractive answer → Dev Mode output
-- **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider
+- **Ask** a grounded question: process query → retrieve top-K chunks → rerank → extractive answer → Dev Mode output
+- **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider, cache, cost, workflow steps and retrieval spans
 - **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
 - **Index management** API: list, delete persisted indexes
 - Phase 1 is **complete**. Baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json`.
+
+### Phase 2 / 2b — Retrieval Quality + Memory 🟡 Mostly Complete
+
+- Query understanding runs before retrieval and is visible in Dev Mode
+- Hybrid retrieval and reranking are implemented in the API path
+- Semantic cache, cost tracking and rolling trade-off metrics are exposed through API and web
+- Session-scoped memory persists locally under `.groundedos/memory/sessions/` when `sessionId` is supplied
+- Remaining Phase 2 gap: record the benchmark artifact proving hybrid search improves over the dense-only baseline
+
+### Phase 3 — Intelligence ✅ Package Baseline Implemented
+
+- `@groundedos/agents` exposes a `DocumentQAAgent`, reasoning loop and tool registry with timeout handling
+- API exposes `POST /agents/execute` for `document-qa`
+- `@groundedos/safety` includes prompt-injection, PII, jailbreak, hallucination, prompt-leakage and indirect-injection guardrails
+- `@groundedos/evals` includes faithfulness, relevance and recall evaluators
 
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
 |---|---|
-| ✅ Python workers (planned) | Phase 3+ |
-| ✅ Cloud LLM providers (planned) | Phase 3+ |
+| Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
+| Cloud LLM providers (OpenAI, Anthropic) | Phase 4+ local-vs-cloud comparison |
+| A/B prompt testing and embedding visualization in web | Phase 4 |
 | LoRA / fine-tuning / quantization | Phase 5 |
 | Docker / CI / auth | Phase 6 |
-
-> **Phases 1-3 now complete.** See [Roadmap](#-roadmap) for success criteria.
-| Docker / CI / auth | Phase 6 |
-| Python workers | Phase 3+ |
-| Cloud LLM providers (OpenAI, Anthropic) | Phase 3+ |
-| LoRA / fine-tuning / quantization | Phase 5 |
 
 ---
 
 ## ⚙️ Quick Start
 
-> Requirements: Node.js ≥ 18, npm ≥ 8
+> Requirements: Node.js ≥ 20, npm ≥ 8
 
 ```bash
 # 1. Install dependencies
@@ -133,7 +143,7 @@ Evaluate quality (faithfulness, relevance, latency, cost)
 Trace the full request
 ```
 
-This loop is **already runnable** (Phases 0–1). Everything else — agents, re-ranking, guardrails, fine-tuning — is an extension that makes one step of this loop better or more observable. Build and understand the loop first.
+This loop is **already runnable** through local RAG, persisted indexes, reranking, trade-off metrics and session memory. Agents, guardrails and evals have package-level baselines; fine-tuning and production infrastructure remain later-phase work. Build and understand the loop first.
 
 ---
 
@@ -149,7 +159,7 @@ Planned / target integrations:
 
 * Local Transformers (quantized models)
 * Ollama-based local execution (opt-in, already available for embeddings)
-* OpenAI / Anthropic APIs (optional, Phase 3+)
+* OpenAI / Anthropic APIs (optional, Phase 4+)
 
 ---
 
@@ -185,23 +195,27 @@ Planned / target integrations:
 
 The architecture is described at three levels of maturity. Not everything in the Target or Experimental views exists yet — see [What works today](#-what-works-today) for the running baseline.
 
-### Current Architecture (Phases 0–1, runnable today)
+### Current Architecture (runnable today)
 
 ```text
-User Input (CLI or HTTP)
+User Input (CLI, HTTP or Web)
    ↓
 apps/api (NestJS)   or  CLI script
    ↓
 packages/etl  →  NormalizedDocument
    ↓
-packages/rag  →  Chunks + Embeddings + In-Memory Vector Search
+packages/rag  →  Query Understanding + Chunks + Embeddings + Hybrid Retrieval + Reranking
+   ↓
+packages/observability  →  Cost + Latency + Trade-off Metrics
+   ↓
+packages/memory  →  Optional session memory when sessionId is supplied
    ↓
 Extractive Answer + Dev Mode Output (chunks, scores, offsets, metadata)
 ```
 
 This is the working loop. It produces observable output — retrieved chunks with scores and source attribution — on every request.
 
-### Target Architecture (Phases 2–4, planned)
+### Target Architecture (next planned additions)
 
 ```text
 --------------------------------
@@ -546,9 +560,9 @@ Compare prompts with automatic eval scoring
 ```text
 groundedos-lab/
   apps/
-    api/        ← Backend API server (REST + GraphQL, auth, pipeline orchestration)
-    web/        ← Frontend application (Next.js)
-    worker/     ← Async workers for ML pipelines and background tasks
+    api/        ← Backend API server (REST, local RAG, agents and metrics)
+    web/        ← Frontend application (React + Vite)
+    worker/     ← Placeholder for future async workers
 
   packages/
     core/               ← Shared types, utilities, and base abstractions
@@ -587,27 +601,27 @@ groundedos-lab/
 
 ### Minimal stack (what you need to run it today)
 
-No external services required for Phases 0–1:
+No external services required for the default local path:
 
 | Layer | What | Note |
 |---|---|---|
 | API server | Node.js + **NestJS** (Fastify adapter) | Runs with `npm run api:dev`. Migrated from raw Fastify; see [ADR-001](./docs/adr/ADR-001-backend-framework.md). |
 | Web | **React 19 + Vite + TypeScript** | Runs with `npm run web:dev` (Vite dev server, proxies `/api` to NestJS). |
-| Storage | Local JSON files (`.groundedos/`) | No database required yet |
+| Storage | Local JSON files (`.groundedos/`) | Persisted indexes, memory sessions and cost ledger |
 | Embeddings | `api-lexical` (built-in) | Default, no server. `local-hash` and `ollama` are opt-in. |
-| Vector search | In-memory (packages/rag) | No external vector DB required yet |
-| Logging | Structured console output | No tracing server required yet |
+| Retrieval | In-memory hybrid search + reranking (`packages/rag`) | No external vector DB required yet |
+| Observability | Local cost tracking + trade-off metrics | No tracing server required yet |
 
 ### Target stack (planned additions, phased in)
 
 | Layer | What | When | Notes |
 |---|---|---|---|
-| Database | PostgreSQL | Phase 2+ | Persistent indexes and memory |
-| Vector DB | **pgvector** → **Qdrant** | Phase 2+ | pgvector first, migrate when needed. See [ADR-002](./docs/adr/ADR-002-vector-database.md). |
+| Database | PostgreSQL | Phase 6 | Production persistence for indexes, memory and users |
+| Vector DB | **pgvector** → **Qdrant** | Phase 6 | pgvector first, migrate when needed. See [ADR-002](./docs/adr/ADR-002-vector-database.md). |
 | Queue | Redis + BullMQ | Phase 3+ | API → Worker communication boundary. See [ADR-003](./docs/adr/ADR-003-api-worker-communication.md). |
 | Workers | Python (ML pipelines) | Phase 3+ | Consume BullMQ jobs for compute-heavy tasks |
-| Observability | OpenTelemetry + Grafana | Phase 2+ | Distributed tracing, cost per stage |
-| AI providers | OpenAI / Anthropic (optional) | Phase 3+ | Cloud LLM option alongside local Ollama |
+| Observability | OpenTelemetry + Grafana | Phase 6 | Distributed tracing, cost per stage |
+| AI providers | OpenAI / Anthropic (optional) | Phase 4+ | Cloud LLM option alongside local Ollama |
 | Containers | Docker + docker-compose | Phase 6 | Full local stack in one command |
 | CI | GitHub Actions | Phase 6 | Lint, typecheck, test on every PR |
 
@@ -746,9 +760,11 @@ To move from architecture scaffold to runnable foundation, the active plan is do
   basic index management. Inline/upload requests can use `api-lexical`
   (default), `local-hash` or opt-in `ollama` embedding providers
 - A first local web surface is available through `npm run web:dev`, including
-  saved-index management and provider selection for new local requests
-- Next focus: harden the provider/API contract or add a cloud semantic provider
-  for local-vs-cloud comparison
+  saved-index management, provider comparison, trade-off metrics and session IDs
+- Agent, safety and eval package baselines are implemented, with `POST /agents/execute`
+  exposing the first document-QA agent path
+- Next focus: produce the missing hybrid-vs-dense benchmark artifact, then start
+  Phase 4 with local-vs-cloud comparison or A/B prompt testing
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in

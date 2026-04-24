@@ -1,7 +1,8 @@
-# Phase 1 Local RAG Usage
+# Local RAG Usage
 
-Phase 1 now has a local, executable RAG foundation. It runs without external
-model APIs or production vector databases.
+The local RAG path has an executable Phase 1 foundation plus later retrieval
+quality additions. The default flow runs without external model APIs or
+production vector databases.
 
 ## Commands
 
@@ -31,7 +32,7 @@ npm run rag:ask -- ./notes.txt "What are the main points?"
 
 ## Pipeline
 
-Both RAG commands execute the same local pipeline:
+The CLI commands execute the local Phase 1 pipeline:
 
 ```text
 source document
@@ -43,6 +44,10 @@ source document
   -> grounded answer JSON
 ```
 
+The API path extends that baseline with query understanding, semantic cache,
+hybrid retrieval, reranking, cost tracking, retrieval spans, trade-off metrics
+and optional session memory.
+
 The output includes:
 
 - `answer.grounded` and a simple answer generated from the top retrieved chunk
@@ -52,6 +57,8 @@ The output includes:
   [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md)
 - index metadata such as chunk count, embedding provider, vector dimensions and
   embedding model metadata when available
+- API Dev Mode fields for `processedQuery`, `workflowContext`, `cache`, `cost`,
+  `reranking`, `stageMetrics`, `retrievalSpans` and optional `memory`
 
 ## Current Limits
 
@@ -68,12 +75,15 @@ The output includes:
 - Full install and setup steps live in
   [`ollama-setup.md`](./ollama-setup.md).
 - The vector store is in memory only.
-- The API is local-development only; it has no auth or observability yet.
+- The API is local-development only; it has no auth or production tracing yet.
 - The API can persist local JSON indexes under `.groundedos/indexes/`, but there
   is no production vector database yet.
+- Session memory persists local JSON files under `.groundedos/memory/sessions/`
+  when `sessionId` is supplied.
 - The web surface is local-development only; it has no saved question history or
   production build pipeline yet.
-- There is no reranking, token accounting, latency tracing or model routing yet.
+- Reranking, token/unit accounting, local cost tracking and latency spans are
+  implemented in the API path. Model routing is not implemented yet.
 
 ## Local API And Web
 
@@ -84,8 +94,10 @@ npm run api:dev
 ```
 
 It exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
-`GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
-multipart text/PDF uploads, persisted local indexes and basic index management.
+`GET /rag/indexes`, `DELETE /rag/indexes/:documentId`,
+`GET /rag/metrics/tradeoffs` and `GET /rag/memory/:sessionId` for inline JSON
+text, multipart text/PDF uploads, persisted local indexes, metrics and memory
+inspection.
 Inline/upload requests accept
 `embeddingProvider: "api-lexical" | "local-hash" | "ollama"`.
 Persisted-index asks use the provider saved with that index.
@@ -112,7 +124,8 @@ npm run web:dev
 It serves `http://localhost:3000` and proxies `/api/*` to the local API.
 Use `Index` to persist the current source, then `Ask` to query the saved local
 index. The indexed-document selector can refresh, select and delete local
-indexes.
+indexes. The UI also includes provider comparison, trade-off metrics and an
+optional session ID field for memory continuity.
 
 Example multipart upload:
 
@@ -150,9 +163,9 @@ curl http://localhost:3001/rag/indexes
 curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 ```
 
-The next implementation target is either API contract hardening around provider
-config/errors or adding a second semantic provider such as OpenAI or Hugging
-Face for local-vs-cloud comparison.
+The next implementation target is the missing hybrid-vs-dense benchmark
+artifact. After that, Phase 4 can start with local-vs-cloud comparison or A/B
+prompt testing.
 
 For a code-level walkthrough of what happens inside this pipeline, see
 [`phase-1-rag-internals.md`](./phase-1-rag-internals.md).

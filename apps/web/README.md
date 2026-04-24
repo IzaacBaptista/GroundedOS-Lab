@@ -16,9 +16,10 @@ grounded retrieval workflows.
 
 ## Status
 
-In Progress - Phase 1 local RAG upload and persisted-index surface is
-implemented, including provider selection for new indexes, optional session
-memory-aware asks, and a local Trade-offs metrics tab backed by API aggregates.
+In Progress - local RAG upload and persisted-index surface is implemented,
+including provider selection for new indexes, optional session memory-aware
+asks, provider comparison, and a local Trade-offs metrics tab backed by API
+aggregates.
 
 ## Local usage
 
@@ -47,6 +48,6 @@ Reference environment values live in
   `.groundedos/indexes/`.
 - Session memory is managed by the API under `.groundedos/memory/` when
   `sessionId` is supplied.
-- Answers remain extractive and deterministic, matching the Phase 1 API.
+- Answers remain extractive and deterministic, matching the local API.
 - The `ollama` provider requires a running local Ollama server and an embedding
   model configured in the API environment.

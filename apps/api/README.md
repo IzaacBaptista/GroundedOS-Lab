@@ -6,7 +6,7 @@ the local AI pipeline.
 ## Responsibilities
 
 - Expose REST endpoints for local development flows
-- Route requests through the Phase 1 RAG pipeline
+- Route requests through the local RAG pipeline
 - Provide a future integration point for web, auth, observability and safety
   layers
 
@@ -39,7 +39,7 @@ Returns a basic service health response.
 
 #### `POST /rag/ask`
 
-Runs the local Phase 1 RAG pipeline against inline text content or an uploaded
+Runs the local RAG pipeline against inline text content or an uploaded
 text/PDF file. It can also ask against a previously persisted index by
 `documentId`.
 
