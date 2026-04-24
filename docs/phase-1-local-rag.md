@@ -163,9 +163,10 @@ curl http://localhost:3001/rag/indexes
 curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 ```
 
-The next implementation target is the missing hybrid-vs-dense benchmark
-artifact. After that, Phase 4 can start with local-vs-cloud comparison or A/B
-prompt testing.
+The Phase 2 hybrid-vs-dense benchmark artifact is recorded at
+`datasets/golden/baselines/phase-2-hybrid-benchmark.json`. The next
+implementation target is Phase 4: local-vs-cloud comparison or A/B prompt
+testing.
 
 For a code-level walkthrough of what happens inside this pipeline, see
 [`phase-1-rag-internals.md`](./phase-1-rag-internals.md).

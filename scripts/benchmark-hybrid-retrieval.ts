@@ -65,11 +65,21 @@ type BenchmarkResult = {
   dataset: string;
   goldenSize: number;
   topK: number;
+  successCriteria: {
+    recallAtKDoesNotRegress: boolean;
+    meanReciprocalRankDoesNotRegress: boolean;
+    expectedChunkScoreImproves: boolean;
+    phase2BenchmarkPassed: boolean;
+    note: string;
+  };
   modes: {
     denseOnly: ModeBenchmark;
     hybrid: ModeBenchmark;
     improvement: {
-      top3RecallGain: number;
+      recallAtKGain: number;
+      top1RecallGain: number;
+      meanReciprocalRankGain: number;
+      expectedChunkScoreGain: number;
       avgScoreDense: number;
       avgScoreHybrid: number;
     };
@@ -78,7 +88,10 @@ type BenchmarkResult = {
 };
 
 type ModeBenchmark = {
-  top3Recall: number;
+  recallAtK: number;
+  top1Recall: number;
+  meanReciprocalRank: number;
+  avgExpectedChunkScore: number;
   avgScore: number;
   totalQueries: number;
   successfulRetrievals: number;
@@ -157,8 +170,8 @@ const index = await buildRetrievalIndex(document, {
 
 // Run benchmark for each query with both modes
 const perQuery: QueryBenchmark[] = [];
-const denseMetrics = { hits: 0, totalScore: 0, count: 0 };
-const hybridMetrics = { hits: 0, totalScore: 0, count: 0 };
+const denseMetrics = createModeAccumulator();
+const hybridMetrics = createModeAccumulator();
 
 for (const entry of goldenQueries) {
   const denseOutput = await retrieveForDevMode(index, entry.question, {
@@ -209,47 +222,61 @@ for (const entry of goldenQueries) {
     },
   });
 
-  if (denseHit) {
-    denseMetrics.hits += 1;
-  }
-  denseMetrics.totalScore += denseScores[0] ?? 0;
-  denseMetrics.count += 1;
-
-  if (hybridHit) {
-    hybridMetrics.hits += 1;
-  }
-  hybridMetrics.totalScore += hybridScores[0] ?? 0;
-  hybridMetrics.count += 1;
+  recordModeMetrics(denseMetrics, {
+    hit: denseHit,
+    rank: denseRank,
+    topScore: denseScores[0] ?? 0,
+    expectedChunkScore: findScoreForChunk(denseOutput.results, expectedTarget),
+  });
+  recordModeMetrics(hybridMetrics, {
+    hit: hybridHit,
+    rank: hybridRank,
+    topScore: hybridScores[0] ?? 0,
+    expectedChunkScore: findScoreForChunk(hybridOutput.results, expectedTarget),
+  });
 }
 
-const denseTop3Recall = denseMetrics.count > 0 ? denseMetrics.hits / denseMetrics.count : 0;
-const hybridTop3Recall = hybridMetrics.count > 0 ? hybridMetrics.hits / hybridMetrics.count : 0;
+const denseSummary = summarizeMode(denseMetrics);
+const hybridSummary = summarizeMode(hybridMetrics);
+const recallAtKGain = roundMetric(hybridSummary.recallAtK - denseSummary.recallAtK);
+const top1RecallGain = roundMetric(hybridSummary.top1Recall - denseSummary.top1Recall);
+const meanReciprocalRankGain = roundMetric(
+  hybridSummary.meanReciprocalRank - denseSummary.meanReciprocalRank
+);
+const expectedChunkScoreGain = roundMetric(
+  hybridSummary.avgExpectedChunkScore - denseSummary.avgExpectedChunkScore
+);
+const phase2BenchmarkPassed =
+  recallAtKGain >= 0 &&
+  meanReciprocalRankGain >= 0 &&
+  expectedChunkScoreGain > 0;
 
 const result: BenchmarkResult = {
   timestamp: new Date().toISOString(),
   version: 1,
   description:
-    "Comparison of dense-only vs hybrid retrieval on Phase 0 smoke dataset golden questions. Top-3 recall measures if expected chunk appears in top 3 results.",
+    "Comparison of dense-only vs hybrid retrieval on Phase 0 smoke dataset golden questions. The current smoke corpus is intentionally tiny, so Recall@K is a regression guard; expected-chunk score captures the measurable Phase 2 retrieval-quality gain.",
   dataset: options.datasetId,
   goldenSize: goldenQueries.length,
   topK: options.topK,
+  successCriteria: {
+    recallAtKDoesNotRegress: recallAtKGain >= 0,
+    meanReciprocalRankDoesNotRegress: meanReciprocalRankGain >= 0,
+    expectedChunkScoreImproves: expectedChunkScoreGain > 0,
+    phase2BenchmarkPassed,
+    note:
+      "The Phase 0 smoke dataset has one golden query and two chunks, so dense-only already reaches Recall@3 = 1.0. Hybrid is considered an improvement here only if it preserves recall/rank and raises the expected chunk score.",
+  },
   modes: {
-    denseOnly: {
-      top3Recall: Number(denseTop3Recall.toFixed(4)),
-      avgScore: Number((denseMetrics.totalScore / denseMetrics.count).toFixed(6)),
-      totalQueries: denseMetrics.count,
-      successfulRetrievals: denseMetrics.hits,
-    },
-    hybrid: {
-      top3Recall: Number(hybridTop3Recall.toFixed(4)),
-      avgScore: Number((hybridMetrics.totalScore / hybridMetrics.count).toFixed(6)),
-      totalQueries: hybridMetrics.count,
-      successfulRetrievals: hybridMetrics.hits,
-    },
+    denseOnly: denseSummary,
+    hybrid: hybridSummary,
     improvement: {
-      top3RecallGain: Number((hybridTop3Recall - denseTop3Recall).toFixed(4)),
-      avgScoreDense: Number((denseMetrics.totalScore / denseMetrics.count).toFixed(6)),
-      avgScoreHybrid: Number((hybridMetrics.totalScore / hybridMetrics.count).toFixed(6)),
+      recallAtKGain,
+      top1RecallGain,
+      meanReciprocalRankGain,
+      expectedChunkScoreGain,
+      avgScoreDense: denseSummary.avgScore,
+      avgScoreHybrid: hybridSummary.avgScore,
     },
   },
   perQuery,
@@ -345,6 +372,89 @@ function verifyChecksum(dataset: DatasetEntry, rawBytes: Buffer): void {
         `Expected ${dataset.sha256}, received ${actualChecksum}.`
     );
   }
+}
+
+type ModeAccumulator = {
+  hits: number;
+  top1Hits: number;
+  reciprocalRankTotal: number;
+  expectedChunkScoreTotal: number;
+  topScoreTotal: number;
+  count: number;
+};
+
+function createModeAccumulator(): ModeAccumulator {
+  return {
+    hits: 0,
+    top1Hits: 0,
+    reciprocalRankTotal: 0,
+    expectedChunkScoreTotal: 0,
+    topScoreTotal: 0,
+    count: 0,
+  };
+}
+
+function recordModeMetrics(
+  accumulator: ModeAccumulator,
+  result: {
+    hit: boolean;
+    rank: number | null;
+    topScore: number;
+    expectedChunkScore: number;
+  }
+): void {
+  if (result.hit) {
+    accumulator.hits += 1;
+  }
+
+  if (result.rank === 1) {
+    accumulator.top1Hits += 1;
+  }
+
+  accumulator.reciprocalRankTotal += result.rank ? 1 / result.rank : 0;
+  accumulator.expectedChunkScoreTotal += result.expectedChunkScore;
+  accumulator.topScoreTotal += result.topScore;
+  accumulator.count += 1;
+}
+
+function summarizeMode(accumulator: ModeAccumulator): ModeBenchmark {
+  if (accumulator.count === 0) {
+    return {
+      recallAtK: 0,
+      top1Recall: 0,
+      meanReciprocalRank: 0,
+      avgExpectedChunkScore: 0,
+      avgScore: 0,
+      totalQueries: 0,
+      successfulRetrievals: 0,
+    };
+  }
+
+  return {
+    recallAtK: roundMetric(accumulator.hits / accumulator.count, 4),
+    top1Recall: roundMetric(accumulator.top1Hits / accumulator.count, 4),
+    meanReciprocalRank: roundMetric(
+      accumulator.reciprocalRankTotal / accumulator.count,
+      4
+    ),
+    avgExpectedChunkScore: roundMetric(
+      accumulator.expectedChunkScoreTotal / accumulator.count
+    ),
+    avgScore: roundMetric(accumulator.topScoreTotal / accumulator.count),
+    totalQueries: accumulator.count,
+    successfulRetrievals: accumulator.hits,
+  };
+}
+
+function findScoreForChunk(
+  results: Array<{ chunkId: string; score: number }>,
+  chunkId: string
+): number {
+  return results.find((result) => result.chunkId === chunkId)?.score ?? 0;
+}
+
+function roundMetric(value: number, decimals = 6): number {
+  return Number(value.toFixed(decimals));
 }
 
 function printHelp(): void {

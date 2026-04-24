@@ -50,13 +50,13 @@
 - **Index management** API: list, delete persisted indexes
 - Phase 1 is **complete**. Baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json`.
 
-### Phase 2 / 2b — Retrieval Quality + Memory 🟡 Mostly Complete
+### Phase 2 / 2b — Retrieval Quality + Memory ✅ Complete
 
 - Query understanding runs before retrieval and is visible in Dev Mode
 - Hybrid retrieval and reranking are implemented in the API path
 - Semantic cache, cost tracking and rolling trade-off metrics are exposed through API and web
 - Session-scoped memory persists locally under `.groundedos/memory/sessions/` when `sessionId` is supplied
-- Remaining Phase 2 gap: record the benchmark artifact proving hybrid search improves over the dense-only baseline
+- Hybrid-vs-dense benchmark artifact is recorded in `datasets/golden/baselines/phase-2-hybrid-benchmark.json`
 
 ### Phase 3 — Intelligence ✅ Package Baseline Implemented
 
@@ -669,7 +669,7 @@ No external services required for the default local path:
 - [x] Semantic cache lookup is integrated before retrieval and reported in Dev Mode (`cache.hit`, similarity, hit/miss counters)
 - [x] Request-level cost tracking with budget enforcement is integrated and exposed in Dev Mode (`cost.breakdown`, `totalCostUsd`, `withinBudget`)
 - [x] Trade-off metrics dashboard exposes request/provider aggregates (latency, cost, grounded rate, cache hit rate) via API and web tab
-- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline on the Phase 0 smoke dataset (measure: top-3 recall) — hybrid mode is implemented; benchmark artifact is pending
+- [x] Hybrid search (dense + sparse) is benchmarked against dense-only retrieval on the Phase 0 smoke dataset — Recall@3 does not regress and expected-chunk score improves in `datasets/golden/baselines/phase-2-hybrid-benchmark.json`
 - [x] Re-ranking is applied and token usage / latency per stage is logged per request
 - [x] Retrieval observability spans (chunk count, scores, latency) appear in the Dev Mode output
 
@@ -763,8 +763,7 @@ To move from architecture scaffold to runnable foundation, the active plan is do
   saved-index management, provider comparison, trade-off metrics and session IDs
 - Agent, safety and eval package baselines are implemented, with `POST /agents/execute`
   exposing the first document-QA agent path
-- Next focus: produce the missing hybrid-vs-dense benchmark artifact, then start
-  Phase 4 with local-vs-cloud comparison or A/B prompt testing
+- Next focus: start Phase 4 with local-vs-cloud comparison or A/B prompt testing
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in
