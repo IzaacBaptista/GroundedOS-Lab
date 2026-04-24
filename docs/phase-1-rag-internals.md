@@ -64,10 +64,11 @@ CLI
   -> grounded answer JSON
 ```
 
-For the web path, `apps/web/src/public/app.js` sends `/api/rag/*` requests to
-the local web server. `apps/web/src/server.ts` proxies those requests to the API
-server. The API route calls the RAG service in
-`apps/api/src/rag-service.ts`.
+For the web path, the React SPA under `apps/web/src/` (entry `main.tsx`,
+root component `App.tsx`) sends `/api/rag/*` requests that the Vite dev server
+proxies to the NestJS API. The API route in
+`apps/api/src/rag/rag.controller.ts` delegates to `RagService`, which in turn
+reuses the pure functions in `apps/api/src/rag-service.ts`.
 
 For the CLI path, `scripts/rag-smoke.ts` and `scripts/rag-ask.ts` call
 `packages/etl` and `packages/rag` directly. They bypass the API server but use

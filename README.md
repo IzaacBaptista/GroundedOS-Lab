@@ -191,7 +191,7 @@ The architecture is described at three levels of maturity. Not everything in the
 ```text
 User Input (CLI or HTTP)
    ↓
-apps/api (Fastify)  or  CLI script
+apps/api (NestJS)   or  CLI script
    ↓
 packages/etl  →  NormalizedDocument
    ↓
@@ -592,8 +592,8 @@ No external services required for Phases 0–1:
 
 | Layer | What | Note |
 |---|---|---|
-| API server | Node.js + **Fastify** | Runs with `npm run api:dev`. See [ADR-001](./docs/adr/ADR-001-backend-framework.md). |
-| Web | Node static web server + TypeScript | Runs with `npm run web:dev`; Next.js remains a target option for a later production UI |
+| API server | Node.js + **NestJS** (Fastify adapter) | Runs with `npm run api:dev`. Migrated from raw Fastify; see [ADR-001](./docs/adr/ADR-001-backend-framework.md). |
+| Web | **React 19 + Vite + TypeScript** | Runs with `npm run web:dev` (Vite dev server, proxies `/api` to NestJS). |
 | Storage | Local JSON files (`.groundedos/`) | No database required yet |
 | Embeddings | `api-lexical` (built-in) | Default, no server. `local-hash` and `ollama` are opt-in. |
 | Vector search | In-memory (packages/rag) | No external vector DB required yet |

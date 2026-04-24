@@ -5,6 +5,10 @@
   "type": "module",
   "main": "./src/server.ts",
   "types": "./src/server.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/server.ts"
+  },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
     "@groundedos/core": "0.1.0",
