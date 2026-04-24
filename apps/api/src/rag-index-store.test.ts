@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
+import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -90,7 +90,8 @@ describe("saveRagIndex and loadRagIndex", () => {
     expect(saved.record.schemaVersion).toBe(SCHEMA_VERSION);
     expect(saved.record.document.documentId).toBe("doc-roundtrip");
     expect(saved.indexPath).toContain(tempDir);
-    expect(saved.relativeIndexPath).not.toMatch(/^\//);  // relative, not absolute
+    expect(saved.relativeIndexPath).not.toMatch(/^\//);
+    expect(saved.relativeIndexPath).toMatch(/[a-f0-9]+\.json$/);
 
     const loaded = await loadRagIndex("doc-roundtrip", tempDir);
 
@@ -108,11 +109,6 @@ describe("saveRagIndex and loadRagIndex", () => {
   });
 
   it("throws a 500 ApiRequestError when the file contains invalid JSON", async () => {
-    const badFile = join(
-      tempDir,
-      "not-a-valid-name-but-save-creates-hashed-files.json"
-    );
-
     const saved = await saveRagIndex(makeRecord("doc-bad-json"), tempDir);
 
     await writeFile(saved.indexPath, "{ invalid json }", "utf-8");
@@ -120,8 +116,6 @@ describe("saveRagIndex and loadRagIndex", () => {
     await expect(loadRagIndex("doc-bad-json", tempDir)).rejects.toMatchObject({
       statusCode: 500,
     });
-
-    void badFile;
   });
 
   it("throws a 500 ApiRequestError when the schema version does not match", async () => {
