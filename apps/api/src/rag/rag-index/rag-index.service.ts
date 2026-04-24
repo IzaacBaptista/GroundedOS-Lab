@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import {
   deletePersistedRagIndex,
   listPersistedRagIndexes,
@@ -9,7 +9,7 @@ import { ApiConfigService } from "../../config/api-config";
 
 @Injectable()
 export class RagIndexService {
-  constructor(private readonly config: ApiConfigService) {}
+  constructor(@Inject(ApiConfigService) private readonly config: ApiConfigService) {}
 
   list(): Promise<RagIndexListResponse> {
     return listPersistedRagIndexes(this.config.indexDir);

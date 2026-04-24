@@ -1,10 +1,10 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, Inject, Param, Query } from "@nestjs/common";
 import type { RagSessionMemoryResponse } from "../../rag-service";
 import { RagMemoryService } from "./rag-memory.service";
 
 @Controller("rag/memory")
 export class RagMemoryController {
-  constructor(private readonly ragMemory: RagMemoryService) {}
+  constructor(@Inject(RagMemoryService) private readonly ragMemory: RagMemoryService) {}
 
   @Get(":sessionId")
   async listSession(

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import {
   askRag,
   askRagFromFile,
@@ -21,7 +21,7 @@ import { ApiConfigService } from "../config/api-config";
  */
 @Injectable()
 export class RagService {
-  constructor(private readonly config: ApiConfigService) {}
+  constructor(@Inject(ApiConfigService) private readonly config: ApiConfigService) {}
 
   ask(request: RagAskRequest): Promise<RagAskResponse> {
     return askRag(this.withIndexDir(request));

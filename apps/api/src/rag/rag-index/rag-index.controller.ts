@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param } from "@nestjs/common";
+import { Controller, Delete, Get, Inject, Param } from "@nestjs/common";
 import type {
   RagIndexDeleteResponse,
   RagIndexListResponse,
@@ -7,7 +7,7 @@ import { RagIndexService } from "./rag-index.service";
 
 @Controller("rag/indexes")
 export class RagIndexController {
-  constructor(private readonly ragIndex: RagIndexService) {}
+  constructor(@Inject(RagIndexService) private readonly ragIndex: RagIndexService) {}
 
   @Get()
   list(): Promise<RagIndexListResponse> {
