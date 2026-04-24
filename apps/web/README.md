@@ -11,11 +11,14 @@ grounded retrieval workflows.
 - Select the local embedding provider for new inline/upload requests
 - Display grounded answers, citations and retrieved chunks
 - Expose the raw Dev Mode JSON returned by the API
+- Show a Trade-offs dashboard tab with rolling request/provider metrics
+- Support optional session IDs for persistent conversation memory continuity
 
 ## Status
 
 In Progress - Phase 1 local RAG upload and persisted-index surface is
-implemented, including provider selection for new indexes and ephemeral asks.
+implemented, including provider selection for new indexes, optional session
+memory-aware asks, and a local Trade-offs metrics tab backed by API aggregates.
 
 ## Local usage
 
@@ -42,6 +45,8 @@ Reference environment values live in
 - No authentication or saved question history.
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
+- Session memory is managed by the API under `.groundedos/memory/` when
+  `sessionId` is supplied.
 - Answers remain extractive and deterministic, matching the Phase 1 API.
 - The `ollama` provider requires a running local Ollama server and an embedding
   model configured in the API environment.

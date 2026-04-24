@@ -6,6 +6,7 @@ import type {
   RagIndexDeleteResponse,
   RagIndexListResponse,
   RagIndexResponse,
+  TradeoffMetricsResponse,
 } from "./types";
 
 const API_PREFIX = "/api";
@@ -51,11 +52,17 @@ export async function deleteIndex(
   return parseResponse<RagIndexDeleteResponse>(response);
 }
 
+export async function getTradeoffMetrics(): Promise<TradeoffMetricsResponse> {
+  const response = await fetch(`${API_PREFIX}/rag/metrics/tradeoffs`);
+  return parseResponse<TradeoffMetricsResponse>(response);
+}
+
 export interface AskTextParams {
   content: string;
   query: string;
   topK: number;
   embeddingProvider: EmbeddingProviderId;
+  sessionId?: string;
   title?: string;
 }
 
@@ -71,6 +78,7 @@ export async function askWithText(
       query: params.query,
       topK: params.topK,
       embeddingProvider: params.embeddingProvider,
+      sessionId: params.sessionId || undefined,
       title: params.title || undefined,
     }),
   });
@@ -83,6 +91,7 @@ export interface AskFileParams {
   query: string;
   topK: number;
   embeddingProvider: EmbeddingProviderId;
+  sessionId?: string;
   title?: string;
 }
 
@@ -96,6 +105,10 @@ export async function askWithFile(
   form.append("query", params.query);
   form.append("topK", String(params.topK));
   form.append("embeddingProvider", params.embeddingProvider);
+
+  if (params.sessionId) {
+    form.append("sessionId", params.sessionId);
+  }
 
   if (params.title) {
     form.append("title", params.title);
@@ -112,6 +125,7 @@ export interface AskPersistedParams {
   documentId: string;
   query: string;
   topK: number;
+  sessionId?: string;
 }
 
 export async function askWithPersisted(

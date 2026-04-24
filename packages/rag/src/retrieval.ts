@@ -1,4 +1,10 @@
 import type { DocumentModality, NormalizedDocument } from "@groundedos/core";
+import {
+  validateEmbeddedChunks,
+  validateNormalizedDocument,
+  validateRetrievalChunks,
+  validateVectorSearchResults,
+} from "@groundedos/core";
 
 import {
   chunkDocument,
@@ -36,14 +42,24 @@ export interface RetrievalIndex {
 export interface RetrieveFromIndexOptions {
   topK?: number;
   filter?: VectorMetadataFilter;
+  mode?: RetrievalMode;
+  hybridDenseWeight?: number;
+  hybridCandidateTopK?: number;
 }
 
 export type RetrievalResult = VectorSearchResult;
+export type RetrievalMode = "dense" | "hybrid";
 
 export interface RetrievalDevModeOutput {
   query: string;
   resultCount: number;
   results: RetrievalDevModeResult[];
+  hybrid?: {
+    mode: "hybrid";
+    denseWeight: number;
+    sparseWeight: number;
+    candidateCount: number;
+  };
 }
 
 export interface RetrievalDevModeResult {
@@ -82,11 +98,15 @@ export async function buildRetrievalIndex(
     throw new Error(`${ERROR_PREFIX} document is required.`);
   }
 
+  validateNormalizedDocument(document);
+
   const embeddingProvider =
     options.embeddingProvider ?? new DeterministicEmbeddingProvider();
   const store = options.store ?? new InMemoryVectorStore();
   const chunks = chunkDocument(document, options.chunkOptions);
+  validateRetrievalChunks(chunks);
   const embeddedChunks = await embedChunks(chunks, embeddingProvider);
+  validateEmbeddedChunks(embeddedChunks);
 
   store.insert(embeddedChunks);
 
@@ -102,6 +122,45 @@ export async function retrieveFromIndex(
   query: string,
   options: RetrieveFromIndexOptions = {}
 ): Promise<RetrievalResult[]> {
+  const internal = await retrieveInternal(index, query, options);
+
+  return internal.results;
+}
+
+export async function retrieveForDevMode(
+  index: RetrievalIndex,
+  query: string,
+  options: RetrieveFromIndexOptions = {}
+): Promise<RetrievalDevModeOutput> {
+  const internal = await retrieveInternal(index, query, options);
+  const output = createRetrievalDevOutput(query, internal.results);
+
+  if (internal.hybridMeta) {
+    output.hybrid = {
+      mode: "hybrid",
+      denseWeight: internal.hybridMeta.denseWeight,
+      sparseWeight: internal.hybridMeta.sparseWeight,
+      candidateCount: internal.hybridMeta.candidateCount,
+    };
+  }
+
+  return output;
+}
+
+type InternalRetrievalResult = {
+  results: RetrievalResult[];
+  hybridMeta?: {
+    denseWeight: number;
+    sparseWeight: number;
+    candidateCount: number;
+  };
+};
+
+async function retrieveInternal(
+  index: RetrievalIndex,
+  query: string,
+  options: RetrieveFromIndexOptions = {}
+): Promise<InternalRetrievalResult> {
   validateRetrievalIndex(index);
 
   if (typeof query !== "string" || query.trim().length === 0) {
@@ -110,21 +169,78 @@ export async function retrieveFromIndex(
 
   const queryEmbedding = await embedQuery(query, index.embeddingProvider);
 
-  return index.store.search({
+  const mode = options.mode ?? "dense";
+
+  if (mode !== "dense" && mode !== "hybrid") {
+    throw new Error(`${ERROR_PREFIX} mode must be "dense" or "hybrid".`);
+  }
+
+  if (mode === "dense") {
+    const results = index.store.search({
+      embedding: queryEmbedding,
+      topK: options.topK,
+      filter: options.filter,
+    });
+
+    return {
+      results: validateVectorSearchResults(results) as RetrievalResult[],
+    };
+  }
+
+  const topK = options.topK ?? 3;
+  const denseWeight = resolveDenseWeight(options.hybridDenseWeight);
+  const sparseWeight = 1 - denseWeight;
+  const candidateTopK = resolveCandidateTopK(options.hybridCandidateTopK, topK);
+
+  const denseCandidates = index.store.search({
     embedding: queryEmbedding,
-    topK: options.topK,
+    topK: candidateTopK,
     filter: options.filter,
   });
-}
 
-export async function retrieveForDevMode(
-  index: RetrievalIndex,
-  query: string,
-  options: RetrieveFromIndexOptions = {}
-): Promise<RetrievalDevModeOutput> {
-  const results = await retrieveFromIndex(index, query, options);
+  const validatedDenseCandidates = validateVectorSearchResults(
+    denseCandidates
+  ) as RetrievalResult[];
 
-  return createRetrievalDevOutput(query, results);
+  if (validatedDenseCandidates.length === 0) {
+    return {
+      results: [],
+      hybridMeta: {
+        denseWeight,
+        sparseWeight,
+        candidateCount: 0,
+      },
+    };
+  }
+
+  const reranked = validatedDenseCandidates
+    .map((candidate) => {
+      const denseScore = normalizeDenseScore(candidate.score);
+      const sparseScore = sparseNgramCosine(query, candidate.chunk.text);
+      const combined = denseWeight * denseScore + sparseWeight * sparseScore;
+
+      return {
+        ...candidate,
+        score: Number(combined.toFixed(12)),
+      };
+    })
+    .sort((left, right) => {
+      if (right.score === left.score) {
+        return right.chunk.text.length - left.chunk.text.length;
+      }
+
+      return right.score - left.score;
+    })
+    .slice(0, topK);
+
+  return {
+    results: reranked,
+    hybridMeta: {
+      denseWeight,
+      sparseWeight,
+      candidateCount: validatedDenseCandidates.length,
+    },
+  };
 }
 
 export function createRetrievalDevOutput(
@@ -138,6 +254,8 @@ export function createRetrievalDevOutput(
   if (!Array.isArray(results)) {
     throw new Error(`${ERROR_PREFIX} retrieval results must be an array.`);
   }
+
+  validateVectorSearchResults(results);
 
   return {
     query: query.trim(),
@@ -209,4 +327,93 @@ async function embedQuery(
   }
 
   return embedding;
+}
+
+function resolveDenseWeight(value: number | undefined): number {
+  if (value === undefined) {
+    return 0.65;
+  }
+
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`${ERROR_PREFIX} hybridDenseWeight must be a number between 0 and 1.`);
+  }
+
+  return value;
+}
+
+function resolveCandidateTopK(value: number | undefined, topK: number): number {
+  if (value === undefined) {
+    return Math.max(topK * 4, 10);
+  }
+
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${ERROR_PREFIX} hybridCandidateTopK must be a positive integer.`);
+  }
+
+  return Math.max(value, topK);
+}
+
+function normalizeDenseScore(score: number): number {
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+
+  if (score >= 0 && score <= 1) {
+    return score;
+  }
+
+  return Math.max(0, Math.min(1, (score + 1) / 2));
+}
+
+function tokenize(text: string): string[] {
+  return text.normalize("NFKC").toLowerCase().match(/[a-z0-9]+/g) ?? [];
+}
+
+function sparseNgramCosine(query: string, chunkText: string): number {
+  const queryTerms = tokenize(query);
+
+  if (queryTerms.length === 0) {
+    return 0;
+  }
+
+  const queryNgrams = buildCharacterNgrams(queryTerms.join(" "));
+  const chunkNgrams = buildCharacterNgrams(tokenize(chunkText).join(" "));
+
+  if (queryNgrams.size === 0 || chunkNgrams.size === 0) {
+    return 0;
+  }
+
+  let overlap = 0;
+
+  for (const ngram of queryNgrams) {
+    if (chunkNgrams.has(ngram)) {
+      overlap += 1;
+    }
+  }
+
+  if (overlap === 0) {
+    return 0;
+  }
+
+  return overlap / Math.sqrt(queryNgrams.size * chunkNgrams.size);
+}
+
+function buildCharacterNgrams(text: string, n = 3): Set<string> {
+  const normalized = text.replace(/\s+/g, "").trim();
+
+  if (normalized.length === 0) {
+    return new Set<string>();
+  }
+
+  if (normalized.length <= n) {
+    return new Set<string>([normalized]);
+  }
+
+  const ngrams = new Set<string>();
+
+  for (let index = 0; index <= normalized.length - n; index += 1) {
+    ngrams.add(normalized.slice(index, index + n));
+  }
+
+  return ngrams;
 }

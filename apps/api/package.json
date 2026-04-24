@@ -13,6 +13,8 @@
     "@fastify/multipart": "^10.0.0",
     "@groundedos/core": "0.1.0",
     "@groundedos/etl": "0.1.0",
+    "@groundedos/memory": "0.1.0",
+    "@groundedos/observability": "0.1.0",
     "@groundedos/rag": "0.1.0",
     "@nestjs/common": "^11.1.16",
     "@nestjs/core": "^11.1.16",

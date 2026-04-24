@@ -1,4 +1,5 @@
 import type { RetrievalChunk } from "./chunking";
+import { validateEmbeddedChunks, validateRetrievalChunks } from "@groundedos/core";
 
 const ERROR_PREFIX = "[rag/embeddings]";
 const DEFAULT_DETERMINISTIC_DIMENSIONS = 16;
@@ -99,6 +100,7 @@ export async function embedChunks(
   provider: EmbeddingProvider
 ): Promise<EmbeddedChunk[]> {
   validateProvider(provider);
+  validateRetrievalChunks(chunks);
 
   if (chunks.length === 0) {
     return [];
@@ -107,7 +109,7 @@ export async function embedChunks(
   const embeddings = await provider.embedTexts(chunks.map((chunk) => chunk.text));
   validateEmbeddings(embeddings, chunks.length, provider);
 
-  return chunks.map((chunk, index) => ({
+  const embedded = chunks.map((chunk, index) => ({
     ...chunk,
     embedding: embeddings[index] as EmbeddingVector,
     embeddingMetadata: {
@@ -117,6 +119,8 @@ export async function embedChunks(
       normalized: provider.modelInfo?.normalized,
     },
   }));
+
+  return validateEmbeddedChunks(embedded) as EmbeddedChunk[];
 }
 
 export class LocalHashEmbeddingsProvider implements SemanticEmbeddingsProvider {

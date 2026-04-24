@@ -11,6 +11,7 @@ import {
   askWithFile,
   askWithPersisted,
   askWithText,
+  getTradeoffMetrics,
   indexFile,
   indexText,
 } from "./api/client";
@@ -21,6 +22,7 @@ import type {
   PersistedRagIndexListItem,
   RagAskResponse,
   SourceMode,
+  TradeoffMetricsResponse,
 } from "./api/types";
 import { useApiHealth } from "./hooks/useApiHealth";
 import { useIndexList } from "./hooks/useIndexList";
@@ -53,7 +55,7 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "ollama",
 ];
 
-type ResultMode = "answer" | "compare";
+type ResultMode = "answer" | "compare" | "tradeoffs";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -85,6 +87,7 @@ export default function App() {
   const [textTitle, setTextTitle] = useState("");
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(3);
+  const [sessionId, setSessionId] = useState("");
 
   // Output state
   const [outputTab, setOutputTab] = useState<ResultMode>("answer");
@@ -93,6 +96,12 @@ export default function App() {
     providerA: "api-lexical",
     providerB: "local-hash",
   });
+  const [tradeoffMetrics, setTradeoffMetrics] = useState<TradeoffMetricsResponse | undefined>(
+    undefined
+  );
+  const [tradeoffMetricsLoading, setTradeoffMetricsLoading] = useState(false);
+  const [tradeoffMessage, setTradeoffMessage] = useState("");
+  const [tradeoffMessageIsError, setTradeoffMessageIsError] = useState(false);
 
   // App state
   const [appState, setAppState] = useState<AppState>("idle");
@@ -121,6 +130,11 @@ export default function App() {
   const reportCompareMessage = useCallback((text: string, isError = false) => {
     setCompareMessage(text);
     setCompareMessageIsError(isError);
+  }, []);
+
+  const reportTradeoffMessage = useCallback((text: string, isError = false) => {
+    setTradeoffMessage(text);
+    setTradeoffMessageIsError(isError);
   }, []);
 
   const setState = useCallback((next: AppState, detail = "") => {
@@ -292,6 +306,7 @@ export default function App() {
               documentId: activeIndex.documentId,
               query: trimmedQuery,
               topK,
+              sessionId: sessionId.trim() || undefined,
             })
           : sourceMode === "file"
             ? await runAskFile(trimmedQuery, topK, embeddingProvider)
@@ -334,6 +349,7 @@ export default function App() {
       query: currentQuery,
       topK: currentTopK,
       embeddingProvider: provider,
+      sessionId: sessionId.trim() || undefined,
       title: fileTitle.trim() || undefined,
     });
   };
@@ -354,6 +370,7 @@ export default function App() {
       query: currentQuery,
       topK: currentTopK,
       embeddingProvider: provider,
+      sessionId: sessionId.trim() || undefined,
       title: textTitle.trim() || undefined,
     });
   };
@@ -380,6 +397,7 @@ export default function App() {
     setTextTitle("");
     setQuery("");
     setTopK(3);
+    setSessionId("");
     setResult(undefined);
     setCompare((state) => ({
       ...state,
@@ -391,6 +409,7 @@ export default function App() {
     reportCompareMessage(
       "Run Ask while Compare tab is active to compare providers side by side."
     );
+    reportTradeoffMessage("");
     setState("idle");
     setOutputTab("answer");
     setSourceMode("file");
@@ -406,6 +425,31 @@ export default function App() {
       clearActiveIndex();
     }
   }, [indexes, activeIndex, clearActiveIndex]);
+
+  const loadTradeoffs = useCallback(async () => {
+    setTradeoffMetricsLoading(true);
+
+    try {
+      const metrics = await getTradeoffMetrics();
+      setTradeoffMetrics(metrics);
+      reportTradeoffMessage("");
+    } catch (error) {
+      reportTradeoffMessage(
+        error instanceof Error ? error.message : "Failed to load trade-off metrics.",
+        true
+      );
+    } finally {
+      setTradeoffMetricsLoading(false);
+    }
+  }, [reportTradeoffMessage]);
+
+  useEffect(() => {
+    if (outputTab !== "tradeoffs") {
+      return;
+    }
+
+    void loadTradeoffs();
+  }, [outputTab, loadTradeoffs]);
 
   const indexStatus = useMemo(() => {
     if (activeIndex) {
@@ -631,6 +675,16 @@ export default function App() {
           <details className="advanced-options" open>
             <summary>Advanced options</summary>
             <label className="field">
+              <span>Session ID (memory)</span>
+              <input
+                type="text"
+                autoComplete="off"
+                placeholder="Optional"
+                value={sessionId}
+                onChange={(event) => setSessionId(event.target.value)}
+              />
+            </label>
+            <label className="field">
               <span>Top K</span>
               <input
                 type="number"
@@ -681,6 +735,11 @@ export default function App() {
           setCompare={setCompare}
           compareMessage={compareMessage}
           compareMessageIsError={compareMessageIsError}
+          tradeoffMetrics={tradeoffMetrics}
+          tradeoffMetricsLoading={tradeoffMetricsLoading}
+          onRefreshTradeoffs={() => void loadTradeoffs()}
+          tradeoffMessage={tradeoffMessage}
+          tradeoffMessageIsError={tradeoffMessageIsError}
         />
       </section>
     </main>
@@ -695,6 +754,11 @@ interface ResultPanelProps {
   setCompare: React.Dispatch<React.SetStateAction<CompareState>>;
   compareMessage: string;
   compareMessageIsError: boolean;
+  tradeoffMetrics: TradeoffMetricsResponse | undefined;
+  tradeoffMetricsLoading: boolean;
+  onRefreshTradeoffs: () => void;
+  tradeoffMessage: string;
+  tradeoffMessageIsError: boolean;
 }
 
 function ResultPanel({
@@ -705,6 +769,11 @@ function ResultPanel({
   setCompare,
   compareMessage,
   compareMessageIsError,
+  tradeoffMetrics,
+  tradeoffMetricsLoading,
+  onRefreshTradeoffs,
+  tradeoffMessage,
+  tradeoffMessageIsError,
 }: ResultPanelProps) {
   const citations = result?.answer?.citations ?? [];
   const results = result?.devMode?.results ?? [];
@@ -753,6 +822,15 @@ function ResultPanel({
           onClick={() => setOutputTab("compare")}
         >
           Compare
+        </button>
+        <button
+          className={`result-tab${outputTab === "tradeoffs" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "tradeoffs"}
+          onClick={() => setOutputTab("tradeoffs")}
+        >
+          Trade-offs
         </button>
       </div>
 
@@ -871,8 +949,103 @@ function ResultPanel({
           </div>
         </div>
       )}
+
+      {outputTab === "tradeoffs" && (
+        <div className="tradeoffs-view">
+          <div className="panel__header">
+            <h3>Request Metrics</h3>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onRefreshTradeoffs}
+              disabled={tradeoffMetricsLoading}
+            >
+              {tradeoffMetricsLoading ? "Refreshing" : "Refresh"}
+            </button>
+          </div>
+
+          <p
+            className={`form-message${tradeoffMessageIsError ? " is-error" : ""}`}
+            role="status"
+            aria-live="polite"
+          >
+            {tradeoffMessage}
+          </p>
+
+          {!tradeoffMetrics && !tradeoffMetricsLoading && (
+            <p className="chunk-text">No trade-off metrics available yet.</p>
+          )}
+
+          {tradeoffMetrics && (
+            <>
+              <div className="tradeoffs-grid">
+                <MetricCard label="Requests" value={String(tradeoffMetrics.totals.requests)} />
+                <MetricCard
+                  label="Avg latency"
+                  value={`${tradeoffMetrics.totals.avgLatencyMs.toFixed(2)} ms`}
+                />
+                <MetricCard
+                  label="P95 latency"
+                  value={`${tradeoffMetrics.totals.p95LatencyMs.toFixed(2)} ms`}
+                />
+                <MetricCard
+                  label="Avg cost"
+                  value={`$${tradeoffMetrics.totals.avgCostUsd.toFixed(6)}`}
+                />
+                <MetricCard
+                  label="Grounded rate"
+                  value={formatRate(tradeoffMetrics.totals.groundedRate)}
+                />
+                <MetricCard
+                  label="Cache hit rate"
+                  value={formatRate(tradeoffMetrics.totals.cacheHitRate)}
+                />
+              </div>
+
+              <section className="output-section">
+                <div className="section-title">
+                  <h3>By Provider</h3>
+                  <span className="count">{tradeoffMetrics.providers.length}</span>
+                </div>
+                <div className="result-list">
+                  {tradeoffMetrics.providers.length === 0 ? (
+                    <p className="chunk-text">No provider metrics yet.</p>
+                  ) : (
+                    tradeoffMetrics.providers.map((provider) => (
+                      <article key={provider.provider} className="result-row">
+                        <div className="result-row__meta">
+                          <span>{provider.provider}</span>
+                          <span>{provider.requests} requests</span>
+                          <span>avg {provider.avgLatencyMs.toFixed(2)} ms</span>
+                          <span>p95 {provider.p95LatencyMs.toFixed(2)} ms</span>
+                          <span>{formatRate(provider.groundedRate)} grounded</span>
+                          <span>{formatRate(provider.cacheHitRate)} cache hit</span>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <article className="metric-card">
+      <span className="metric-card__label">{label}</span>
+      <strong className="metric-card__value">{value}</strong>
+    </article>
+  );
+}
+
+function formatRate(value: number): string {
+  const safe = Number.isFinite(value) ? value : 0;
+  return `${(safe * 100).toFixed(1)}%`;
 }
 
 function CompareColumn({

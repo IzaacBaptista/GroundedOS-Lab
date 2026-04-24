@@ -12,10 +12,18 @@ Grounded documents often contain product names, IDs, error codes and exact phras
 
 | Package / Location | How it uses the concept |
 |---|---|
-| [`packages/rag`](../../packages/rag/README.md) | Plans dense plus sparse retrieval before reranking. |
+| [`packages/rag`](../../packages/rag/README.md) | Implements `mode: "hybrid"` retrieval with dense score + sparse lexical score blending. |
+| [`apps/api/src/rag-service.ts`](../../apps/api/src/rag-service.ts) | Uses hybrid mode by default in ask workflows before answer construction. |
 | [`packages/benchmarks`](../../packages/benchmarks/README.md) | Compares hybrid retrieval against dense-only baselines. |
 | [`packages/evals`](../../packages/evals/README.md) | Measures retrieval relevance and answer faithfulness. |
 | [`packages/viz`](../../packages/viz/README.md) | Can expose retrieval scores and chunk origins. |
+
+## Current implementation notes
+
+- Dense candidates are fetched from vector search.
+- Sparse lexical score is computed with character n-gram overlap for robustness.
+- Final ranking blends both signals using configurable weights.
+- Dev Mode can expose hybrid diagnostics (`denseWeight`, `sparseWeight`, `candidateCount`).
 
 ## Trade-offs
 

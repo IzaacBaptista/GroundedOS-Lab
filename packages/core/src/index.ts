@@ -18,3 +18,39 @@ export type {
 // Ingestion contract (Phase 0 — Multimodal Ingestion Standardization)
 export type { IngestionInput } from "./types/ingestion";
 export type { Extractor } from "./types/extractor";
+
+// Query types (Phase 2 — Query Understanding)
+export type { RawQuery, ProcessedQuery, QueryIntent } from "./types/query";
+
+// Runtime validation (Phase 2 — Data Contracts & Schema Validation)
+export {
+  ContractViolationError,
+  validateNormalizedDocument,
+  validateDocumentSection,
+  validateRetrievalChunk,
+  validateEmbeddedChunk,
+  validateVectorSearchResult,
+  validateRagAskResponse,
+  validateProcessedQuery,
+  validateRetrievalChunks,
+  validateEmbeddedChunks,
+  validateVectorSearchResults,
+} from "./validation/index";
+
+export {
+  NormalizedDocumentSchema,
+  RetrievalChunkSchema,
+  EmbeddedChunkSchema,
+  VectorSearchResultSchema,
+  ProcessedQuerySchema,
+  RagAskResponseSchema,
+} from "./validation/schemas";
+
+// Workflow engine (Phase 2 — Workflow Orchestration)
+export type {
+  StepStatus,
+  WorkflowStep,
+  WorkflowContext,
+  WorkflowResult,
+} from "./workflow/types";
+export { WorkflowRunner } from "./workflow/runner";

@@ -84,6 +84,7 @@ export class RagController {
         originalFilename: upload.filename,
         type: fields.type as RagAskFileRequest["type"],
         query: fields.query,
+        sessionId: fields.sessionId,
         topK: parsePositiveInteger(fields.topK, "topK"),
         title: fields.title,
         documentId: fields.documentId,

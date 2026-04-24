@@ -1,16 +1,23 @@
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   ApiRequestError,
   askRag,
   askRagFromFile,
   deletePersistedRagIndex,
+  getRagSessionMemory,
+  getRagTradeoffMetrics,
   indexRag,
   listPersistedRagIndexes,
+  resetRagRuntimeStateForTests,
 } from "./rag-service";
+
+beforeEach(async () => {
+  await resetRagRuntimeStateForTests();
+});
 
 describe("askRag", () => {
   it("answers a grounded question against inline text", async () => {
@@ -52,6 +59,100 @@ describe("askRag", () => {
       },
     });
     expect(output.devMode.results[0]?.chunkId).toBe("api-test-doc:section-2:chunk-1");
+    expect(output.devMode.processedQuery?.intent).toBe("factual");
+    expect(output.devMode.workflowContext?.steps["process-query"]?.status).toBe("success");
+    expect(output.devMode.hybrid?.mode).toBe("hybrid");
+    expect(output.devMode.hybrid?.candidateCount).toBeGreaterThanOrEqual(1);
+    expect(output.devMode.reranking).toMatchObject({
+      applied: true,
+      returnedCount: 1,
+    });
+    expect(output.devMode.reranking?.candidateCount).toBeGreaterThanOrEqual(1);
+    expect(output.devMode.workflowContext?.steps["rerank-chunks"]?.status).toBe("success");
+    expect(output.devMode.stageMetrics).toBeDefined();
+    expect(output.devMode.stageMetrics?.map((stage) => stage.stage)).toEqual([
+      "process-query",
+      "retrieve-chunks",
+      "rerank-chunks",
+    ]);
+    expect(output.devMode.stageMetrics?.every((stage) => stage.inputTokens >= 0)).toBe(true);
+    expect(output.devMode.stageMetrics?.every((stage) => stage.durationMs >= 0)).toBe(true);
+    expect(output.devMode.retrievalSpans?.map((span) => span.stage)).toEqual([
+      "retrieve-chunks",
+      "rerank-chunks",
+    ]);
+    expect(output.devMode.retrievalSpans?.every((span) => span.chunkCount >= 0)).toBe(true);
+    expect(output.devMode.retrievalSpans?.every((span) => span.latencyMs >= 0)).toBe(true);
+    expect(output.devMode.retrievalSpans?.[0]?.score.max).toBeGreaterThanOrEqual(
+      output.devMode.retrievalSpans?.[0]?.score.min ?? 0
+    );
+    expect(output.devMode.cache?.hit).toBe(false);
+    expect(output.devMode.cost?.withinBudget).toBe(true);
+    expect(output.devMode.cost?.breakdown.some((item) => item.stage === "reranking")).toBe(true);
+  });
+
+  it("returns a semantic cache hit on repeated equivalent requests", async () => {
+    const request = {
+      type: "text" as const,
+      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+      query: "What explains vector search?",
+      title: "Cache API Test",
+      documentId: "api-cache-doc",
+      topK: 1,
+    };
+
+    const first = await askRag(request);
+    const second = await askRag(request);
+
+    expect(first.devMode.cache?.hit).toBe(false);
+    expect(second.devMode.cache?.hit).toBe(true);
+    expect(second.devMode.cache?.hits).toBeGreaterThanOrEqual(1);
+  });
+
+  it("records trade-off metrics for dashboard aggregation", async () => {
+    await askRag({
+      type: "text",
+      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+      query: "What explains vector search?",
+      title: "Metrics API Test",
+      documentId: "api-metrics-doc",
+      topK: 1,
+    });
+
+    const metrics = getRagTradeoffMetrics();
+
+    expect(metrics.totals.requests).toBe(1);
+    expect(metrics.providers[0]?.provider).toBe("api-lexical");
+    expect(metrics.recent[0]?.requestId).toBeTruthy();
+  });
+
+  it("stores and recalls session memory when sessionId is provided", async () => {
+    const first = await askRag({
+      type: "text",
+      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+      query: "What explains vector search?",
+      title: "Memory API Test",
+      documentId: "api-memory-doc",
+      topK: 1,
+      sessionId: "session-memory-1",
+    });
+
+    expect(first.devMode.memory?.stored).toBe(true);
+
+    const second = await askRag({
+      type: "text",
+      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+      query: "What explains vector search?",
+      title: "Memory API Test",
+      documentId: "api-memory-doc",
+      topK: 1,
+      sessionId: "session-memory-1",
+    });
+
+    expect(second.devMode.memory?.recalled).toBeGreaterThanOrEqual(1);
+
+    const memory = await getRagSessionMemory("session-memory-1");
+    expect(memory.count).toBeGreaterThanOrEqual(2);
   });
 
   it("rejects invalid request payloads", async () => {

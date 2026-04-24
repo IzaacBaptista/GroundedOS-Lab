@@ -48,3 +48,10 @@ You do **not** need an ADR for obvious or easily-reversible choices (e.g. adding
 | [ADR-003](./ADR-003-api-worker-communication.md) | API → Worker communication via BullMQ / Redis | Accepted |
 | [ADR-004](./ADR-004-monorepo-tooling.md) | Monorepo tooling: npm workspaces + Vitest | Accepted |
 | [ADR-005](./ADR-005-provider-contracts.md) | Minimal provider contracts before broad package extraction | Accepted |
+| [ADR-006](./ADR-006-query-understanding-strategy.md) | Query understanding strategy: deterministic pre-retrieval layer | Accepted |
+| [ADR-007](./ADR-007-runtime-validation-strategy.md) | Runtime validation strategy: schema-first contracts | Accepted |
+| [ADR-008](./ADR-008-workflow-engine-design.md) | Workflow engine design: lightweight step runner | Accepted |
+| [ADR-009](./ADR-009-semantic-cache-design.md) | Semantic cache design: in-memory cosine similarity cache | Accepted |
+| [ADR-010](./ADR-010-tradeoff-metrics-dashboard.md) | Trade-off metrics dashboard: in-memory aggregation with API summary endpoint | Accepted |
+| [ADR-011](./ADR-011-session-memory-persistence.md) | Session memory persistence: file-backed per-session memory store | Accepted |
+| [ADR-013](./ADR-013-cost-tracking-strategy.md) | Cost tracking strategy: request-level accounting and budget enforcement | Accepted |

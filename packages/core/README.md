@@ -11,7 +11,7 @@ Shared foundational types, utilities and abstractions used across all packages a
 
 ## Status
 
-🟡 In Progress — Phase 0 (Data Foundation)
+🟡 In Progress — Phase 0 (Data Foundation), Phase 2 foundations in progress (runtime validation, query contracts, workflow engine)
 
 ## Contents
 
@@ -76,3 +76,43 @@ import type { SourceDocument, NormalizedDocument } from "@groundedos/core";
 ```
 
 > All types are pure TypeScript interfaces — no runtime dependencies.
+
+### `src/types/query.ts` — Query Understanding Contracts
+
+Defines the pre-retrieval query contracts used by `packages/rag` and API Dev Mode output.
+
+Key exports:
+
+| Export | Purpose |
+|---|---|
+| `RawQuery` | Raw user query payload before processing |
+| `ProcessedQuery` | Enriched query with rewrite, expansion and intent |
+| `QueryIntent` | Intent classification union (`factual`, `comparative`, `procedural`, `exploratory`, `unknown`) |
+
+### `src/validation/*` — Runtime Contract Validation
+
+Schema-first runtime validation for stable cross-package contracts using Zod.
+
+Key exports:
+
+| Export | Purpose |
+|---|---|
+| `ContractViolationError` | Typed runtime validation error with contract/field/value context |
+| `validateNormalizedDocument` | Validates ETL output documents |
+| `validateRetrievalChunk(s)` | Validates chunking outputs |
+| `validateEmbeddedChunk(s)` | Validates embedding outputs |
+| `validateVectorSearchResult(s)` | Validates retrieval outputs |
+| `validateProcessedQuery` | Validates query understanding outputs |
+| `validateRagAskResponse` | Validates API response contract |
+
+### `src/workflow/*` — Workflow Engine
+
+Lightweight step-based workflow orchestration primitives.
+
+Key exports:
+
+| Export | Purpose |
+|---|---|
+| `WorkflowStep` | Named executable workflow step |
+| `WorkflowContext` | Per-run state (step statuses, durations, metadata) |
+| `WorkflowRunner` | Sequential step executor with failure and timing semantics |

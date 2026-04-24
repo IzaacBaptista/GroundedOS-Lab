@@ -223,6 +223,68 @@ describe("api server", () => {
       },
     });
   });
+
+  it("serves GET /rag/metrics/tradeoffs", async () => {
+    const app = await createTestServer();
+
+    await app.inject({
+      method: "POST",
+      url: "/rag/ask",
+      payload: {
+        type: "text",
+        content: "Alpha notes.\n\nBeta notes about retrieval metrics.",
+        query: "What mentions retrieval?",
+        topK: 1,
+      },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/rag/metrics/tradeoffs",
+    });
+    const body = response.json() as {
+      totals: { requests: number };
+      providers: Array<{ provider: string; requests: number }>;
+      recent: Array<{ requestId: string }>;
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.totals.requests).toBeGreaterThanOrEqual(1);
+    expect(body.providers.length).toBeGreaterThanOrEqual(1);
+    expect(body.recent.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("serves GET /rag/memory/:sessionId", async () => {
+    const app = await createTestServer();
+    const sessionId = `session-http-${Date.now()}`;
+
+    await app.inject({
+      method: "POST",
+      url: "/rag/ask",
+      payload: {
+        type: "text",
+        content: "Alpha notes.\n\nBeta notes about retrieval metrics.",
+        query: "What mentions retrieval?",
+        topK: 1,
+        sessionId,
+      },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/rag/memory/${encodeURIComponent(sessionId)}`,
+    });
+    const body = response.json() as {
+      sessionId: string;
+      count: number;
+      entries: Array<{ query: string; answer: string }>;
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.sessionId).toBe(sessionId);
+    expect(body.count).toBeGreaterThanOrEqual(1);
+    expect(body.entries[0]?.query).toBeTruthy();
+  });
 });
 
 async function createTestServer(indexDir?: string): Promise<NestFastifyApplication> {

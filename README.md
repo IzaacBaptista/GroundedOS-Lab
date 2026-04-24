@@ -57,7 +57,6 @@
 | Hybrid search (dense + sparse) | Phase 2 |
 | Re-ranking | Phase 2 |
 | Full observability (OpenTelemetry spans) | Phase 2 |
-| Persistent conversation memory | Phase 2b |
 | Agents and tool calling | Phase 3 |
 | Guardrails (beyond stubs) | Phase 3 |
 | Automated evals (faithfulness, relevance) | Phase 3 |
@@ -650,9 +649,15 @@ No external services required for Phases 0–1:
 * Observability
 
 **✅ Success Criteria:**
-- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline on the Phase 0 smoke dataset (measure: top-3 recall)
-- [ ] Re-ranking is applied and token usage / latency per stage is logged per request
-- [ ] Retrieval observability spans (chunk count, scores, latency) appear in the Dev Mode output
+- [x] Runtime contract validation is enforced at package and API boundaries (schema-first validation layer in `packages/core`)
+- [x] Query understanding runs before retrieval (rewrite, expansion, intent detection) and is visible in Dev Mode output
+- [x] RAG ask execution is exposed as explicit workflow steps with per-step status and duration in Dev Mode
+- [x] Semantic cache lookup is integrated before retrieval and reported in Dev Mode (`cache.hit`, similarity, hit/miss counters)
+- [x] Request-level cost tracking with budget enforcement is integrated and exposed in Dev Mode (`cost.breakdown`, `totalCostUsd`, `withinBudget`)
+- [x] Trade-off metrics dashboard exposes request/provider aggregates (latency, cost, grounded rate, cache hit rate) via API and web tab
+- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline on the Phase 0 smoke dataset (measure: top-3 recall) — hybrid mode is implemented; benchmark artifact is pending
+- [x] Re-ranking is applied and token usage / latency per stage is logged per request
+- [x] Retrieval observability spans (chunk count, scores, latency) appear in the Dev Mode output
 
 > **Note:** Persistent memory between sessions is a separate product and infrastructure concern (storage, user identity, privacy) and is tracked in Phase 2b, not here. Mixing it with retrieval quality improvements would cause one to delay the other.
 
@@ -663,9 +668,11 @@ No external services required for Phases 0–1:
 * Memory read/write contracts
 
 **✅ Success Criteria:**
-- [ ] Conversation memory persists and is retrievable across independent API restarts using a documented storage contract
-- [ ] Memory entries are associated with a session identifier; no cross-session leakage
-- [ ] Memory scope, retention policy and privacy implications are documented in [`packages/memory/README.md`](./packages/memory/README.md)
+- [x] Conversation memory persists and is retrievable across independent API restarts using a documented storage contract
+- [x] Memory entries are associated with a session identifier; no cross-session leakage
+- [x] Memory scope, retention policy and privacy implications are documented in [`packages/memory/README.md`](./packages/memory/README.md)
+
+Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with optional `sessionId` plus `GET /rag/memory/:sessionId` for session inspection.
 
 ### Phase 3 — Intelligence
 
@@ -732,7 +739,8 @@ To move from architecture scaffold to runnable foundation, the active plan is do
 
 - Phase 1 local RAG foundation is executable through `npm run rag:smoke` and `npm run rag:ask`
 - A local API is available through `npm run api:dev` with `POST /rag/index`
-  `POST /rag/ask`, `GET /rag/indexes`, and `DELETE /rag/indexes/:documentId`
+   `POST /rag/ask`, `GET /rag/indexes`, `DELETE /rag/indexes/:documentId`, and
+   `GET /rag/metrics/tradeoffs`
   for inline JSON text, multipart text/PDF uploads, persisted local indexes and
   basic index management. Inline/upload requests can use `api-lexical`
   (default), `local-hash` or opt-in `ollama` embedding providers

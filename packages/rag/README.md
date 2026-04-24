@@ -14,8 +14,10 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 In Progress - Phase 1 chunking, deterministic local embeddings, semantic
 embedding provider interfaces, in-memory vector storage, first retrieval flow
-and Dev Mode retrieval output contract implemented. Re-ranking and context
-assembly remain planned.
+and Dev Mode retrieval output contract implemented. Phase 2 foundations now
+include query understanding (rewrite/expand/intent), an in-memory semantic
+cache module, and hybrid retrieval mode (dense + sparse lexical re-ranking).
+Context assembly remains planned.
 
 ## Current implementation
 
@@ -133,8 +135,19 @@ import { buildRetrievalIndex, retrieveFromIndex } from "@groundedos/rag";
 const index = await buildRetrievalIndex(normalizedDocument);
 const results = await retrieveFromIndex(index, "what does this document say?", {
   topK: 3,
+  mode: "hybrid",
 });
 ```
+
+Retrieval options:
+
+| Option | Default | Description |
+|---|---|---|
+| `topK` | store default (`5`) | Number of ranked chunks returned |
+| `filter` | unset | Exact metadata filter applied before ranking |
+| `mode` | `"dense"` | `"dense"` for cosine-only ranking, `"hybrid"` for dense+sparse |
+| `hybridDenseWeight` | `0.65` | Dense weight in hybrid score blend (`0..1`) |
+| `hybridCandidateTopK` | `max(topK*4, 10)` | Candidate pool size before hybrid reranking |
 
 For Dev Mode diagnostics, use `retrieveForDevMode()` to return the documented
 retrieval output shape with chunk IDs, scores, source metadata and offsets.
@@ -144,8 +157,16 @@ import { retrieveForDevMode } from "@groundedos/rag";
 
 const devOutput = await retrieveForDevMode(index, "what does this document say?", {
   topK: 3,
+  mode: "hybrid",
 });
 ```
+
+When `mode: "hybrid"` is used, Dev Mode includes a `hybrid` block with
+`denseWeight`, `sparseWeight`, and `candidateCount`.
+
+In the API workflow, retrieval can fetch a larger candidate set and apply a
+dedicated reranking step before answer generation. The API Dev Mode includes
+reranking/stage telemetry for that orchestration layer.
 
 The output contract is documented in
 [`docs/phase-1-dev-mode-output.md`](../../docs/phase-1-dev-mode-output.md).
@@ -179,3 +200,8 @@ The end-to-end internals guide is documented in
 | `RetrievalIndex` | Local retrieval index with provider, store and embedded chunks |
 | `retrieveForDevMode(index, query, options?)` | Retrieve ranked chunks as the Dev Mode diagnostics contract |
 | `RetrievalDevModeOutput` | Stable Dev Mode retrieval output shape |
+| `processQuery(raw)` | Run query rewriting, expansion and intent detection before retrieval |
+| `rewriteQuery(text)` | Normalize and simplify a raw query |
+| `expandQuery(text)` | Generate lexical variants for retrieval recall |
+| `detectIntent(text)` | Classify query intent into a stable contract |
+| `SemanticCache` | In-memory semantic cache keyed by document scope and query embedding similarity |

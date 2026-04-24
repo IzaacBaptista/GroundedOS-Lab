@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ingest } from "@groundedos/etl";
 
-import type { EmbeddingProvider, EmbeddingVector } from "./embeddings";
+import {
+  DeterministicEmbeddingProvider,
+  type EmbeddingProvider,
+  type EmbeddingVector,
+} from "./embeddings";
 import { InMemoryVectorStore } from "./vector-store";
 import {
   buildRetrievalIndex,
@@ -184,6 +188,103 @@ describe("retrieval flow", () => {
     expect(results).toEqual([]);
   });
 
+  it("reranks dense candidates with sparse matching in hybrid mode", async () => {
+    const document = await ingest({
+      type: "text",
+      content:
+        "Alpha control note without answer terms.\n\nThis command verifies that the ETL dispatcher can route plain text input and return a NormalizedDocument.\n\nBeta control note without answer terms.",
+      metadata: {
+        documentId: "doc-hybrid",
+        title: "Hybrid Retrieval Test",
+      },
+    });
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: {
+        maxChunkChars: 300,
+        overlapChars: 0,
+      },
+    });
+
+    const denseOnly = await retrieveFromIndex(index, "dispatcher normalized document", {
+      topK: 1,
+      mode: "dense",
+    });
+    const hybrid = await retrieveFromIndex(index, "dispatcher normalized document", {
+      topK: 1,
+      mode: "hybrid",
+      hybridDenseWeight: 0.2,
+    });
+
+    expect(denseOnly[0]?.chunk.sectionId).toBe("section-1");
+    expect(hybrid[0]?.chunk.sectionId).toBe("section-2");
+    expect(hybrid[0]?.score ?? 0).toBeGreaterThan(denseOnly[0]?.score ?? 0);
+  });
+
+  it("adds hybrid diagnostics to Dev Mode output when hybrid mode is used", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Alpha note.\n\nBeta retrieval note.",
+      metadata: {
+        documentId: "doc-hybrid-dev",
+        title: "Hybrid Dev Mode",
+      },
+    });
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: {
+        maxChunkChars: 200,
+        overlapChars: 0,
+      },
+    });
+
+    const output = await retrieveForDevMode(index, "beta question", {
+      topK: 1,
+      mode: "hybrid",
+    });
+
+    expect(output.hybrid).toBeDefined();
+    expect(output.hybrid?.mode).toBe("hybrid");
+    expect(output.hybrid?.candidateCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("improves smoke-style retrieval with hybrid mode when query tokenization diverges", async () => {
+    const document = await ingest({
+      type: "text",
+      content:
+        "GroundedOS Lab smoke test.\n\nThis command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
+      metadata: {
+        documentId: "doc-smoke-hybrid",
+        title: "Smoke Hybrid Test",
+      },
+    });
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new DeterministicEmbeddingProvider(),
+      chunkOptions: {
+        maxChunkChars: 200,
+        overlapChars: 0,
+      },
+    });
+
+    const query = "Which output is the normalized document form?";
+
+    const denseOnly = await retrieveFromIndex(index, query, {
+      topK: 1,
+      mode: "dense",
+    });
+    const hybrid = await retrieveFromIndex(index, query, {
+      topK: 1,
+      mode: "hybrid",
+      hybridDenseWeight: 0.3,
+    });
+
+    expect(denseOnly[0]?.chunk.sectionId).toBe("section-2");
+    expect(hybrid[0]?.chunk.sectionId).toBe("section-2");
+  });
+
   it("rejects invalid retrieval inputs and provider query embeddings", async () => {
     const document = await ingest({
       type: "text",
@@ -230,6 +331,12 @@ describe("retrieval flow", () => {
     await expect(retrieveFromIndex(badProviderIndex, "alpha")).rejects.toThrow(
       "[rag/retrieval] provider must return exactly one query embedding."
     );
+    await expect(
+      retrieveFromIndex(index, "alpha", {
+        mode: "hybrid",
+        hybridDenseWeight: 1.2,
+      })
+    ).rejects.toThrow("[rag/retrieval] hybridDenseWeight must be a number between 0 and 1.");
     expect(() => createRetrievalDevOutput("alpha", undefined as unknown as [])).toThrow(
       "[rag/retrieval] retrieval results must be an array."
     );

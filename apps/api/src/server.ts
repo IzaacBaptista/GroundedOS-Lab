@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import multipart from "@fastify/multipart";
+import { validateRagAskResponse } from "@groundedos/core";
 import { NestFactory } from "@nestjs/core";
 import {
   FastifyAdapter,
@@ -40,6 +41,26 @@ export async function createApiServer(
   // works at runtime against both; cast to keep strict typechecking green.
   await app.register(multipart as unknown as Parameters<typeof app.register>[0], {
     limits: MULTIPART_LIMITS,
+  });
+
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook("onSend", (request, reply, payload, done) => {
+    const shouldValidate =
+      request.url.startsWith("/rag/ask") && reply.statusCode >= 200 && reply.statusCode < 300;
+
+    if (!shouldValidate) {
+      done(null, payload);
+      return;
+    }
+
+    try {
+      const body =
+        typeof payload === "string" ? (JSON.parse(payload) as unknown) : (payload as unknown);
+      validateRagAskResponse(body);
+      done(null, payload);
+    } catch (error) {
+      done(error as Error);
+    }
   });
 
   app.useGlobalFilters(new ApiExceptionFilter());

@@ -1,13 +1,39 @@
 import { createHash } from "crypto";
 import { readFile } from "fs/promises";
 import { basename, extname } from "path";
-import type { DocumentModality } from "@groundedos/core";
+import {
+  validateNormalizedDocument,
+  validateProcessedQuery,
+  validateRagAskResponse,
+  WorkflowRunner,
+  type DocumentModality,
+  type ProcessedQuery,
+  type WorkflowContext,
+  type WorkflowStep,
+} from "@groundedos/core";
 import { ingest } from "@groundedos/etl";
+import {
+  FileSessionMemoryStore,
+  type MemoryEntry,
+  type MemorySearchResult,
+} from "@groundedos/memory";
+import {
+  CostBudgetEnforcer,
+  CostLedger,
+  CostTracker,
+  TradeoffMetricsStore,
+  resolveCostBudgetFromEnv,
+  resolveUnitCostUsd,
+  type RequestCostSummary,
+  type TradeoffMetricsSummary,
+} from "@groundedos/observability";
 import {
   buildRetrievalIndex,
   InMemoryVectorStore,
   LocalHashEmbeddingsProvider,
   OllamaEmbeddingsProvider,
+  SemanticCache,
+  processQuery,
   retrieveForDevMode,
   semanticToEmbeddingProvider,
   type EmbeddingModelInfo,
@@ -31,6 +57,15 @@ const EMBEDDING_DIMENSIONS = 64;
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OLLAMA_EMBEDDING_MODEL = "embeddinggemma";
 const DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS = 768;
+const DEFAULT_MEMORY_RECALL_LIMIT = 3;
+const DEFAULT_RETRIEVAL_MODE = "hybrid" as const;
+const DEFAULT_RERANK_CANDIDATE_MULTIPLIER = 3;
+const semanticCache = new SemanticCache();
+const costLedger = new CostLedger();
+const tradeoffMetricsStore = new TradeoffMetricsStore();
+const sessionMemoryStore = new FileSessionMemoryStore(
+  process.env.GROUNDEDOS_MEMORY_DIR ?? ".groundedos/memory/sessions"
+);
 
 export { ApiRequestError } from "./errors";
 
@@ -52,6 +87,7 @@ export type RagAskRequest = {
   type?: DocumentModality;
   content?: string;
   query?: string;
+  sessionId?: string;
   topK?: number;
   title?: string;
   documentId?: string;
@@ -65,6 +101,7 @@ export type RagAskFileRequest = {
   filePath?: string;
   originalFilename?: string;
   query?: string;
+  sessionId?: string;
   topK?: number;
   title?: string;
   documentId?: string;
@@ -118,7 +155,50 @@ export type RagAskResponse = {
     persisted: boolean;
     indexPath?: string;
   };
-  devMode: RetrievalDevModeOutput;
+  devMode: RetrievalDevModeOutput & {
+    processedQuery?: ProcessedQuery;
+    workflowContext?: WorkflowContext;
+    cache?: {
+      hit: boolean;
+      similarity?: number;
+      hits?: number;
+      misses?: number;
+      evictions?: number;
+    };
+    cost?: RequestCostSummary;
+    memory?: {
+      sessionId?: string;
+      recalled: number;
+      stored: boolean;
+      matches: Array<{
+        score: number;
+        query: string;
+        answer: string;
+        createdAt: number;
+      }>;
+    };
+    reranking?: {
+      applied: boolean;
+      candidateCount: number;
+      returnedCount: number;
+    };
+    stageMetrics?: Array<{
+      stage: "process-query" | "retrieve-chunks" | "rerank-chunks";
+      durationMs: number;
+      inputTokens: number;
+      outputUnits: number;
+    }>;
+    retrievalSpans?: {
+      stage: "retrieve-chunks" | "rerank-chunks";
+      latencyMs: number;
+      chunkCount: number;
+      score: {
+        min: number;
+        max: number;
+        avg: number;
+      };
+    }[];
+  };
 };
 
 export type RagIndexResponse = {
@@ -140,6 +220,14 @@ export type RagIndexDeleteResponse = {
   index: PersistedRagIndexListItem;
 };
 
+export type RagTradeoffMetricsResponse = TradeoffMetricsSummary;
+
+export type RagSessionMemoryResponse = {
+  sessionId: string;
+  count: number;
+  entries: MemoryEntry[];
+};
+
 export type GroundedAnswer = {
   grounded: boolean;
   text: string;
@@ -152,6 +240,30 @@ export type GroundedAnswer = {
     offsets: RetrievalDevModeOutput["results"][number]["offsets"];
   }>;
 };
+
+export function getRagTradeoffMetrics(): RagTradeoffMetricsResponse {
+  return tradeoffMetricsStore.getSummary();
+}
+
+export async function getRagSessionMemory(
+  sessionId: string,
+  limit = 20
+): Promise<RagSessionMemoryResponse> {
+  const normalized = normalizeSessionId(sessionId);
+  const entries = await sessionMemoryStore.list(normalized, limit);
+
+  return {
+    sessionId: normalized,
+    count: entries.length,
+    entries,
+  };
+}
+
+export async function resetRagRuntimeStateForTests(): Promise<void> {
+  semanticCache.clear();
+  tradeoffMetricsStore.clear();
+  await sessionMemoryStore.clearAll();
+}
 
 class ApiLexicalEmbeddingProvider implements EmbeddingProvider {
   readonly name = "api-lexical";
@@ -206,14 +318,16 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
       checksum,
     },
   });
+  validateNormalizedDocument(document);
   const ragOutput = await runLocalRag(
     document,
     normalizedRequest.query,
     normalizedRequest.topK,
-    normalizedRequest.embeddingProvider
+    normalizedRequest.embeddingProvider,
+    normalizedRequest.sessionId
   );
 
-  return {
+  const response: RagAskResponse = {
     document: {
       documentId,
       title,
@@ -223,6 +337,10 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
     query: normalizedRequest.query,
     ...ragOutput,
   };
+
+  validateRagAskResponse(response);
+
+  return response;
 }
 
 export async function askRagFromFile(
@@ -247,14 +365,16 @@ export async function askRagFromFile(
       originalFilename: normalizedRequest.originalFilename,
     },
   });
+  validateNormalizedDocument(document);
   const ragOutput = await runLocalRag(
     document,
     normalizedRequest.query,
     normalizedRequest.topK,
-    normalizedRequest.embeddingProvider
+    normalizedRequest.embeddingProvider,
+    normalizedRequest.sessionId
   );
 
-  return {
+  const response: RagAskResponse = {
     document: {
       documentId,
       title,
@@ -265,6 +385,10 @@ export async function askRagFromFile(
     query: normalizedRequest.query,
     ...ragOutput,
   };
+
+  validateRagAskResponse(response);
+
+  return response;
 }
 
 export async function indexRag(request: RagIndexRequest): Promise<RagIndexResponse> {
@@ -284,6 +408,7 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
       checksum,
     },
   });
+  validateNormalizedDocument(document);
   const provider = createApiEmbeddingProvider(normalizedRequest.embeddingProvider);
   const index = await buildRetrievalIndex(document, {
     embeddingProvider: provider,
@@ -303,6 +428,8 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
     },
     normalizedRequest.indexDir
   );
+
+  semanticCache.invalidate(documentId);
 
   return {
     document: documentSummary,
@@ -336,6 +463,7 @@ export async function indexRagFromFile(
       originalFilename: normalizedRequest.originalFilename,
     },
   });
+  validateNormalizedDocument(document);
   const provider = createApiEmbeddingProvider(normalizedRequest.embeddingProvider);
   const index = await buildRetrievalIndex(document, {
     embeddingProvider: provider,
@@ -357,6 +485,8 @@ export async function indexRagFromFile(
     normalizedRequest.indexDir
   );
 
+  semanticCache.invalidate(documentId);
+
   return {
     document: documentSummary,
     index: indexSummary,
@@ -368,7 +498,7 @@ export async function indexRagFromFile(
 }
 
 export async function askPersistedRag(
-  request: Pick<RagAskRequest, "documentId" | "query" | "topK" | "indexDir">
+  request: Pick<RagAskRequest, "documentId" | "query" | "topK" | "indexDir" | "sessionId">
 ): Promise<RagAskResponse> {
   const normalizedRequest = normalizePersistedAskRequest(request);
   const saved = await loadRagIndex(normalizedRequest.documentId, normalizedRequest.indexDir);
@@ -387,10 +517,11 @@ export async function askPersistedRag(
       embeddedChunks: saved.record.embeddedChunks,
     },
     normalizedRequest.query,
-    normalizedRequest.topK
+    normalizedRequest.topK,
+    normalizedRequest.sessionId
   );
 
-  return {
+  const response: RagAskResponse = {
     document: saved.record.document,
     query: normalizedRequest.query,
     storage: {
@@ -399,6 +530,10 @@ export async function askPersistedRag(
     },
     ...ragOutput,
   };
+
+  validateRagAskResponse(response);
+
+  return response;
 }
 
 export async function listPersistedRagIndexes(indexDir?: string): Promise<RagIndexListResponse> {
@@ -419,6 +554,7 @@ export async function deletePersistedRagIndex(
   }
 
   const index = await deleteRagIndex(documentId.trim(), indexDir);
+  semanticCache.invalidate(documentId.trim());
 
   return {
     deleted: true,
@@ -429,7 +565,7 @@ export async function deletePersistedRagIndex(
 function normalizeRequest(request: RagAskRequest): Required<
   Pick<RagAskRequest, "content" | "query" | "topK" | "embeddingProvider">
 > &
-  Pick<RagAskRequest, "title" | "documentId" | "metadata"> {
+  Pick<RagAskRequest, "title" | "documentId" | "metadata" | "sessionId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -464,6 +600,10 @@ function normalizeRequest(request: RagAskRequest): Required<
     throw new ApiRequestError("documentId must be a string when provided.");
   }
 
+  if (request.sessionId !== undefined && typeof request.sessionId !== "string") {
+    throw new ApiRequestError("sessionId must be a string when provided.");
+  }
+
   if (
     request.metadata !== undefined &&
     (!request.metadata || typeof request.metadata !== "object" || Array.isArray(request.metadata))
@@ -478,6 +618,7 @@ function normalizeRequest(request: RagAskRequest): Required<
     embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
     title: request.title,
     documentId: request.documentId,
+    sessionId: request.sessionId,
     metadata: request.metadata,
   };
 }
@@ -519,7 +660,7 @@ function normalizeIndexRequest(request: RagIndexRequest): Required<
 function normalizeFileRequest(request: RagAskFileRequest): Required<
   Pick<RagAskFileRequest, "filePath" | "query" | "topK" | "type" | "embeddingProvider">
 > &
-  Pick<RagAskFileRequest, "title" | "documentId" | "metadata" | "originalFilename"> {
+  Pick<RagAskFileRequest, "title" | "documentId" | "metadata" | "originalFilename" | "sessionId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Multipart request data must be provided.");
   }
@@ -552,6 +693,10 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
     throw new ApiRequestError("documentId must be a string when provided.");
   }
 
+  if (request.sessionId !== undefined && typeof request.sessionId !== "string") {
+    throw new ApiRequestError("sessionId must be a string when provided.");
+  }
+
   if (
     request.metadata !== undefined &&
     (!request.metadata || typeof request.metadata !== "object" || Array.isArray(request.metadata))
@@ -567,6 +712,7 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
     embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
     title: request.title,
     documentId: request.documentId,
+    sessionId: request.sessionId,
     metadata: request.metadata,
     originalFilename: request.originalFilename,
   };
@@ -607,9 +753,9 @@ function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
 }
 
 function normalizePersistedAskRequest(
-  request: Pick<RagAskRequest, "documentId" | "query" | "topK" | "indexDir">
+  request: Pick<RagAskRequest, "documentId" | "query" | "topK" | "indexDir" | "sessionId">
 ): Required<Pick<RagAskRequest, "documentId" | "query" | "topK">> &
-  Pick<RagAskRequest, "indexDir"> {
+  Pick<RagAskRequest, "indexDir" | "sessionId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -620,6 +766,10 @@ function normalizePersistedAskRequest(
 
   if (typeof request.query !== "string" || request.query.trim().length === 0) {
     throw new ApiRequestError("query must be a non-empty string.");
+  }
+
+  if (request.sessionId !== undefined && typeof request.sessionId !== "string") {
+    throw new ApiRequestError("sessionId must be a string when provided.");
   }
 
   const topK = request.topK ?? DEFAULT_TOP_K;
@@ -633,44 +783,737 @@ function normalizePersistedAskRequest(
     query: request.query.trim(),
     topK,
     indexDir: request.indexDir,
+    sessionId: request.sessionId,
   };
 }
-
 async function runLocalRag(
   document: Awaited<ReturnType<typeof ingest>>,
   query: string,
   topK: number,
-  embeddingProviderId: ApiEmbeddingProviderId
+  embeddingProviderId: ApiEmbeddingProviderId,
+  sessionId?: string
 ): Promise<Pick<RagAskResponse, "answer" | "index" | "devMode">> {
   const provider = createApiEmbeddingProvider(embeddingProviderId);
-  const index = await buildRetrievalIndex(document, {
-    embeddingProvider: provider,
-  });
-  const devMode = await retrieveForDevMode(index, query, {
+  const budget = resolveCostBudgetFromEnv();
+  const budgetEnforcer = new CostBudgetEnforcer(budget);
+  const dailySpentUsd = await costLedger.getDailyTotalUsd();
+
+  type RagWorkflowState = {
+    document: Awaited<ReturnType<typeof ingest>>;
+    rawQuery: string;
+    retrievalQuery: string;
+    topK: number;
+    provider: EmbeddingProvider;
+    index?: RetrievalIndex;
+    processedQuery?: ProcessedQuery;
+    devMode?: RetrievalDevModeOutput;
+    answer?: GroundedAnswer;
+    indexSummary?: RagIndexSummary;
+    queryEmbedding?: EmbeddingVector;
+    cacheHit?: boolean;
+    cacheSimilarity?: number;
+    sessionId?: string;
+    memoryMatches?: MemorySearchResult[];
+    memoryStored?: boolean;
+    rerankCandidateCount?: number;
+    rerankInputTokens?: number;
+    costTracker: CostTracker;
+    costSummary?: RequestCostSummary;
+  };
+
+  const steps: Array<WorkflowStep<RagWorkflowState, RagWorkflowState>> = [
+    {
+      name: "normalize-request",
+      async run(input) {
+        return {
+          ...input,
+          retrievalQuery: input.rawQuery.trim(),
+        };
+      },
+    },
+    {
+      name: "load-memory",
+      async run(input) {
+        if (!input.sessionId) {
+          return {
+            ...input,
+            memoryMatches: [],
+          };
+        }
+
+        const matches = await sessionMemoryStore.search(
+          input.sessionId,
+          input.rawQuery,
+          DEFAULT_MEMORY_RECALL_LIMIT
+        );
+
+        return {
+          ...input,
+          memoryMatches: matches,
+        };
+      },
+    },
+    {
+      name: "ingest-document",
+      async run(input) {
+        validateNormalizedDocument(input.document);
+        return input;
+      },
+    },
+    {
+      name: "build-index",
+      async run(input) {
+        const estimatedUnits = Math.max(1, input.document.content.sections.length);
+        const projected =
+          input.costTracker.getTotalCostUsd() +
+          estimatedUnits * resolveUnitCostUsd(input.provider.name, "embedding-index");
+        budgetEnforcer.validateBudget(input.document.documentId, projected, dailySpentUsd);
+
+        const index = await buildRetrievalIndex(input.document, {
+          embeddingProvider: input.provider,
+        });
+
+        const chunkUnits = index.embeddedChunks.length;
+        input.costTracker.trackEvent(
+          "embedding-index",
+          input.provider.name,
+          chunkUnits,
+          resolveUnitCostUsd(input.provider.name, "embedding-index"),
+          { timestamp: Date.now(), documentId: input.document.documentId, chunkUnits }
+        );
+
+        return {
+          ...input,
+          index,
+          indexSummary: createIndexSummary(index),
+        };
+      },
+    },
+    {
+      name: "process-query",
+      async run(input) {
+        const processedQuery = processQuery({ text: input.rawQuery });
+        validateProcessedQuery(processedQuery);
+
+        const memoryHint = (input.memoryMatches ?? [])
+          .map((match) => `${match.entry.query} ${match.entry.answer}`)
+          .join(" ")
+          .trim();
+
+        const retrievalQuery = [
+          processedQuery.rewritten ?? processedQuery.original,
+          ...processedQuery.expanded,
+          memoryHint,
+        ]
+          .join(" ")
+          .trim();
+
+        return {
+          ...input,
+          processedQuery,
+          retrievalQuery: retrievalQuery.length > 0 ? retrievalQuery : input.rawQuery,
+        };
+      },
+    },
+    {
+      name: "cache-lookup",
+      async run(input) {
+        if (!input.index) {
+          throw new ApiRequestError("RAG workflow index was not built.", 500);
+        }
+
+        if (input.sessionId) {
+          return {
+            ...input,
+            cacheHit: false,
+            cacheSimilarity: undefined,
+          };
+        }
+
+        const queryEmbedding = await embedQueryVector(input.provider, input.retrievalQuery);
+        const cacheLookup = semanticCache.lookup(input.document.documentId, queryEmbedding);
+
+        if (cacheLookup.hit && isCachedRagPayload(cacheLookup.entry?.result)) {
+          const cached = cacheLookup.entry.result;
+
+          return {
+            ...input,
+            queryEmbedding,
+            cacheHit: true,
+            cacheSimilarity: cacheLookup.similarity,
+            devMode: cached.devMode,
+            answer: cached.answer,
+            indexSummary: cached.index,
+          };
+        }
+
+        return {
+          ...input,
+          queryEmbedding,
+          cacheHit: false,
+          cacheSimilarity: cacheLookup.similarity,
+        };
+      },
+    },
+    {
+      name: "retrieve-chunks",
+      async run(input) {
+        if (!input.index) {
+          throw new ApiRequestError("RAG workflow index was not built.", 500);
+        }
+
+        if (input.cacheHit && input.devMode) {
+          return input;
+        }
+
+        const projected =
+          input.costTracker.getTotalCostUsd() +
+          input.retrievalQuery.length *
+            resolveUnitCostUsd(input.provider.name, "embedding-query") +
+          input.topK * resolveUnitCostUsd(input.provider.name, "retrieval");
+        budgetEnforcer.validateBudget(input.document.documentId, projected, dailySpentUsd);
+
+        input.costTracker.trackEvent(
+          "embedding-query",
+          input.provider.name,
+          input.retrievalQuery.length,
+          resolveUnitCostUsd(input.provider.name, "embedding-query"),
+          { timestamp: Date.now(), queryLength: input.retrievalQuery.length }
+        );
+
+        const devMode = await retrieveForDevMode(input.index, input.retrievalQuery, {
+          topK: resolveRerankCandidateTopK(input.topK),
+          mode: DEFAULT_RETRIEVAL_MODE,
+        });
+
+        input.costTracker.trackEvent(
+          "retrieval",
+          input.provider.name,
+          input.topK,
+          resolveUnitCostUsd(input.provider.name, "retrieval"),
+          { timestamp: Date.now(), resultCount: devMode.resultCount }
+        );
+
+        return {
+          ...input,
+          devMode,
+          rerankCandidateCount: devMode.resultCount,
+        };
+      },
+    },
+    {
+      name: "rerank-chunks",
+      async run(input) {
+        if (!input.devMode) {
+          throw new ApiRequestError("RAG workflow retrieval output is missing.", 500);
+        }
+
+        const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const rerankInputTokens = estimateTokenUsage(
+          `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
+        );
+        const rerankUnits = input.rerankCandidateCount ?? input.devMode.resultCount;
+
+        const projected =
+          input.costTracker.getTotalCostUsd() +
+          rerankUnits * resolveUnitCostUsd(input.provider.name, "reranking");
+        budgetEnforcer.validateBudget(input.document.documentId, projected, dailySpentUsd);
+
+        input.costTracker.trackEvent(
+          "reranking",
+          input.provider.name,
+          rerankUnits,
+          resolveUnitCostUsd(input.provider.name, "reranking"),
+          { timestamp: Date.now(), candidateCount: rerankUnits, returnedCount: reranked.resultCount }
+        );
+
+        return {
+          ...input,
+          devMode: reranked,
+          rerankInputTokens,
+        };
+      },
+    },
+    {
+      name: "build-answer",
+      async run(input) {
+        if (!input.devMode) {
+          throw new ApiRequestError("RAG workflow retrieval output is missing.", 500);
+        }
+
+        const answer = input.answer ?? createGroundedAnswer(input.devMode);
+
+        if (!input.sessionId && !input.cacheHit && input.queryEmbedding) {
+          const indexSummary = input.indexSummary ?? createIndexSummary(input.index!);
+          semanticCache.set(input.document.documentId, input.queryEmbedding, input.processedQuery!, {
+            answer,
+            index: indexSummary,
+            devMode: input.devMode,
+          });
+        }
+
+        let memoryStored = false;
+
+        if (input.sessionId) {
+          await sessionMemoryStore.append({
+            sessionId: input.sessionId,
+            query: input.rawQuery,
+            answer: answer.text,
+            metadata: {
+              documentId: input.document.documentId,
+              grounded: answer.grounded,
+            },
+          });
+          memoryStored = true;
+        }
+
+        const total = input.costTracker.getTotalCostUsd();
+        const budgetRemainingUsd = budgetEnforcer.computeBudgetRemaining(total, dailySpentUsd);
+        const costSummary = input.costTracker.summarize(true, budgetRemainingUsd);
+        await costLedger.appendSummary(costSummary);
+
+        return {
+          ...input,
+          answer,
+          costSummary,
+          memoryStored,
+        };
+      },
+    },
+  ];
+
+  const runner = new WorkflowRunner<RagWorkflowState>(steps);
+  const result = await runner.run({
+    document,
+    rawQuery: query,
+    retrievalQuery: query,
     topK,
+    provider,
+    sessionId: normalizeSessionIdOrUndefined(sessionId),
+    costTracker: new CostTracker(document.documentId),
   });
 
-  return {
-    answer: createGroundedAnswer(devMode),
-    index: createIndexSummary(index),
-    devMode,
+  if (result.status !== "success" || !result.output?.index || !result.output.devMode) {
+    const failedStep = Object.values(result.context.steps).find((step) => step.status === "failed");
+    const message = failedStep?.error ?? "RAG workflow failed before producing an answer.";
+    const statusCode = message.toLowerCase().includes("budget") ? 429 : 500;
+    throw new ApiRequestError(message, statusCode);
+  }
+
+  const cacheMetrics = semanticCache.getMetrics();
+  const resolvedIndexSummary = result.output.indexSummary ?? createIndexSummary(result.output.index);
+
+  const response = {
+    answer: result.output.answer ?? createGroundedAnswer(result.output.devMode),
+    index: resolvedIndexSummary,
+    devMode: {
+      ...result.output.devMode,
+      processedQuery: result.output.processedQuery,
+      workflowContext: result.context,
+      cache: {
+        hit: Boolean(result.output.cacheHit),
+        similarity: result.output.cacheSimilarity,
+        hits: cacheMetrics.hits,
+        misses: cacheMetrics.misses,
+        evictions: cacheMetrics.evictions,
+      },
+      cost: result.output.costSummary,
+      memory: {
+        sessionId: result.output.sessionId,
+        recalled: result.output.memoryMatches?.length ?? 0,
+        stored: Boolean(result.output.memoryStored),
+        matches: (result.output.memoryMatches ?? []).map((match) => ({
+          score: match.score,
+          query: match.entry.query,
+          answer: match.entry.answer,
+          createdAt: match.entry.createdAt,
+        })),
+      },
+      reranking: {
+        applied: true,
+        candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
+        returnedCount: result.output.devMode.resultCount,
+      },
+      stageMetrics: buildStageMetrics(result.context, {
+        rawQuery: result.output.rawQuery,
+        retrievalQuery: result.output.retrievalQuery,
+        retrievalResultCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
+        rerankResultCount: result.output.devMode.resultCount,
+        rerankInputTokens:
+          result.output.rerankInputTokens ?? estimateTokenUsage(result.output.retrievalQuery),
+        expansionCount: result.output.processedQuery?.expanded.length ?? 0,
+      }),
+      retrievalSpans: buildRetrievalSpans(result.context, {
+        retrievalResults: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
+        rerankResults: result.output.devMode.resultCount,
+        scores: result.output.devMode.results.map((item) => item.score),
+      }),
+    },
   };
+
+  recordTradeoffSample({
+    requestId: result.context.workflowId,
+    timestamp: Date.now(),
+    provider: resolvedIndexSummary.embeddingProvider,
+    latencyMs: result.totalDurationMs,
+    costUsd: result.output.costSummary?.totalCostUsd ?? 0,
+    grounded: response.answer.grounded,
+    cacheHit: Boolean(result.output.cacheHit),
+    topK,
+    resultCount: response.devMode.resultCount ?? response.devMode.results.length,
+  });
+
+  return response;
 }
 
 async function runPersistedRag(
   index: RetrievalIndex,
   query: string,
-  topK: number
+  topK: number,
+  sessionId?: string
 ): Promise<Pick<RagAskResponse, "answer" | "index" | "devMode">> {
-  const devMode = await retrieveForDevMode(index, query, {
+  const budget = resolveCostBudgetFromEnv();
+  const budgetEnforcer = new CostBudgetEnforcer(budget);
+  const dailySpentUsd = await costLedger.getDailyTotalUsd();
+  const persistedDocumentId = resolveDocumentIdFromIndex(index);
+
+  type PersistedRagState = {
+    index: RetrievalIndex;
+    rawQuery: string;
+    retrievalQuery: string;
+    topK: number;
+    processedQuery?: ProcessedQuery;
+    devMode?: RetrievalDevModeOutput;
+    answer?: GroundedAnswer;
+    queryEmbedding?: EmbeddingVector;
+    cacheHit?: boolean;
+    cacheSimilarity?: number;
+    sessionId?: string;
+    memoryMatches?: MemorySearchResult[];
+    memoryStored?: boolean;
+    rerankCandidateCount?: number;
+    rerankInputTokens?: number;
+    indexSummary?: RagIndexSummary;
+    costTracker: CostTracker;
+    costSummary?: RequestCostSummary;
+  };
+
+  const steps: Array<WorkflowStep<PersistedRagState, PersistedRagState>> = [
+    {
+      name: "normalize-request",
+      async run(input) {
+        return {
+          ...input,
+          retrievalQuery: input.rawQuery.trim(),
+        };
+      },
+    },
+    {
+      name: "load-memory",
+      async run(input) {
+        if (!input.sessionId) {
+          return {
+            ...input,
+            memoryMatches: [],
+          };
+        }
+
+        const matches = await sessionMemoryStore.search(
+          input.sessionId,
+          input.rawQuery,
+          DEFAULT_MEMORY_RECALL_LIMIT
+        );
+
+        return {
+          ...input,
+          memoryMatches: matches,
+        };
+      },
+    },
+    {
+      name: "ingest-document",
+      async run(input) {
+        // Persisted flow does not re-ingest the document. Keep step for parity.
+        return input;
+      },
+    },
+    {
+      name: "build-index",
+      async run(input) {
+        // Persisted flow already has an index. Keep step for consistent tracing.
+        return {
+          ...input,
+          indexSummary: createIndexSummary(input.index),
+        };
+      },
+    },
+    {
+      name: "process-query",
+      async run(input) {
+        const processedQuery = processQuery({ text: input.rawQuery });
+        validateProcessedQuery(processedQuery);
+
+        const memoryHint = (input.memoryMatches ?? [])
+          .map((match) => `${match.entry.query} ${match.entry.answer}`)
+          .join(" ")
+          .trim();
+
+        const retrievalQuery = [
+          processedQuery.rewritten ?? processedQuery.original,
+          ...processedQuery.expanded,
+          memoryHint,
+        ]
+          .join(" ")
+          .trim();
+
+        return {
+          ...input,
+          processedQuery,
+          retrievalQuery: retrievalQuery.length > 0 ? retrievalQuery : input.rawQuery,
+        };
+      },
+    },
+    {
+      name: "cache-lookup",
+      async run(input) {
+        if (input.sessionId) {
+          return {
+            ...input,
+            cacheHit: false,
+            cacheSimilarity: undefined,
+          };
+        }
+
+        const queryEmbedding = await embedQueryVector(input.index.embeddingProvider, input.retrievalQuery);
+        const cacheLookup = semanticCache.lookup(persistedDocumentId, queryEmbedding);
+
+        if (cacheLookup.hit && isCachedRagPayload(cacheLookup.entry?.result)) {
+          const cached = cacheLookup.entry.result;
+
+          return {
+            ...input,
+            queryEmbedding,
+            cacheHit: true,
+            cacheSimilarity: cacheLookup.similarity,
+            devMode: cached.devMode,
+            answer: cached.answer,
+            indexSummary: cached.index,
+          };
+        }
+
+        return {
+          ...input,
+          queryEmbedding,
+          cacheHit: false,
+          cacheSimilarity: cacheLookup.similarity,
+        };
+      },
+    },
+    {
+      name: "retrieve-chunks",
+      async run(input) {
+        if (input.cacheHit && input.devMode) {
+          return input;
+        }
+
+        const providerName = input.index.embeddingProvider.name;
+        const projected =
+          input.costTracker.getTotalCostUsd() +
+          input.retrievalQuery.length * resolveUnitCostUsd(providerName, "embedding-query") +
+          input.topK * resolveUnitCostUsd(providerName, "retrieval");
+        budgetEnforcer.validateBudget(persistedDocumentId, projected, dailySpentUsd);
+
+        input.costTracker.trackEvent(
+          "embedding-query",
+          providerName,
+          input.retrievalQuery.length,
+          resolveUnitCostUsd(providerName, "embedding-query"),
+          { timestamp: Date.now(), queryLength: input.retrievalQuery.length }
+        );
+
+        const devMode = await retrieveForDevMode(input.index, input.retrievalQuery, {
+          topK: resolveRerankCandidateTopK(input.topK),
+          mode: DEFAULT_RETRIEVAL_MODE,
+        });
+
+        input.costTracker.trackEvent(
+          "retrieval",
+          providerName,
+          input.topK,
+          resolveUnitCostUsd(providerName, "retrieval"),
+          { timestamp: Date.now(), resultCount: devMode.resultCount }
+        );
+
+        return {
+          ...input,
+          devMode,
+          rerankCandidateCount: devMode.resultCount,
+        };
+      },
+    },
+    {
+      name: "rerank-chunks",
+      async run(input) {
+        if (!input.devMode) {
+          throw new ApiRequestError("Persisted RAG workflow retrieval output is missing.", 500);
+        }
+
+        const providerName = input.index.embeddingProvider.name;
+        const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const rerankInputTokens = estimateTokenUsage(
+          `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
+        );
+        const rerankUnits = input.rerankCandidateCount ?? input.devMode.resultCount;
+
+        const projected =
+          input.costTracker.getTotalCostUsd() +
+          rerankUnits * resolveUnitCostUsd(providerName, "reranking");
+        budgetEnforcer.validateBudget(persistedDocumentId, projected, dailySpentUsd);
+
+        input.costTracker.trackEvent(
+          "reranking",
+          providerName,
+          rerankUnits,
+          resolveUnitCostUsd(providerName, "reranking"),
+          { timestamp: Date.now(), candidateCount: rerankUnits, returnedCount: reranked.resultCount }
+        );
+
+        return {
+          ...input,
+          devMode: reranked,
+          rerankInputTokens,
+        };
+      },
+    },
+    {
+      name: "build-answer",
+      async run(input) {
+        if (!input.devMode) {
+          throw new ApiRequestError("Persisted RAG workflow retrieval output is missing.", 500);
+        }
+
+        const answer = input.answer ?? createGroundedAnswer(input.devMode);
+
+        if (!input.sessionId && !input.cacheHit && input.queryEmbedding) {
+          const indexSummary = input.indexSummary ?? createIndexSummary(input.index);
+          semanticCache.set(persistedDocumentId, input.queryEmbedding, input.processedQuery!, {
+            answer,
+            index: indexSummary,
+            devMode: input.devMode,
+          });
+        }
+
+        let memoryStored = false;
+
+        if (input.sessionId) {
+          await sessionMemoryStore.append({
+            sessionId: input.sessionId,
+            query: input.rawQuery,
+            answer: answer.text,
+            metadata: {
+              documentId: persistedDocumentId,
+              grounded: answer.grounded,
+            },
+          });
+          memoryStored = true;
+        }
+
+        const total = input.costTracker.getTotalCostUsd();
+        const budgetRemainingUsd = budgetEnforcer.computeBudgetRemaining(total, dailySpentUsd);
+        const costSummary = input.costTracker.summarize(true, budgetRemainingUsd);
+        await costLedger.appendSummary(costSummary);
+
+        return {
+          ...input,
+          answer,
+          costSummary,
+          memoryStored,
+        };
+      },
+    },
+  ];
+
+  const runner = new WorkflowRunner<PersistedRagState>(steps);
+  const result = await runner.run({
+    index,
+    rawQuery: query,
+    retrievalQuery: query,
     topK,
+    sessionId: normalizeSessionIdOrUndefined(sessionId),
+    costTracker: new CostTracker(persistedDocumentId),
   });
 
-  return {
-    answer: createGroundedAnswer(devMode),
-    index: createIndexSummary(index),
-    devMode,
+  if (result.status !== "success" || !result.output?.devMode) {
+    const failedStep = Object.values(result.context.steps).find((step) => step.status === "failed");
+    const message = failedStep?.error ?? "Persisted RAG workflow failed before producing an answer.";
+    const statusCode = message.toLowerCase().includes("budget") ? 429 : 500;
+    throw new ApiRequestError(message, statusCode);
+  }
+
+  const cacheMetrics = semanticCache.getMetrics();
+  const indexSummary = result.output.indexSummary ?? createIndexSummary(index);
+
+  const response = {
+    answer: result.output.answer ?? createGroundedAnswer(result.output.devMode),
+    index: indexSummary,
+    devMode: {
+      ...result.output.devMode,
+      processedQuery: result.output.processedQuery,
+      workflowContext: result.context,
+      cache: {
+        hit: Boolean(result.output.cacheHit),
+        similarity: result.output.cacheSimilarity,
+        hits: cacheMetrics.hits,
+        misses: cacheMetrics.misses,
+        evictions: cacheMetrics.evictions,
+      },
+      cost: result.output.costSummary,
+      memory: {
+        sessionId: result.output.sessionId,
+        recalled: result.output.memoryMatches?.length ?? 0,
+        stored: Boolean(result.output.memoryStored),
+        matches: (result.output.memoryMatches ?? []).map((match) => ({
+          score: match.score,
+          query: match.entry.query,
+          answer: match.entry.answer,
+          createdAt: match.entry.createdAt,
+        })),
+      },
+      reranking: {
+        applied: true,
+        candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
+        returnedCount: result.output.devMode.resultCount,
+      },
+      stageMetrics: buildStageMetrics(result.context, {
+        rawQuery: result.output.rawQuery,
+        retrievalQuery: result.output.retrievalQuery,
+        retrievalResultCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
+        rerankResultCount: result.output.devMode.resultCount,
+        rerankInputTokens:
+          result.output.rerankInputTokens ?? estimateTokenUsage(result.output.retrievalQuery),
+        expansionCount: result.output.processedQuery?.expanded.length ?? 0,
+      }),
+      retrievalSpans: buildRetrievalSpans(result.context, {
+        retrievalResults: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
+        rerankResults: result.output.devMode.resultCount,
+        scores: result.output.devMode.results.map((item) => item.score),
+      }),
+    },
   };
+
+  recordTradeoffSample({
+    requestId: result.context.workflowId,
+    timestamp: Date.now(),
+    provider: indexSummary.embeddingProvider,
+    latencyMs: result.totalDurationMs,
+    costUsd: result.output.costSummary?.totalCostUsd ?? 0,
+    grounded: response.answer.grounded,
+    cacheHit: Boolean(result.output.cacheHit),
+    topK,
+    resultCount: response.devMode.resultCount ?? response.devMode.results.length,
+  });
+
+  return response;
 }
 
 function createIndexSummary(index: RetrievalIndex): RagIndexSummary {
@@ -787,6 +1630,24 @@ function validateOptionalString(value: string | undefined, fieldName: string): v
   }
 }
 
+function normalizeSessionIdOrUndefined(sessionId: string | undefined): string | undefined {
+  if (sessionId === undefined) {
+    return undefined;
+  }
+
+  return normalizeSessionId(sessionId);
+}
+
+function normalizeSessionId(sessionId: string): string {
+  const trimmed = sessionId.trim();
+
+  if (trimmed.length === 0) {
+    throw new ApiRequestError("sessionId must be a non-empty string.");
+  }
+
+  return trimmed;
+}
+
 function validateOptionalMetadata(metadata: Record<string, unknown> | undefined): void {
   if (
     metadata !== undefined &&
@@ -831,6 +1692,177 @@ function createGroundedAnswer(devMode: RetrievalDevModeOutput): GroundedAnswer {
   };
 }
 
+function rerankRetrievalOutput(
+  devMode: RetrievalDevModeOutput,
+  retrievalQuery: string,
+  topK: number
+): RetrievalDevModeOutput {
+  if (devMode.results.length <= 1) {
+    return {
+      ...devMode,
+      resultCount: Math.min(devMode.results.length, topK),
+      results: devMode.results.slice(0, topK).map((result, index) => ({
+        ...result,
+        rank: index + 1,
+      })),
+    };
+  }
+
+  const queryTokens = new Set(tokenize(retrievalQuery));
+
+  const reranked = devMode.results
+    .map((result) => {
+      const candidateTokens = new Set(tokenize(result.text));
+      let overlap = 0;
+
+      for (const token of queryTokens) {
+        if (candidateTokens.has(token)) {
+          overlap += 1;
+        }
+      }
+
+      const sparseScore =
+        queryTokens.size > 0 && candidateTokens.size > 0
+          ? overlap / Math.sqrt(queryTokens.size * candidateTokens.size)
+          : 0;
+      const finalScore = Number((0.8 * result.score + 0.2 * sparseScore).toFixed(12));
+
+      return {
+        ...result,
+        score: finalScore,
+      };
+    })
+    .sort((left, right) => {
+      if (right.score === left.score) {
+        return left.rank - right.rank;
+      }
+
+      return right.score - left.score;
+    })
+    .slice(0, topK)
+    .map((result, index) => ({
+      ...result,
+      rank: index + 1,
+    }));
+
+  return {
+    ...devMode,
+    resultCount: reranked.length,
+    results: reranked,
+  };
+}
+
+function resolveRerankCandidateTopK(topK: number): number {
+  return Math.max(topK * DEFAULT_RERANK_CANDIDATE_MULTIPLIER, topK + 2, 5);
+}
+
+function estimateTokenUsage(text: string): number {
+  return tokenize(text).length;
+}
+
+function buildStageMetrics(
+  context: WorkflowContext,
+  input: {
+    rawQuery: string;
+    retrievalQuery: string;
+    retrievalResultCount: number;
+    rerankResultCount: number;
+    rerankInputTokens: number;
+    expansionCount: number;
+  }
+): Array<{
+  stage: "process-query" | "retrieve-chunks" | "rerank-chunks";
+  durationMs: number;
+  inputTokens: number;
+  outputUnits: number;
+}> {
+  const processDuration = context.steps["process-query"]?.durationMs ?? 0;
+  const retrievalDuration = context.steps["retrieve-chunks"]?.durationMs ?? 0;
+  const rerankDuration = context.steps["rerank-chunks"]?.durationMs ?? 0;
+
+  return [
+    {
+      stage: "process-query",
+      durationMs: processDuration,
+      inputTokens: estimateTokenUsage(input.rawQuery),
+      outputUnits: 1 + input.expansionCount,
+    },
+    {
+      stage: "retrieve-chunks",
+      durationMs: retrievalDuration,
+      inputTokens: estimateTokenUsage(input.retrievalQuery),
+      outputUnits: input.retrievalResultCount,
+    },
+    {
+      stage: "rerank-chunks",
+      durationMs: rerankDuration,
+      inputTokens: input.rerankInputTokens,
+      outputUnits: input.rerankResultCount,
+    },
+  ];
+}
+
+function buildRetrievalSpans(
+  context: WorkflowContext,
+  input: {
+    retrievalResults: number;
+    rerankResults: number;
+    scores: number[];
+  }
+): {
+  stage: "retrieve-chunks" | "rerank-chunks";
+  latencyMs: number;
+  chunkCount: number;
+  score: {
+    min: number;
+    max: number;
+    avg: number;
+  };
+}[] {
+  const score = summarizeScores(input.scores);
+
+  return [
+    {
+      stage: "retrieve-chunks",
+      latencyMs: context.steps["retrieve-chunks"]?.durationMs ?? 0,
+      chunkCount: input.retrievalResults,
+      score,
+    },
+    {
+      stage: "rerank-chunks",
+      latencyMs: context.steps["rerank-chunks"]?.durationMs ?? 0,
+      chunkCount: input.rerankResults,
+      score,
+    },
+  ];
+}
+
+function summarizeScores(scores: number[]): { min: number; max: number; avg: number } {
+  if (scores.length === 0) {
+    return {
+      min: 0,
+      max: 0,
+      avg: 0,
+    };
+  }
+
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const avg = scores.reduce((total, value) => total + value, 0) / scores.length;
+
+  return {
+    min: Number(min.toFixed(12)),
+    max: Number(max.toFixed(12)),
+    avg: Number(avg.toFixed(12)),
+  };
+}
+
+function recordTradeoffSample(
+  sample: Parameters<TradeoffMetricsStore["record"]>[0]
+): void {
+  tradeoffMetricsStore.record(sample);
+}
+
 function tokenize(text: string): string[] {
   return (text.normalize("NFKC").toLowerCase().match(/[a-z0-9]+/g) ?? [])
     .map(stemToken)
@@ -861,4 +1893,43 @@ function hashToken(token: string): number {
   }
 
   return hash;
+}
+
+async function embedQueryVector(provider: EmbeddingProvider, query: string): Promise<EmbeddingVector> {
+  const embeddings = await provider.embedTexts([query]);
+
+  if (!Array.isArray(embeddings) || embeddings.length !== 1) {
+    throw new ApiRequestError("Embedding provider must return exactly one query embedding.", 500);
+  }
+
+  const [embedding] = embeddings;
+
+  if (!Array.isArray(embedding) || embedding.length !== provider.dimensions) {
+    throw new ApiRequestError(
+      `Query embedding must have ${provider.dimensions} dimensions for provider \"${provider.name}\".`,
+      500
+    );
+  }
+
+  return embedding;
+}
+
+function resolveDocumentIdFromIndex(index: RetrievalIndex): string {
+  const firstChunk = index.embeddedChunks[0];
+
+  if (!firstChunk || typeof firstChunk.documentId !== "string" || firstChunk.documentId.length === 0) {
+    return "unknown-document";
+  }
+
+  return firstChunk.documentId;
+}
+
+function isCachedRagPayload(value: unknown): value is Pick<RagAskResponse, "answer" | "index" | "devMode"> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const maybe = value as Partial<Pick<RagAskResponse, "answer" | "index" | "devMode">>;
+
+  return Boolean(maybe.answer && maybe.index && maybe.devMode);
 }

@@ -15,6 +15,7 @@ Grounded AI systems involve many stages. Observability makes it possible to unde
 | [`packages/observability`](../../packages/observability/README.md) | Owns tracing, metrics, cost tracking and telemetry hooks. |
 | [`packages/model-routing`](../../packages/model-routing/README.md) | Uses cost and latency data to inform routing policies. |
 | [`packages/rag`](../../packages/rag/README.md) | Exposes retrieval, reranking and context assembly stages. |
+| [`apps/api/src/rag-service.ts`](../../apps/api/src/rag-service.ts) | Emits Dev Mode retrieval spans (chunk count, score stats, latency) and per-stage token/latency metrics. |
 | [`packages/agents`](../../packages/agents/README.md) | Traces tool calls and multi-step execution. |
 | [`packages/safety`](../../packages/safety/README.md) | Logs guardrail decisions for auditing. |
 

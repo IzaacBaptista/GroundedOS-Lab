@@ -14,7 +14,10 @@ the local AI pipeline.
 
 In Progress - local RAG API is implemented for inline JSON text, multipart file
 upload, persisted local document indexes, basic index management, and selectable
-local embedding providers, including an opt-in Ollama semantic provider.
+local embedding providers, including an opt-in Ollama semantic provider and
+session-scoped persistent memory. Retrieval executes in hybrid mode (dense +
+sparse lexical blending) by default, followed by an explicit reranking stage
+with per-stage telemetry in Dev Mode.
 
 ## Local usage
 
@@ -66,6 +69,7 @@ JSON request body:
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | Additional object metadata passed into ETL. |
 | `embeddingProvider` | No | `"api-lexical"`, `"local-hash"` or `"ollama"`. Defaults to `"api-lexical"`. |
+| `sessionId` | No | Optional session identifier for persistent per-session memory recall/store. |
 
 Response includes `document`, `answer`, `index`, and `devMode`.
 
@@ -106,6 +110,7 @@ Multipart fields:
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | JSON object string with additional metadata passed into ETL. |
 | `embeddingProvider` | No | `"api-lexical"`, `"local-hash"` or `"ollama"`. Defaults to `"api-lexical"`. |
+| `sessionId` | No | Optional session identifier for persistent per-session memory recall/store. |
 
 #### `POST /rag/index`
 
@@ -181,6 +186,31 @@ Deletes one persisted local index.
 ```bash
 curl -X DELETE http://localhost:3001/rag/indexes/smoke-text-001
 ```
+
+#### `GET /rag/metrics/tradeoffs`
+
+Returns aggregated request metrics for the local trade-offs dashboard.
+
+```bash
+curl http://localhost:3001/rag/metrics/tradeoffs
+```
+
+Response includes:
+
+- `totals`: rolling-window aggregate (`requests`, `avgLatencyMs`, `p95LatencyMs`, `avgCostUsd`, `groundedRate`, `cacheHitRate`)
+- `providers`: per-provider aggregates for quick comparison
+- `recent`: most recent request samples
+
+#### `GET /rag/memory/:sessionId`
+
+Returns persisted session memory entries for the provided session.
+
+```bash
+curl http://localhost:3001/rag/memory/demo-session
+```
+
+Response includes `sessionId`, `count`, and `entries` with stored query/answer
+pairs and timestamps.
 
 ## Current limits
 

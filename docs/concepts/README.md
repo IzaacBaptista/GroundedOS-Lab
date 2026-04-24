@@ -79,6 +79,8 @@ Some concepts appear in more than one track. The table below lists the primary l
 | [evals.md](./evals.md) | Evals | Track 4 - Evaluation & Comparison | Phase 3 - Intelligence |
 | [observability.md](./observability.md) | Observability | Track 4 - Evaluation & Comparison | Phase 2 - Retrieval Quality |
 | [cost-analysis.md](./cost-analysis.md) | Cost Analysis | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
+| [cost-governance.md](./cost-governance.md) | Cost Governance | Track 4 - Evaluation & Comparison | Phase 2 - Retrieval Quality |
+| [trade-offs-dashboard.md](./trade-offs-dashboard.md) | Trade-offs Dashboard | Track 4 - Evaluation & Comparison | Phase 2 - Retrieval Quality |
 | [ab-testing.md](./ab-testing.md) | A/B Testing | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
 | [benchmarking.md](./benchmarking.md) | Benchmarking | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
 | [rag.md](./rag.md) | RAG | Track 5 - Advanced RAG | Phase 1 - Core RAG |
@@ -91,6 +93,10 @@ Some concepts appear in more than one track. The table below lists the primary l
 | [semantic-caching.md](./semantic-caching.md) | Semantic Caching | Track 5 - Advanced RAG | Phase 4 - Lab |
 | [data-lineage.md](./data-lineage.md) | Data Lineage | Track 5 - Advanced RAG | Phase 0 - Data Foundation |
 | [uniform-document-schema.md](./uniform-document-schema.md) | Uniform Document Schema | Track 5 - Advanced RAG | Phase 0 - Data Foundation |
+| [data-contracts.md](./data-contracts.md) | Data Contracts & Schemas | Track 5 - Advanced RAG | Phase 2 - Retrieval Quality |
+| [query-understanding.md](./query-understanding.md) | Query Understanding | Track 5 - Advanced RAG | Phase 2 - Retrieval Quality |
+| [workflow-orchestration.md](./workflow-orchestration.md) | Workflow Orchestration | Track 7 - Autonomous AI Systems | Phase 2 - Retrieval Quality |
+| [long-term-memory.md](./long-term-memory.md) | Long-Term Memory | Track 7 - Autonomous AI Systems | Phase 2b - Persistent Memory |
 | [fine-tuning.md](./fine-tuning.md) | Fine-tuning | Track 6 - Fine-tuning & Adaptation | Phase 5 - Advanced ML |
 | [lora.md](./lora.md) | LoRA | Track 6 - Fine-tuning & Adaptation | Phase 5 - Advanced ML |
 | [distillation.md](./distillation.md) | Distillation | Track 6 - Fine-tuning & Adaptation | Phase 5 - Advanced ML |

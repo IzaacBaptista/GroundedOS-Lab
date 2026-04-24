@@ -52,6 +52,24 @@ export {
   type RetrievalDevModeOutput,
   type RetrievalDevModeResult,
   type RetrievalIndex,
+  type RetrievalMode,
   type RetrievalResult,
   type RetrieveFromIndexOptions,
 } from "./retrieval";
+
+// Query Understanding (Phase 2 — Concept 1)
+export {
+  processQuery,
+  rewriteQuery,
+  expandQuery,
+  detectIntent,
+} from "./query-understanding";
+
+// Semantic Cache (Phase 2 — Concept 4)
+export {
+  SemanticCache,
+  type CacheEntry,
+  type SemanticCacheConfig,
+  type CacheLookupResult,
+  type CacheMetrics,
+} from "./semantic-cache";
