@@ -1273,57 +1273,59 @@ function EmbeddingMapView({ map }: { map: EmbeddingMapResponse }) {
 
   return (
     <>
-      <div className="embedding-map" role="img" aria-label="Embedding projection">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-          <rect className="embedding-map__plot" x="0" y="0" width="100" height="100" />
-          {map.clusters.map((cluster) => (
-            <text
-              key={cluster.label}
-              className="embedding-map__label"
-              x={cluster.centroid.x}
-              y={100 - cluster.centroid.y}
-            >
-              {cluster.label}
-            </text>
-          ))}
-          {map.points.map((point) => (
-            <circle
-              key={point.chunkId}
-              cx={point.x}
-              cy={100 - point.y}
-              r="2.2"
-              fill={colorFor(point.clusterLabel)}
-            >
-              <title>{`${point.chunkId}: ${point.textPreview}`}</title>
-            </circle>
-          ))}
-        </svg>
+      <div className="embedding-layout">
+        <div className="embedding-map" role="img" aria-label="Embedding projection">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <rect className="embedding-map__plot" x="0" y="0" width="100" height="100" />
+            {map.clusters.map((cluster) => (
+              <text
+                key={cluster.label}
+                className="embedding-map__label"
+                x={cluster.centroid.x}
+                y={100 - cluster.centroid.y}
+              >
+                {cluster.label}
+              </text>
+            ))}
+            {map.points.map((point) => (
+              <circle
+                key={point.chunkId}
+                cx={point.x}
+                cy={100 - point.y}
+                r="2.2"
+                fill={colorFor(point.clusterLabel)}
+              >
+                <title>{`${point.chunkId}: ${point.textPreview}`}</title>
+              </circle>
+            ))}
+          </svg>
+        </div>
+
+        <section className="embedding-card" aria-label="Embedding clusters">
+          <div className="section-title">
+            <h3>Clusters</h3>
+            <span className="count">{map.clusters.length}</span>
+          </div>
+          <div className="cluster-list">
+            {map.clusters.map((cluster) => (
+              <span key={cluster.label} className="cluster-chip">
+                <span
+                  className="cluster-chip__swatch"
+                  style={{ backgroundColor: colorFor(cluster.label) }}
+                />
+                {cluster.label} · {cluster.count}
+              </span>
+            ))}
+          </div>
+        </section>
       </div>
 
-      <section className="output-section">
-        <div className="section-title">
-          <h3>Clusters</h3>
-          <span className="count">{map.clusters.length}</span>
-        </div>
-        <div className="cluster-list">
-          {map.clusters.map((cluster) => (
-            <span key={cluster.label} className="cluster-chip">
-              <span
-                className="cluster-chip__swatch"
-                style={{ backgroundColor: colorFor(cluster.label) }}
-              />
-              {cluster.label} · {cluster.count}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <section className="output-section">
+      <section className="output-section embedding-chunks-section">
         <div className="section-title">
           <h3>Chunks</h3>
           <span className="count">{map.points.length}</span>
         </div>
-        <div className="result-list">
+        <div className="result-list embedding-chunks-list">
           {map.points.map((point) => (
             <article key={point.chunkId} className="result-row">
               <div className="result-row__meta">
