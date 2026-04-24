@@ -713,7 +713,7 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 
 **✅ Success Criteria:**
 - [ ] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval)
-- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline
+- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline — `npm run benchmark:models` is implemented and records skipped providers until Ollama/OpenAI are configured
 - [ ] Embedding visualization renders in the web app with cluster labels for at least one indexed dataset
 
 ### Phase 5 — Advanced ML
@@ -763,7 +763,9 @@ To move from architecture scaffold to runnable foundation, the active plan is do
   saved-index management, provider comparison, trade-off metrics and session IDs
 - Agent, safety and eval package baselines are implemented, with `POST /agents/execute`
   exposing the first document-QA agent path
-- Next focus: start Phase 4 with local-vs-cloud comparison or A/B prompt testing
+- Phase 4 model/provider benchmark scaffold is available through
+  `npm run benchmark:models`; next focus is running it with Ollama plus a cloud
+  provider, then moving to A/B prompt testing or embedding visualization
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in

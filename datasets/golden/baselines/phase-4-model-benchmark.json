@@ -1,0 +1,119 @@
+{
+  "timestamp": "2026-04-24T17:41:18.036Z",
+  "version": 1,
+  "phase": "phase-4",
+  "description": "Phase 4 model/provider benchmark over the golden dataset. Local baseline always runs; Ollama and OpenAI run when configured through environment variables.",
+  "dataset": "phase-0-smoke-text",
+  "goldenSize": 1,
+  "topK": 3,
+  "requestedProviders": [
+    "local-extractive",
+    "ollama",
+    "openai"
+  ],
+  "successCriteria": {
+    "atLeastTwoProvidersCompleted": false,
+    "includesLocalProvider": true,
+    "includesCloudProvider": false,
+    "phase4ModelBenchmarkPassed": false,
+    "note": "The roadmap target of local Ollama plus one cloud provider is satisfied only when both configured providers complete. Without external config, this artifact records a local baseline and explicit skips."
+  },
+  "providers": [
+    {
+      "provider": "local-extractive",
+      "kind": "local",
+      "model": "top-chunk-extractive-v1",
+      "status": "completed",
+      "metrics": {
+        "requestCount": 1,
+        "avgLatencyMs": 0,
+        "p95LatencyMs": 0,
+        "avgFaithfulness": 1,
+        "avgRelevance": 0.416,
+        "avgQuality": 0.708,
+        "containsExpectedAnswerRate": 1,
+        "avgCostUsd": 0,
+        "totalCostUsd": 0
+      },
+      "perQuery": [
+        {
+          "id": "gd-001",
+          "question": "What does this command verify?",
+          "status": "completed",
+          "latencyMs": 0,
+          "answer": "Based on the retrieved context: This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
+          "expectedAnswerContains": [
+            "ETL dispatcher",
+            "NormalizedDocument"
+          ],
+          "containsExpectedAnswer": true,
+          "usage": {
+            "inputTokens": 39,
+            "outputTokens": 34,
+            "totalTokens": 73
+          },
+          "costUsd": 0,
+          "evals": {
+            "faithfulness": 1,
+            "relevance": 0.416,
+            "quality": 0.708
+          },
+          "retrievedChunkIds": [
+            "smoke-text-001:section-2:chunk-1",
+            "smoke-text-001:section-1:chunk-1"
+          ]
+        }
+      ]
+    },
+    {
+      "provider": "ollama",
+      "kind": "ollama",
+      "model": "(not configured)",
+      "status": "skipped",
+      "skippedReason": "Set GROUNDEDOS_OLLAMA_GENERATE_MODEL to run the Ollama generation benchmark.",
+      "metrics": {
+        "requestCount": 0,
+        "avgLatencyMs": 0,
+        "p95LatencyMs": 0,
+        "avgFaithfulness": 0,
+        "avgRelevance": 0,
+        "avgQuality": 0,
+        "containsExpectedAnswerRate": 0,
+        "avgCostUsd": 0,
+        "totalCostUsd": 0
+      },
+      "perQuery": []
+    },
+    {
+      "provider": "openai",
+      "kind": "cloud",
+      "model": "gpt-5-mini",
+      "status": "skipped",
+      "skippedReason": "Set OPENAI_API_KEY to run the OpenAI cloud benchmark.",
+      "metrics": {
+        "requestCount": 0,
+        "avgLatencyMs": 0,
+        "p95LatencyMs": 0,
+        "avgFaithfulness": 0,
+        "avgRelevance": 0,
+        "avgQuality": 0,
+        "containsExpectedAnswerRate": 0,
+        "avgCostUsd": 0,
+        "totalCostUsd": 0
+      },
+      "perQuery": []
+    }
+  ],
+  "summary": {
+    "completedProviders": [
+      "local-extractive"
+    ],
+    "skippedProviders": [
+      "ollama",
+      "openai"
+    ],
+    "bestByQuality": "local-extractive",
+    "bestByLatency": "local-extractive",
+    "bestByCost": "local-extractive"
+  }
+}
