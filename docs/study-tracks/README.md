@@ -14,10 +14,10 @@ Guided Study Tracks are learning routes across the existing GroundedOS Lab archi
 | Track | Focus | Roadmap alignment |
 |---|---|---|
 | [Track 1 - LLM Foundations](#track-1---llm-foundations) | Core model mechanics, inference and generation controls | Cross-cutting foundation, Phase 4 - Lab |
-| [Track 2 - Multi-Modal & Agents](#track-2---multi-modal--agents) | Multimodal ingestion, tool use, agents and memory | Phase 0 - Data Foundation, Phase 2 - Quality, Phase 3 - Intelligence |
+| [Track 2 - Multi-Modal & Agents](#track-2---multi-modal--agents) | Multimodal ingestion, tool use, agents and memory | Phase 0 - Data Foundation, Phase 2b - Persistent Memory, Phase 3 - Intelligence |
 | [Track 3 - Open-Source Ecosystem](#track-3---open-source-ecosystem) | Hugging Face, local models, quantization and deployment trade-offs | Phase 4 - Lab, Phase 5 - Advanced ML |
 | [Track 4 - Evaluation & Comparison](#track-4---evaluation--comparison) | Evals, observability, cost analysis, A/B testing and benchmarking | Phase 3 - Intelligence, Phase 4 - Lab |
-| [Track 5 - Advanced RAG](#track-5---advanced-rag) | Retrieval, embeddings, search quality, grounding and lineage | Phase 0 - Data Foundation, Phase 1 - Core RAG, Phase 2 - Quality |
+| [Track 5 - Advanced RAG](#track-5---advanced-rag) | Retrieval, embeddings, search quality, grounding and lineage | Phase 0 - Data Foundation, Phase 1 - Core RAG, Phase 2 - Retrieval Quality |
 | [Track 6 - Fine-tuning & Adaptation](#track-6---fine-tuning--adaptation) | Fine-tuning, LoRA, distillation and synthetic data | Phase 5 - Advanced ML |
 | [Track 7 - Autonomous AI Systems](#track-7---autonomous-ai-systems) | Planning, memory, self-reflection and guardrails | Phase 3 - Intelligence |
 
@@ -31,7 +31,7 @@ Guided Study Tracks are learning routes across the existing GroundedOS Lab archi
 
 | Concepts | Repo map | Roadmap |
 |---|---|---|
-| [Multimodality](../concepts/multimodality.md), [Tool Calling](../concepts/tool-calling.md), [Multi-agents](../concepts/multi-agents.md), [Memory](../concepts/memory.md) | [`packages/etl`](../../packages/etl/README.md), [`packages/agents`](../../packages/agents/README.md), [`packages/memory`](../../packages/memory/README.md), [`packages/core`](../../packages/core/README.md) | [Phase 0 - Data Foundation](../../README.md#phase-0--data-foundation), [Phase 2 - Quality](../../README.md#phase-2--quality), [Phase 3 - Intelligence](../../README.md#phase-3--intelligence) |
+| [Multimodality](../concepts/multimodality.md), [Tool Calling](../concepts/tool-calling.md), [Multi-agents](../concepts/multi-agents.md), [Memory](../concepts/memory.md) | [`packages/etl`](../../packages/etl/README.md), [`packages/agents`](../../packages/agents/README.md), [`packages/memory`](../../packages/memory/README.md), [`packages/core`](../../packages/core/README.md) | [Phase 0 - Data Foundation](../../README.md#phase-0--data-foundation), [Phase 2b - Persistent Memory](../../README.md#phase-2b--persistent-memory), [Phase 3 - Intelligence](../../README.md#phase-3--intelligence) |
 
 ## Track 3 - Open-Source Ecosystem
 
@@ -49,7 +49,7 @@ Guided Study Tracks are learning routes across the existing GroundedOS Lab archi
 
 | Concepts | Repo map | Roadmap |
 |---|---|---|
-| [RAG](../concepts/rag.md), [Embeddings](../concepts/embeddings.md), [Chunking](../concepts/chunking.md), [Vector Database](../concepts/vector-database.md), [Hybrid Search](../concepts/hybrid-search.md), [Re-ranking](../concepts/re-ranking.md), [Grounding](../concepts/grounding.md), [Semantic Caching](../concepts/semantic-caching.md), [Data Lineage](../concepts/data-lineage.md) | [`packages/rag`](../../packages/rag/README.md), [`packages/etl`](../../packages/etl/README.md), [`packages/core`](../../packages/core/README.md), [`packages/observability`](../../packages/observability/README.md) | [Phase 0 - Data Foundation](../../README.md#phase-0--data-foundation), [Phase 1 - Core RAG](../../README.md#phase-1--core-rag), [Phase 2 - Quality](../../README.md#phase-2--quality) |
+| [RAG](../concepts/rag.md), [Embeddings](../concepts/embeddings.md), [Chunking](../concepts/chunking.md), [Vector Database](../concepts/vector-database.md), [Hybrid Search](../concepts/hybrid-search.md), [Re-ranking](../concepts/re-ranking.md), [Grounding](../concepts/grounding.md), [Semantic Caching](../concepts/semantic-caching.md), [Data Lineage](../concepts/data-lineage.md) | [`packages/rag`](../../packages/rag/README.md), [`packages/etl`](../../packages/etl/README.md), [`packages/core`](../../packages/core/README.md), [`packages/observability`](../../packages/observability/README.md) | [Phase 0 - Data Foundation](../../README.md#phase-0--data-foundation), [Phase 1 - Core RAG](../../README.md#phase-1--core-rag), [Phase 2 - Retrieval Quality](../../README.md#phase-2--retrieval-quality) |
 
 ## Track 6 - Fine-tuning & Adaptation
 

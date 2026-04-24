@@ -11,6 +11,40 @@ Every concept file must describe:
 - **Where it is used** — the specific packages or experiments in this project that apply it
 - **Trade-offs** — known limitations, costs or design tensions
 
+## Concept file template
+
+Copy the block below when creating a new concept file. Every heading is required.
+
+```markdown
+# <Concept Name>
+
+## What it is
+
+<One- or two-sentence definition. Be precise — avoid jargon where possible.>
+
+## Why it matters
+
+<Explain the role this concept plays in real AI systems and why a builder needs to understand it.>
+
+## Where it is used
+
+| Package / Location | How it uses the concept |
+|---|---|
+| [`packages/<name>`](../../packages/<name>/README.md) | <One-line description of the usage.> |
+
+## Trade-offs
+
+| Trade-off | Detail |
+|---|---|
+| **<Trade-off label>** | <Concrete explanation of the cost, limitation or design tension.> |
+```
+
+Rules:
+- Keep each file self-contained. A reader should not need to open other files to understand the concept.
+- Link packages and experiments using relative paths from `docs/concepts/`.
+- List at least one trade-off. "No trade-offs" is almost never true.
+- Do not duplicate another concept's content — cross-link instead.
+
 ## Responsibilities
 
 - Document foundational AI concepts (LLM, RAG, Agents, Embeddings, etc.)
@@ -37,13 +71,13 @@ Some concepts appear in more than one track. The table below lists the primary l
 | [multimodality.md](./multimodality.md) | Multimodality | Track 2 - Multi-Modal & Agents | Phase 0 - Data Foundation |
 | [tool-calling.md](./tool-calling.md) | Tool Calling | Track 2 - Multi-Modal & Agents | Phase 3 - Intelligence |
 | [multi-agents.md](./multi-agents.md) | Multi-agents | Track 2 - Multi-Modal & Agents, Track 7 - Autonomous AI Systems | Phase 3 - Intelligence |
-| [memory.md](./memory.md) | Memory | Track 2 - Multi-Modal & Agents, Track 7 - Autonomous AI Systems | Phase 2 - Quality |
+| [memory.md](./memory.md) | Memory | Track 2 - Multi-Modal & Agents, Track 7 - Autonomous AI Systems | Phase 2b - Persistent Memory |
 | [hugging-face.md](./hugging-face.md) | Hugging Face | Track 3 - Open-Source Ecosystem | Phase 5 - Advanced ML |
 | [local-models.md](./local-models.md) | Local Models | Track 3 - Open-Source Ecosystem | Phase 4 - Lab |
 | [quantization.md](./quantization.md) | Quantization | Track 3 - Open-Source Ecosystem | Phase 5 - Advanced ML |
 | [inference-trade-offs.md](./inference-trade-offs.md) | Inference Trade-offs | Track 3 - Open-Source Ecosystem | Phase 4 - Lab |
 | [evals.md](./evals.md) | Evals | Track 4 - Evaluation & Comparison | Phase 3 - Intelligence |
-| [observability.md](./observability.md) | Observability | Track 4 - Evaluation & Comparison | Phase 2 - Quality |
+| [observability.md](./observability.md) | Observability | Track 4 - Evaluation & Comparison | Phase 2 - Retrieval Quality |
 | [cost-analysis.md](./cost-analysis.md) | Cost Analysis | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
 | [ab-testing.md](./ab-testing.md) | A/B Testing | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
 | [benchmarking.md](./benchmarking.md) | Benchmarking | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
@@ -51,8 +85,8 @@ Some concepts appear in more than one track. The table below lists the primary l
 | [embeddings.md](./embeddings.md) | Embeddings | Track 5 - Advanced RAG | Phase 1 - Core RAG |
 | [chunking.md](./chunking.md) | Chunking | Track 5 - Advanced RAG | Phase 1 - Core RAG |
 | [vector-database.md](./vector-database.md) | Vector Database | Track 5 - Advanced RAG | Phase 1 - Core RAG |
-| [hybrid-search.md](./hybrid-search.md) | Hybrid Search | Track 5 - Advanced RAG | Phase 2 - Quality |
-| [re-ranking.md](./re-ranking.md) | Re-ranking | Track 5 - Advanced RAG | Phase 2 - Quality |
+| [hybrid-search.md](./hybrid-search.md) | Hybrid Search | Track 5 - Advanced RAG | Phase 2 - Retrieval Quality |
+| [re-ranking.md](./re-ranking.md) | Re-ranking | Track 5 - Advanced RAG | Phase 2 - Retrieval Quality |
 | [grounding.md](./grounding.md) | Grounding | Track 5 - Advanced RAG | Phase 3 - Intelligence |
 | [semantic-caching.md](./semantic-caching.md) | Semantic Caching | Track 5 - Advanced RAG | Phase 4 - Lab |
 | [data-lineage.md](./data-lineage.md) | Data Lineage | Track 5 - Advanced RAG | Phase 0 - Data Foundation |

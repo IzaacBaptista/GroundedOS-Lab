@@ -2,10 +2,93 @@
 
 > Build, evaluate and understand grounded AI systems — from RAG pipelines to multi-agent orchestration.
 
-**An open-source platform to build, study and evaluate grounded AI systems using LLMs, RAG, Agents and advanced inference pipelines.**
+**A practical learning laboratory for AI Engineering: RAG, agents, evals, observability and safety — built incrementally from a working local foundation.**
 
 > ⚠️ This project is a learning and experimentation platform for modern AI systems.
 > It intentionally exposes internal mechanics such as RAG pipelines, agent orchestration, evaluation, observability and safety layers.
+
+---
+
+## ⚡ Start Here
+
+> **New here? Pick the path that fits your goal:**
+
+| I want to… | Go to |
+|---|---|
+| **Try the working RAG pipeline right now** | [▶ What works today](#-what-works-today) |
+| **Run it in 5 minutes** | [⚙ Quick start](#-quick-start) |
+| **Understand what we're building and why** | [🎯 Objectives](#-objectives) |
+| **See the architecture** | [🏗 Architecture](#-architecture) |
+| **Learn AI concepts behind the code** | [📖 Concepts](./docs/concepts/README.md) |
+| **Follow a guided learning path** | [📘 Study Tracks](./docs/study-tracks/README.md) |
+| **Understand key design decisions** | [📐 ADRs](./docs/adr/README.md) |
+| **Contribute** | [🤝 Contributing](#-contributing) |
+
+---
+
+## ✅ What Works Today
+
+> This section tracks what is **actually runnable**, not what is planned.
+> Planned work lives in the [Roadmap](#-roadmap).
+
+### Phase 0 — Data Foundation ✅ Complete
+
+- Uniform Document Schema (`SourceDocument`, `NormalizedDocument`) in `packages/core`
+- ETL pipeline ingests **text** and **PDF** files → `NormalizedDocument` with sections and lineage
+- Image and audio extractors exist as registered stubs (return `NOT_IMPLEMENTED`)
+- Sample dataset registered in `datasets/registry.json` with checksum and metadata
+- `npm run ingest:smoke` runs the full ETL pipeline locally
+
+### Phase 1 — Core RAG 🟡 Runnable
+
+- **Upload a document** (inline text or text/PDF file) via API or CLI
+- **Index** it: chunk → embed → store in local in-memory or persisted index (`.groundedos/indexes/`)
+- **Ask** a grounded question: retrieve top-K chunks → extractive answer → Dev Mode output
+- **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider
+- **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
+- **Index management** API: list, delete persisted indexes
+- Phase 1 is functionally runnable; the remaining closeout item is recording baseline metrics before Phase 2 retrieval-quality work starts.
+
+### What is NOT yet implemented
+
+| Feature | Planned phase |
+|---|---|
+| Hybrid search (dense + sparse) | Phase 2 |
+| Re-ranking | Phase 2 |
+| Full observability (OpenTelemetry spans) | Phase 2 |
+| Persistent conversation memory | Phase 2b |
+| Agents and tool calling | Phase 3 |
+| Guardrails (beyond stubs) | Phase 3 |
+| Automated evals (faithfulness, relevance) | Phase 3 |
+| Docker / CI / auth | Phase 6 |
+| Python workers | Phase 3+ |
+| Cloud LLM providers (OpenAI, Anthropic) | Phase 3+ |
+| LoRA / fine-tuning / quantization | Phase 5 |
+
+---
+
+## ⚙️ Quick Start
+
+> Requirements: Node.js ≥ 18, npm ≥ 8
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Ask a question against the sample dataset (no config needed)
+npm run rag:smoke -- --dataset phase-0-smoke-text --query "What does this command verify?"
+
+# 3. Ask against your own file
+npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "Your question"
+
+# 4. Start the local API server (port 3001)
+npm run api:dev
+
+# 5. Start the web interface (port 3000) in another terminal
+npm run web:dev
+```
+
+Both CLI commands print a JSON response with the query, a grounded answer, retrieved chunk IDs, scores, source metadata and offsets. See [docs/phase-1-local-rag.md](./docs/phase-1-local-rag.md) for the full usage guide.
 
 ---
 
@@ -13,35 +96,50 @@
 
 ---
 
-## 🚀 Overview
+## 🎯 Objectives
 
-GroundedOS Lab is a **product + laboratory + engineering platform** designed to help developers:
+GroundedOS Lab has one primary goal and two secondary ones. **Order matters** — if there is ever a conflict, the primary goal wins.
 
-* Build real AI-powered applications
-* Understand how modern AI systems work internally
-* Evaluate quality, cost and performance
-* Experiment safely with cutting-edge techniques
+1. **Primary — practical learning laboratory**
+   A hands-on environment where developers build each component of a grounded AI system from scratch, observe its internals and understand why it works. Every feature exists to teach something, not to ship a product.
 
-This is not just a chatbot.
-This is a **complete system for grounded AI**.
+2. **Secondary — architecture reference**
+   A structured, documented monorepo that shows how RAG, agents, evals, observability and safety fit together in a real codebase. Decisions are recorded in [ADRs](./docs/adr/README.md) so the reasoning is visible.
+
+3. **Tertiary — usable product**
+   Once the learning foundation is solid, the system should also work as a usable local AI assistant. This is never the reason to add complexity; it is the outcome of doing 1 and 2 well.
 
 ---
 
-## 🎯 Goals
+## 🔁 Core Product Loop
 
-* Deliver a **usable AI assistant**
-* Expose **internal mechanics of LLM systems**
-* Enable **experimentation and benchmarking**
-* Serve as a **learning platform**
-* Demonstrate **production-ready architecture**
+Every feature in this project orbits a single observable loop:
+
+```text
+Upload document
+   ↓
+Index (chunk → embed → store)
+   ↓
+Ask a question
+   ↓
+Retrieve relevant chunks
+   ↓
+Generate a grounded answer
+   ↓
+Show sources + Dev Mode metadata
+   ↓
+Evaluate quality (faithfulness, relevance, latency, cost)
+   ↓
+Trace the full request
+```
+
+This loop is **already runnable** (Phases 0–1). Everything else — agents, re-ranking, guardrails, fine-tuning — is an extension that makes one step of this loop better or more observable. Build and understand the loop first.
 
 ---
 
 ## ⚡ Local-First Philosophy
 
-GroundedOS Lab is designed to run **locally first**, with optional cloud integration as the project evolves.
-
-Goals:
+GroundedOS Lab runs **locally first**, with optional cloud integration as the project evolves.
 
 * Enable local model execution for experimentation
 * Compare local vs cloud performance
@@ -50,8 +148,8 @@ Goals:
 Planned / target integrations:
 
 * Local Transformers (quantized models)
-* Ollama-based local execution
-* OpenAI / Anthropic APIs (optional, planned)
+* Ollama-based local execution (opt-in, already available for embeddings)
+* OpenAI / Anthropic APIs (optional, Phase 3+)
 
 ---
 
@@ -85,16 +183,34 @@ Planned / target integrations:
 
 ## 🏗️ Architecture
 
+The architecture is described at three levels of maturity. Not everything in the Target or Experimental views exists yet — see [What works today](#-what-works-today) for the running baseline.
+
+### Current Architecture (Phases 0–1, runnable today)
+
 ```text
+User Input (CLI or HTTP)
+   ↓
+apps/api (Fastify)  or  CLI script
+   ↓
+packages/etl  →  NormalizedDocument
+   ↓
+packages/rag  →  Chunks + Embeddings + In-Memory Vector Search
+   ↓
+Extractive Answer + Dev Mode Output (chunks, scores, offsets, metadata)
+```
+
+This is the working loop. It produces observable output — retrieved chunks with scores and source attribution — on every request.
+
+### Target Architecture (Phases 2–4, planned)
+
+```text
+--------------------------------
+| Session / Request Manager    |  ← lifecycle owner for the entire request
+--------------------------------
+   ↓
 User Input
    ↓
 Prompt / Context Engineering
-   ↓
-Model Routing
-   ↓
---------------------------------
-| Semantic Cache (optional)     |
---------------------------------
    ↓
 (Adaptive RAG Decision)
    ↓
@@ -107,6 +223,12 @@ Model Routing
 | - Re-ranking                 |
 --------------------------------
    ↓
+--------------------------------
+| Semantic Cache (optional)    |  ← operates on (query + retrieved context)
+--------------------------------
+   ↓
+Model Routing                      ← context-informed: considers retrieved content,
+   ↓                                 context length, cost and reasoning requirements
 Multi-Agent Orchestration
    ↓
 Tool Calling Layer
@@ -127,9 +249,32 @@ Response + Data Lineage
 --------------------------------
 ```
 
+> **Architecture notes**
+> - **Session / Request Manager** owns the full request lifecycle. It is the component that will manage state across multiple tool calls in agent flows.
+> - **RAG before Model Routing**: retrieved context (volume, domain, complexity) informs which model to use. Routing before retrieval loses this signal.
+> - **Semantic Cache after RAG**: the cache key is `(query, retrieved_context)`, not the raw query alone. Caching the raw query produces false hits when different retrievals produce the same query string but different contexts.
+
+### Experimental Architecture (Phase 5, separate from the core loop)
+
+The `experiments/` folder holds independent experiments that are **not part of the request path**. They produce artifacts (fine-tuned weights, quantized models) that can later feed into Model Routing as new provider options.
+
+```text
+experiments/
+  fine-tuning/    ← offline training runs, produce weights
+  lora/           ← LoRA adapter training
+  quantization/   ← quantize models for local inference
+  distillation/   ← teacher → student model compression
+  jailbreak-defense/  ← red-teaming, produces attack fixtures for packages/safety
+  bias-tests/     ← produces eval fixtures for packages/evals
+```
+
+These experiments orbit the core loop — they make it better — but they are never prerequisites for the core loop to run.
+
 ---
 
-## 🧠 Concepts Implemented
+## 🧠 Concepts Covered
+
+Some concepts below are already implemented in the runnable Phase 0-1 loop. Others are documented and roadmapped so contributors can learn the system in the order it will be built. See [What works today](#-what-works-today) for the implementation boundary.
 
 ### 🔹 Core AI
 
@@ -241,25 +386,29 @@ GroundedOS Lab is built for:
 
 Use this repository as a structured learning path:
 
-* Want the big-picture introduction?
-  → Start with [🚀 Overview](#-overview)
+* **New here? Start in 5 minutes:**
+  → [⚡ Quick Start](#-quick-start) and [✅ What works today](#-what-works-today)
 
-* Want to understand the platform goals and learning focus?
-  → Review the introduction at the top of this document
+* **Want to understand what we're building?**
+  → [🎯 Objectives](#-objectives) and [🔁 Core Product Loop](#-core-product-loop)
 
-* Interested in the hands-on module concepts?
+* **Interested in the hands-on module concepts?**
   → Jump to [🔬 Laboratory Modules](#-laboratory-modules)
 
-* Looking for evals, agents, guardrails, routing, or prompt experimentation?
+* **Looking for evals, agents, guardrails, routing, or prompt experimentation?**
   → Browse the [`packages/`](./packages/) and [`experiments/`](./experiments/) folders — each has its own `README.md`
 
-* Want to understand AI concepts behind the system?
+* **Want to understand AI concepts behind the system?**
   → Start at [`docs/concepts/`](./docs/concepts/)
 
-* Want a guided learning path by topic?
+* **Want a guided learning path by topic?**
   → Explore the [📘 Guided Study Tracks](./docs/study-tracks/README.md)
 
-As the project evolves, this section will map each concept directly to code implementations.
+* **Want to understand *why* the system is built the way it is?**
+  → Read the [Architecture Decision Records](./docs/adr/README.md)
+
+* **Want to know how quality is measured?**
+  → Read the [Evaluation Strategy](./docs/evaluation-strategy.md)
 
 ---
 
@@ -314,6 +463,36 @@ Start here:
 * PII sanitization
 * Output validation
 * Grounding enforcement
+
+---
+
+## 🔒 Security
+
+### Authentication & Authorization
+
+The project currently runs without authentication (local-first, development only). Before any public deployment or multi-user access, the following must be in place:
+
+* **API authentication** — all API endpoints require a bearer token or session cookie. No anonymous access to indexes or agent state.
+* **Index ownership** — persisted indexes are scoped to a user or session identifier; one user cannot read or delete another user's indexes.
+* **Role boundaries** — Lab Mode features (Jailbreak Playground, prompt A/B tests) are restricted to authenticated users with explicit opt-in.
+
+This strategy is tracked as a Phase 6 success criterion. Implementation decisions will be recorded in [`docs/adr/`](./docs/adr/).
+
+### Jailbreak Playground security model
+
+The Jailbreak Playground (`experiments/jailbreak-defense/`) is a red-teaming surface that deliberately tests adversarial inputs. Before it is exposed beyond local development:
+
+* All playground inputs are logged with the authenticated user identifier — no anonymous red-teaming.
+* Playground outputs (successful jailbreaks, bypass patterns) are never exposed publicly; results are stored in `datasets/` with access controls.
+* External contributors must review the security policy in `experiments/jailbreak-defense/README.md` before submitting new attack patterns.
+
+### Multimodality (image & audio)
+
+Image and audio extractors are registered stubs. They will re-enter the roadmap when:
+
+1. A concrete use case is identified (e.g. PDF-with-images ingestion, audio transcription for meeting notes).
+2. The relevant privacy and content-moderation implications for user-uploaded media are documented.
+3. A Phase milestone explicitly includes multimodal success criteria.
 
 ---
 
@@ -395,6 +574,8 @@ groundedos-lab/
 
   docs/
     concepts/           ← One file per AI concept, linked to code
+    adr/                ← Architecture Decision Records (why the system is built this way)
+    study-tracks/       ← Guided learning routes by topic
   
   datasets/   ← Raw, processed and synthetic datasets registry
   infra/      ← Docker, Compose, K8s, environment configs
@@ -402,18 +583,33 @@ groundedos-lab/
 
 ---
 
-## ⚙️ Tech Stack (Planned)
+## ⚙️ Tech Stack
 
-> ⚠️ The tech stack below describes the **intended target architecture**. Tooling configuration (package.json, turbo.json, etc.) will be added before Phase 0 coding begins.
+### Minimal stack (what you need to run it today)
 
-* Frontend: Next.js + TypeScript
-* Backend: Node.js (Fastify/Nest)
-* Workers: Python (ML pipelines)
-* Database: PostgreSQL
-* Vector DB: pgvector / Qdrant
-* Queue: Redis + BullMQ
-* Observability: OpenTelemetry + Grafana
-* AI: Local (Ollama, planned) + OpenAI / Anthropic (optional, planned)
+No external services required for Phases 0–1:
+
+| Layer | What | Note |
+|---|---|---|
+| API server | Node.js + **Fastify** | Runs with `npm run api:dev`. See [ADR-001](./docs/adr/ADR-001-backend-framework.md). |
+| Web | Node static web server + TypeScript | Runs with `npm run web:dev`; Next.js remains a target option for a later production UI |
+| Storage | Local JSON files (`.groundedos/`) | No database required yet |
+| Embeddings | `api-lexical` (built-in) | Default, no server. `local-hash` and `ollama` are opt-in. |
+| Vector search | In-memory (packages/rag) | No external vector DB required yet |
+| Logging | Structured console output | No tracing server required yet |
+
+### Target stack (planned additions, phased in)
+
+| Layer | What | When | Notes |
+|---|---|---|---|
+| Database | PostgreSQL | Phase 2+ | Persistent indexes and memory |
+| Vector DB | **pgvector** → **Qdrant** | Phase 2+ | pgvector first, migrate when needed. See [ADR-002](./docs/adr/ADR-002-vector-database.md). |
+| Queue | Redis + BullMQ | Phase 3+ | API → Worker communication boundary. See [ADR-003](./docs/adr/ADR-003-api-worker-communication.md). |
+| Workers | Python (ML pipelines) | Phase 3+ | Consume BullMQ jobs for compute-heavy tasks |
+| Observability | OpenTelemetry + Grafana | Phase 2+ | Distributed tracing, cost per stage |
+| AI providers | OpenAI / Anthropic (optional) | Phase 3+ | Cloud LLM option alongside local Ollama |
+| Containers | Docker + docker-compose | Phase 6 | Full local stack in one command |
+| CI | GitHub Actions | Phase 6 | Lint, typecheck, test on every PR |
 
 ---
 
@@ -444,18 +640,31 @@ groundedos-lab/
 - [x] Local RAG smoke command can ask a question against a registered dataset
 - [x] Retrieved chunks have a documented [Dev Mode output contract](./docs/phase-1-dev-mode-output.md) with relevance scores
 - [x] `packages/rag` has integration tests covering the full retrieval flow
+- [ ] Phase 1 baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json` before Phase 2 begins — see [Evaluation Strategy](./docs/evaluation-strategy.md)
 
-### Phase 2 — Quality
+### Phase 2 — Retrieval Quality
 
-* Hybrid search
+* Hybrid search (dense + sparse)
 * Re-ranking
-* Memory
 * Observability
 
 **✅ Success Criteria:**
-- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline
-- [ ] Re-ranking is applied and token usage / latency per stage is logged
-- [ ] Conversation memory persists across sessions
+- [ ] Hybrid search (dense + sparse) demonstrably improves retrieval vs dense-only baseline on the Phase 0 smoke dataset (measure: top-3 recall)
+- [ ] Re-ranking is applied and token usage / latency per stage is logged per request
+- [ ] Retrieval observability spans (chunk count, scores, latency) appear in the Dev Mode output
+
+> **Note:** Persistent memory between sessions is a separate product and infrastructure concern (storage, user identity, privacy) and is tracked in Phase 2b, not here. Mixing it with retrieval quality improvements would cause one to delay the other.
+
+### Phase 2b — Persistent Memory
+
+* Conversation memory across sessions
+* Storage backend for memory entries
+* Memory read/write contracts
+
+**✅ Success Criteria:**
+- [ ] Conversation memory persists and is retrievable across independent API restarts using a documented storage contract
+- [ ] Memory entries are associated with a session identifier; no cross-session leakage
+- [ ] Memory scope, retention policy and privacy implications are documented in [`packages/memory/README.md`](./packages/memory/README.md)
 
 ### Phase 3 — Intelligence
 
@@ -466,9 +675,11 @@ groundedos-lab/
 * Self-reflection / validation layer
 
 **✅ Success Criteria:**
-- [ ] At least one end-to-end agent flow is runnable (tool call → LLM → response)
-- [ ] Guardrails block at least prompt injection and PII leakage
-- [ ] Evals report automated scores (faithfulness, relevance) for a baseline dataset
+- [ ] At least one end-to-end agent flow is runnable: a `document-qa` agent that retrieves from a persisted index, calls a summarization tool, and returns a grounded answer with source attribution
+- [ ] Guardrails implement all six risks in the [threat matrix](./docs/concepts/guardrails.md#threat-matrix) with test fixtures
+- [ ] Evals report automated faithfulness and answer-relevance scores against the golden dataset using the [Evaluation Strategy](./docs/evaluation-strategy.md)
+- [ ] All six provider contracts from [ADR-005](./docs/adr/ADR-005-provider-contracts.md) have at least one concrete implementation each
+- [ ] Phase 3 baseline metrics recorded in `datasets/golden/baselines/phase-3-baseline.json`
 
 ### Phase 4 — Lab
 
@@ -478,9 +689,9 @@ groundedos-lab/
 * Model routing
 
 **✅ Success Criteria:**
-- [ ] A/B prompt test runs automatically and reports winner with statistical summary
-- [ ] Benchmark compares at least two models (local + cloud) on latency, cost and quality
-- [ ] Embedding visualization renders in the web app
+- [ ] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval)
+- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline
+- [ ] Embedding visualization renders in the web app with cluster labels for at least one indexed dataset
 
 ### Phase 5 — Advanced ML
 
@@ -490,9 +701,22 @@ groundedos-lab/
 * Distillation
 
 **✅ Success Criteria:**
-- [ ] Each `experiments/` folder contains a reproducible notebook or script
-- [ ] Benchmark scores compare base model vs tuned variant
-- [ ] Results are logged and stored in `datasets/`
+- [ ] Each `experiments/` folder contains a reproducible notebook or script with a documented environment setup (Python version, dependencies)
+- [ ] Benchmark scores compare base model vs tuned or quantized variant on at least one task-specific metric (e.g. BLEU, F1, or faithfulness)
+- [ ] Results are logged and stored in `datasets/` with the input dataset, hyperparameters and output metrics recorded
+
+### Phase 6 — Infrastructure & Deploy
+
+* Docker and docker-compose for local full-stack environment
+* CI pipeline (lint, typecheck, test on every PR)
+* Environment configuration and secrets management
+* Staging deployment (optional cloud target)
+
+**✅ Success Criteria:**
+- [ ] `docker-compose up` starts the full local stack (API, web, worker, Redis, Postgres) with one command
+- [ ] GitHub Actions CI runs lint, typecheck and tests on every PR and blocks merge on failure
+- [ ] `.env.example` files for all apps are complete and document every required variable
+- [ ] Authentication strategy is documented (who can access which endpoints) even if not yet implemented — see [Security](#-security)
 
 ---
 
@@ -620,7 +844,8 @@ Contributions at all levels are welcome: documentation, experiments, package imp
 
 | Type | Where | Notes |
 |---|---|---|
-| AI concept documentation | `docs/concepts/` | Follow the template in the folder's `README.md` |
+| AI concept documentation | `docs/concepts/` | Follow the template in [`docs/concepts/README.md`](./docs/concepts/README.md) |
+| Architecture decision | `docs/adr/` | Write an ADR before implementing a hard-to-reverse decision |
 | Package implementation | `packages/<name>/` | Start with the `README.md` in that package |
 | Experiment | `experiments/<name>/` | Include a reproducible notebook or script |
 | Dataset | `datasets/` | Include metadata (source, license, size) |
