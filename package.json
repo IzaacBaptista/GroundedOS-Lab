@@ -11,6 +11,8 @@
   "scripts": {
     "api:dev": "tsx apps/api/src/server.ts",
     "build": "npm run typecheck",
+    "build:api": "tsc -p apps/api/tsconfig.json",
+    "build:web": "npm --workspace @groundedos/web run build",
     "ingest:smoke": "tsx scripts/ingest-smoke.ts",
     "rag:ask": "tsx scripts/rag-ask.ts",
     "rag:smoke": "tsx scripts/rag-smoke.ts",
@@ -23,9 +25,11 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@swc/core": "^1.9.3",
     "@types/node": "^22.10.2",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
+    "unplugin-swc": "^1.5.1",
     "vitest": "^2.1.8"
   }
 }
