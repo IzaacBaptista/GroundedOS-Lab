@@ -2,10 +2,11 @@ import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
+import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 
 import { createApiServer } from "./server";
 
-const servers: ReturnType<typeof createApiServer>[] = [];
+const servers: NestFastifyApplication[] = [];
 const tempDirs: string[] = [];
 
 afterEach(async () => {
@@ -17,7 +18,7 @@ afterEach(async () => {
 
 describe("api server", () => {
   it("serves health checks", async () => {
-    const app = createTestServer();
+    const app = await createTestServer();
     const response = await app.inject({
       method: "GET",
       url: "/health",
@@ -31,7 +32,7 @@ describe("api server", () => {
   });
 
   it("serves JSON POST /rag/ask", async () => {
-    const app = createTestServer();
+    const app = await createTestServer();
     const response = await app.inject({
       method: "POST",
       url: "/rag/ask",
@@ -57,8 +58,9 @@ describe("api server", () => {
   });
 
   it("serves multipart POST /rag/ask", async () => {
-    const app = createTestServer();
-    const address = await app.listen({ port: 0, host: "127.0.0.1" });
+    const app = await createTestServer();
+    await app.listen({ port: 0, host: "127.0.0.1" });
+    const address = await app.getUrl();
     const form = new FormData();
 
     form.append(
@@ -93,7 +95,7 @@ describe("api server", () => {
 
   it("serves POST /rag/index and asks against the persisted index", async () => {
     const indexDir = await createTempIndexDir();
-    const app = createTestServer(indexDir);
+    const app = await createTestServer(indexDir);
     const indexResponse = await app.inject({
       method: "POST",
       url: "/rag/index",
@@ -146,7 +148,7 @@ describe("api server", () => {
 
   it("serves GET and DELETE /rag/indexes", async () => {
     const indexDir = await createTempIndexDir();
-    const app = createTestServer(indexDir);
+    const app = await createTestServer(indexDir);
 
     await app.inject({
       method: "POST",
@@ -203,7 +205,7 @@ describe("api server", () => {
   });
 
   it("returns validation errors as JSON", async () => {
-    const app = createTestServer();
+    const app = await createTestServer();
     const response = await app.inject({
       method: "POST",
       url: "/rag/ask",
@@ -223,8 +225,8 @@ describe("api server", () => {
   });
 });
 
-function createTestServer(indexDir?: string): ReturnType<typeof createApiServer> {
-  const server = createApiServer({ indexDir });
+async function createTestServer(indexDir?: string): Promise<NestFastifyApplication> {
+  const server = await createApiServer({ indexDir });
   servers.push(server);
 
   return server;

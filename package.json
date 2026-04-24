@@ -23,9 +23,11 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@swc/core": "^1.9.3",
     "@types/node": "^22.10.2",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
+    "unplugin-swc": "^1.5.1",
     "vitest": "^2.1.8"
   }
 }
