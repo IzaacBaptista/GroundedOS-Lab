@@ -95,14 +95,18 @@
 
           <label class="field">
             <span>Question</span>
-            <textarea id="queryInput" rows="4" required placeholder="Question"></textarea>
+            <textarea id="queryInput" rows="4" required placeholder="Ask a question about the indexed document..."></textarea>
           </label>
 
-          <div class="run-row">
-            <label class="field field--compact">
+          <details class="advanced-options" open>
+            <summary>Advanced options</summary>
+            <label class="field">
               <span>Top K</span>
               <input id="topKInput" type="number" min="1" max="10" step="1" value="3">
             </label>
+          </details>
+
+          <div class="run-row">
             <div class="action-buttons">
               <button id="indexButton" class="secondary-button" type="button">Index</button>
               <button id="submitButton" class="primary-button" type="submit">Ask</button>
@@ -119,15 +123,37 @@
             <span id="resultMeta" class="tag">No result</span>
           </div>
 
+          <div class="result-tabs" role="tablist" aria-label="Output modes">
+            <button
+              id="answerTabButton"
+              class="result-tab result-tab--active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+            >
+              Answer
+            </button>
+            <button
+              id="compareTabButton"
+              class="result-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+            >
+              Compare
+            </button>
+          </div>
+
           <div id="emptyState" class="empty-state">
             <div class="empty-state__mark" aria-hidden="true"></div>
-            <p>No result yet.</p>
+            <p class="empty-state__message">Index a document on the left, then ask a question to see the grounded answer and Dev Mode output here.</p>
           </div>
 
           <div id="resultView" class="result-view" hidden>
             <section class="answer-block">
               <p id="answerText"></p>
             </section>
+            <p id="resultHint" class="result-hint" hidden></p>
 
             <section class="output-section">
               <div class="section-title">
@@ -146,9 +172,67 @@
             </section>
 
             <details class="dev-mode">
-              <summary>Dev Mode JSON</summary>
-              <pre id="devModeJson"></pre>
+              <summary>
+                <div class="dev-mode__header">
+                  <span>Dev Mode JSON</span>
+                  <button type="button" id="copyDevModeButton" class="dev-mode__copy-button" title="Copy JSON to clipboard">Copy</button>
+                </div>
+              </summary>
+              <div id="devModeTree" class="json-tree"></div>
+              <div class="dev-mode__raw-toggle">
+                <button type="button" id="devModeRawToggle" class="secondary-button" title="Toggle raw JSON view">Raw JSON</button>
+              </div>
+              <pre id="devModeJson" class="dev-mode__raw" hidden></pre>
             </details>
+          </div>
+
+          <div id="compareView" class="compare-view" hidden>
+            <section class="compare-controls">
+              <label class="field field--compact">
+                <span>Provider A</span>
+                <select id="compareProviderASelect">
+                  <option value="api-lexical">api-lexical</option>
+                  <option value="local-hash">local-hash</option>
+                  <option value="ollama">ollama</option>
+                </select>
+              </label>
+              <label class="field field--compact">
+                <span>Provider B</span>
+                <select id="compareProviderBSelect">
+                  <option value="local-hash">local-hash</option>
+                  <option value="api-lexical">api-lexical</option>
+                  <option value="ollama">ollama</option>
+                </select>
+              </label>
+            </section>
+
+            <p id="compareMessage" class="form-message" role="status" aria-live="polite">
+              Run Ask while Compare tab is active to compare providers side by side.
+            </p>
+
+            <p class="compare-tip" title="api-lexical and local-hash are lexical strategies. Ollama embeddings usually produce stronger semantic differences.">
+              Tip: Try <strong>ollama</strong> as Provider B to see semantic vs lexical retrieval differences.
+            </p>
+
+            <div class="compare-grid">
+              <article class="compare-column">
+                <header class="compare-column__header">
+                  <h3 id="compareProviderATitle">Provider A</h3>
+                  <span id="compareProviderAMeta" class="tag">No result</span>
+                </header>
+                <p id="compareProviderAAnswer" class="chunk-text">No result yet.</p>
+                <div id="compareProviderAChunks" class="result-list"></div>
+              </article>
+
+              <article class="compare-column">
+                <header class="compare-column__header">
+                  <h3 id="compareProviderBTitle">Provider B</h3>
+                  <span id="compareProviderBMeta" class="tag">No result</span>
+                </header>
+                <p id="compareProviderBAnswer" class="chunk-text">No result yet.</p>
+                <div id="compareProviderBChunks" class="result-list"></div>
+              </article>
+            </div>
           </div>
         </section>
       </section>
