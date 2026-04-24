@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App";
 
 /**
@@ -11,8 +11,11 @@ import App from "./App";
  */
 describe("App", () => {
   const originalFetch = globalThis.fetch;
+  let indexListResponse: unknown;
 
   beforeEach(() => {
+    indexListResponse = { count: 0, indexes: [] };
+
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
 
@@ -24,7 +27,65 @@ describe("App", () => {
       }
 
       if (url.endsWith("/api/rag/indexes")) {
-        return new Response(JSON.stringify({ count: 0, indexes: [] }), {
+        return new Response(JSON.stringify(indexListResponse), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/api/rag/indexes/visual-test/embedding-map")) {
+        return new Response(JSON.stringify({
+          document: {
+            documentId: "visual-test",
+            title: "Visual Test",
+            modality: "text",
+            checksum: "abc",
+          },
+          index: {
+            chunkCount: 2,
+            embeddingProvider: "api-lexical",
+            embeddingDimensions: 64,
+          },
+          projection: {
+            method: "variance-dimensions",
+            xDimension: 1,
+            yDimension: 2,
+          },
+          points: [
+            {
+              chunkId: "visual-test:section-1:chunk-1",
+              documentId: "visual-test",
+              sectionId: "section-1",
+              x: 8,
+              y: 92,
+              clusterLabel: "section-1",
+              textPreview: "Alpha setup notes.",
+              offsets: {
+                startOffset: 0,
+                endOffset: 18,
+                offsetBasis: "document",
+              },
+            },
+            {
+              chunkId: "visual-test:section-2:chunk-1",
+              documentId: "visual-test",
+              sectionId: "section-2",
+              x: 92,
+              y: 8,
+              clusterLabel: "section-2",
+              textPreview: "Beta retrieval notes.",
+              offsets: {
+                startOffset: 20,
+                endOffset: 41,
+                offsetBasis: "document",
+              },
+            },
+          ],
+          clusters: [
+            { label: "section-1", count: 1, centroid: { x: 8, y: 92 } },
+            { label: "section-2", count: 1, centroid: { x: 92, y: 8 } },
+          ],
+        }), {
           status: 200,
           headers: { "content-type": "application/json" },
         });
@@ -78,5 +139,49 @@ describe("App", () => {
       const matches = screen.getAllByText(/question is required/i);
       expect(matches.length).toBeGreaterThan(0);
     });
+  });
+
+  it("loads the embedding map for a selected persisted index", async () => {
+    indexListResponse = {
+      count: 1,
+      indexes: [
+        {
+          createdAt: "2026-04-24T00:00:00.000Z",
+          document: {
+            documentId: "visual-test",
+            title: "Visual Test",
+            modality: "text",
+            checksum: "abc",
+          },
+          index: {
+            chunkCount: 2,
+            embeddingProvider: "api-lexical",
+            embeddingDimensions: 64,
+          },
+          storage: {
+            persisted: true,
+            indexPath: ".groundedos/indexes/visual-test.json",
+          },
+        },
+      ],
+    };
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/visual test \| 2 chunks \| api-lexical/i)).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText(/indexed documents/i), {
+      target: { value: "visual-test" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: /embeddings/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/alpha setup notes/i).length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getAllByText(/section-1/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/section-2/i).length).toBeGreaterThan(0);
   });
 });

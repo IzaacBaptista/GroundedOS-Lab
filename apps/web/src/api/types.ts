@@ -114,6 +114,38 @@ export interface RagIndexDeleteResponse {
   index: PersistedRagIndexListItem;
 }
 
+export interface EmbeddingMapPoint {
+  chunkId: string;
+  documentId: string;
+  sectionId: string;
+  x: number;
+  y: number;
+  clusterLabel: string;
+  textPreview: string;
+  offsets: ChunkOffsets;
+}
+
+export interface EmbeddingMapCluster {
+  label: string;
+  count: number;
+  centroid: {
+    x: number;
+    y: number;
+  };
+}
+
+export interface EmbeddingMapResponse {
+  document: RagDocumentSummary;
+  index: RagIndexSummary;
+  projection: {
+    method: "variance-dimensions";
+    xDimension: number;
+    yDimension: number;
+  };
+  points: EmbeddingMapPoint[];
+  clusters: EmbeddingMapCluster[];
+}
+
 export interface TradeoffAggregateMetrics {
   requests: number;
   avgLatencyMs: number;

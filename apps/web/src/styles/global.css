@@ -785,9 +785,74 @@ textarea:focus {
   gap: 12px;
 }
 
-.tradeoffs-view {
+.tradeoffs-view,
+.embedding-view {
   display: grid;
   gap: 12px;
+}
+
+.embedding-map {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 280px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.embedding-map svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.embedding-map__plot {
+  fill: #fbfaf7;
+}
+
+.embedding-map circle {
+  stroke: #fff;
+  stroke-width: 0.75;
+  vector-effect: non-scaling-stroke;
+}
+
+.embedding-map__label {
+  fill: var(--muted);
+  font-size: 3px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke;
+  stroke: #fbfaf7;
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.cluster-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cluster-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cluster-chip__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
 }
 
 .tradeoffs-grid {

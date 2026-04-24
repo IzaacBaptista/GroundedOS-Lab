@@ -69,6 +69,8 @@
 
 - Prompt A/B testing is executable with `npm run experiment:prompts`
 - Model/provider benchmarking is executable with `npm run benchmark:models`
+- Persisted-index embedding visualization is available in the web app with
+  section cluster labels
 - The current model benchmark artifact records a local extractive baseline and
   explicit skips for Ollama/OpenAI until those providers are configured
 - The next Phase 4 milestone is a completed local-vs-cloud benchmark run:
@@ -80,7 +82,6 @@
 |---|---|
 | Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
 | Completed local-vs-cloud benchmark artifact | Phase 4 |
-| Embedding visualization in web | Phase 4 |
 | LoRA / fine-tuning / quantization | Phase 5 |
 | Docker / CI / auth | Phase 6 |
 
@@ -723,7 +724,7 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 **✅ Success Criteria:**
 - [x] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval) — `npm run experiment:prompts` writes `datasets/golden/baselines/phase-4-ab-prompt-test.json`; current result is not statistically conclusive because the golden dataset has one query
 - [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline — `npm run benchmark:models` is implemented and records skipped providers until Ollama/OpenAI are configured
-- [ ] Embedding visualization renders in the web app with cluster labels for at least one indexed dataset
+- [x] Embedding visualization renders in the web app with section cluster labels for persisted indexes
 
 ### Phase 5 — Advanced ML
 
@@ -771,8 +772,8 @@ and embedding visualization.
 - Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
   results for product decisions; the current prompt test has only one golden
   query
-- After the local-vs-cloud benchmark passes, add embedding visualization to the
-  web app with cluster labels for at least one indexed dataset
+- Use the Embeddings tab in the web app to inspect persisted-index chunk
+  projections and section cluster labels
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in

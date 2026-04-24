@@ -11,12 +11,14 @@ import {
   askWithFile,
   askWithPersisted,
   askWithText,
+  getEmbeddingMap,
   getTradeoffMetrics,
   indexFile,
   indexText,
 } from "./api/client";
 import type {
   ActiveIndex,
+  EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
   PersistedRagIndexListItem,
@@ -55,7 +57,7 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "ollama",
 ];
 
-type ResultMode = "answer" | "compare" | "tradeoffs";
+type ResultMode = "answer" | "compare" | "embeddings" | "tradeoffs";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -102,6 +104,12 @@ export default function App() {
   const [tradeoffMetricsLoading, setTradeoffMetricsLoading] = useState(false);
   const [tradeoffMessage, setTradeoffMessage] = useState("");
   const [tradeoffMessageIsError, setTradeoffMessageIsError] = useState(false);
+  const [embeddingMap, setEmbeddingMap] = useState<EmbeddingMapResponse | undefined>(
+    undefined
+  );
+  const [embeddingMapLoading, setEmbeddingMapLoading] = useState(false);
+  const [embeddingMapMessage, setEmbeddingMapMessage] = useState("");
+  const [embeddingMapMessageIsError, setEmbeddingMapMessageIsError] = useState(false);
 
   // App state
   const [appState, setAppState] = useState<AppState>("idle");
@@ -135,6 +143,11 @@ export default function App() {
   const reportTradeoffMessage = useCallback((text: string, isError = false) => {
     setTradeoffMessage(text);
     setTradeoffMessageIsError(isError);
+  }, []);
+
+  const reportEmbeddingMapMessage = useCallback((text: string, isError = false) => {
+    setEmbeddingMapMessage(text);
+    setEmbeddingMapMessageIsError(isError);
   }, []);
 
   const setState = useCallback((next: AppState, detail = "") => {
@@ -404,12 +417,14 @@ export default function App() {
       outputA: undefined,
       outputB: undefined,
     }));
+    setEmbeddingMap(undefined);
     clearActiveIndex();
     reportMessage("");
     reportCompareMessage(
       "Run Ask while Compare tab is active to compare providers side by side."
     );
     reportTradeoffMessage("");
+    reportEmbeddingMapMessage("");
     setState("idle");
     setOutputTab("answer");
     setSourceMode("file");
@@ -443,6 +458,29 @@ export default function App() {
     }
   }, [reportTradeoffMessage]);
 
+  const loadEmbeddingMap = useCallback(async () => {
+    if (!activeIndex) {
+      setEmbeddingMap(undefined);
+      reportEmbeddingMapMessage("Select an indexed document to visualize embeddings.");
+      return;
+    }
+
+    setEmbeddingMapLoading(true);
+
+    try {
+      const map = await getEmbeddingMap(activeIndex.documentId);
+      setEmbeddingMap(map);
+      reportEmbeddingMapMessage("");
+    } catch (error) {
+      reportEmbeddingMapMessage(
+        error instanceof Error ? error.message : "Failed to load embedding map.",
+        true
+      );
+    } finally {
+      setEmbeddingMapLoading(false);
+    }
+  }, [activeIndex, reportEmbeddingMapMessage]);
+
   useEffect(() => {
     if (outputTab !== "tradeoffs") {
       return;
@@ -450,6 +488,14 @@ export default function App() {
 
     void loadTradeoffs();
   }, [outputTab, loadTradeoffs]);
+
+  useEffect(() => {
+    if (outputTab !== "embeddings") {
+      return;
+    }
+
+    void loadEmbeddingMap();
+  }, [outputTab, loadEmbeddingMap]);
 
   const indexStatus = useMemo(() => {
     if (activeIndex) {
@@ -472,7 +518,7 @@ export default function App() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Phase 1</p>
+          <p className="eyebrow">Phase 4 Lab</p>
           <h1>Local RAG Console</h1>
         </div>
         <div className="topbar__meta">
@@ -730,6 +776,7 @@ export default function App() {
         <ResultPanel
           outputTab={outputTab}
           setOutputTab={setOutputTab}
+          activeIndex={activeIndex}
           result={result}
           compare={compare}
           setCompare={setCompare}
@@ -740,6 +787,11 @@ export default function App() {
           onRefreshTradeoffs={() => void loadTradeoffs()}
           tradeoffMessage={tradeoffMessage}
           tradeoffMessageIsError={tradeoffMessageIsError}
+          embeddingMap={embeddingMap}
+          embeddingMapLoading={embeddingMapLoading}
+          onRefreshEmbeddingMap={() => void loadEmbeddingMap()}
+          embeddingMapMessage={embeddingMapMessage}
+          embeddingMapMessageIsError={embeddingMapMessageIsError}
         />
       </section>
     </main>
@@ -749,6 +801,7 @@ export default function App() {
 interface ResultPanelProps {
   outputTab: ResultMode;
   setOutputTab: (tab: ResultMode) => void;
+  activeIndex: ActiveIndex | undefined;
   result: RagAskResponse | undefined;
   compare: CompareState;
   setCompare: React.Dispatch<React.SetStateAction<CompareState>>;
@@ -759,11 +812,17 @@ interface ResultPanelProps {
   onRefreshTradeoffs: () => void;
   tradeoffMessage: string;
   tradeoffMessageIsError: boolean;
+  embeddingMap: EmbeddingMapResponse | undefined;
+  embeddingMapLoading: boolean;
+  onRefreshEmbeddingMap: () => void;
+  embeddingMapMessage: string;
+  embeddingMapMessageIsError: boolean;
 }
 
 function ResultPanel({
   outputTab,
   setOutputTab,
+  activeIndex,
   result,
   compare,
   setCompare,
@@ -774,6 +833,11 @@ function ResultPanel({
   onRefreshTradeoffs,
   tradeoffMessage,
   tradeoffMessageIsError,
+  embeddingMap,
+  embeddingMapLoading,
+  onRefreshEmbeddingMap,
+  embeddingMapMessage,
+  embeddingMapMessageIsError,
 }: ResultPanelProps) {
   const citations = result?.answer?.citations ?? [];
   const results = result?.devMode?.results ?? [];
@@ -788,6 +852,10 @@ function ResultPanel({
       }`
     : outputTab === "compare"
       ? "Compare mode"
+      : outputTab === "embeddings"
+        ? activeIndex
+          ? `${activeIndex.chunkCount} chunks | ${activeIndex.embeddingProvider}`
+          : "No index selected"
       : "No result";
 
   const showHint =
@@ -822,6 +890,15 @@ function ResultPanel({
           onClick={() => setOutputTab("compare")}
         >
           Compare
+        </button>
+        <button
+          className={`result-tab${outputTab === "embeddings" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "embeddings"}
+          onClick={() => setOutputTab("embeddings")}
+        >
+          Embeddings
         </button>
         <button
           className={`result-tab${outputTab === "tradeoffs" ? " result-tab--active" : ""}`}
@@ -1030,7 +1107,119 @@ function ResultPanel({
           )}
         </div>
       )}
+
+      {outputTab === "embeddings" && (
+        <div className="embedding-view">
+          <div className="panel__header">
+            <h3>Embedding Map</h3>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onRefreshEmbeddingMap}
+              disabled={embeddingMapLoading || !activeIndex}
+            >
+              {embeddingMapLoading ? "Refreshing" : "Refresh"}
+            </button>
+          </div>
+
+          <p
+            className={`form-message${embeddingMapMessageIsError ? " is-error" : ""}`}
+            role="status"
+            aria-live="polite"
+          >
+            {embeddingMapMessage}
+          </p>
+
+          {!activeIndex && (
+            <p className="chunk-text">Select a persisted index to inspect its chunks.</p>
+          )}
+
+          {activeIndex && !embeddingMap && !embeddingMapLoading && (
+            <p className="chunk-text">No embedding map loaded yet.</p>
+          )}
+
+          {embeddingMap && <EmbeddingMapView map={embeddingMap} />}
+        </div>
+      )}
     </section>
+  );
+}
+
+function EmbeddingMapView({ map }: { map: EmbeddingMapResponse }) {
+  const palette = ["#007c72", "#b45f06", "#3b6ea8", "#8f4e8b", "#5f7f2a", "#a33f3f"];
+  const colorFor = (label: string) => {
+    const index = map.clusters.findIndex((cluster) => cluster.label === label);
+    return palette[Math.max(0, index) % palette.length];
+  };
+
+  return (
+    <>
+      <div className="embedding-map" role="img" aria-label="Embedding projection">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+          <rect className="embedding-map__plot" x="0" y="0" width="100" height="100" />
+          {map.clusters.map((cluster) => (
+            <text
+              key={cluster.label}
+              className="embedding-map__label"
+              x={cluster.centroid.x}
+              y={100 - cluster.centroid.y}
+            >
+              {cluster.label}
+            </text>
+          ))}
+          {map.points.map((point) => (
+            <circle
+              key={point.chunkId}
+              cx={point.x}
+              cy={100 - point.y}
+              r="2.2"
+              fill={colorFor(point.clusterLabel)}
+            >
+              <title>{`${point.chunkId}: ${point.textPreview}`}</title>
+            </circle>
+          ))}
+        </svg>
+      </div>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Clusters</h3>
+          <span className="count">{map.clusters.length}</span>
+        </div>
+        <div className="cluster-list">
+          {map.clusters.map((cluster) => (
+            <span key={cluster.label} className="cluster-chip">
+              <span
+                className="cluster-chip__swatch"
+                style={{ backgroundColor: colorFor(cluster.label) }}
+              />
+              {cluster.label} · {cluster.count}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Chunks</h3>
+          <span className="count">{map.points.length}</span>
+        </div>
+        <div className="result-list">
+          {map.points.map((point) => (
+            <article key={point.chunkId} className="result-row">
+              <div className="result-row__meta">
+                <span>{point.chunkId}</span>
+                <span>{point.clusterLabel}</span>
+                <span>
+                  x {point.x.toFixed(2)} · y {point.y.toFixed(2)}
+                </span>
+              </div>
+              <p className="chunk-text">{point.textPreview}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 

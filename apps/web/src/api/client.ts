@@ -1,5 +1,6 @@
 import type {
   ApiErrorBody,
+  EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
   RagAskResponse,
@@ -50,6 +51,15 @@ export async function deleteIndex(
     { method: "DELETE" }
   );
   return parseResponse<RagIndexDeleteResponse>(response);
+}
+
+export async function getEmbeddingMap(
+  documentId: string
+): Promise<EmbeddingMapResponse> {
+  const response = await fetch(
+    `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}/embedding-map`
+  );
+  return parseResponse<EmbeddingMapResponse>(response);
 }
 
 export async function getTradeoffMetrics(): Promise<TradeoffMetricsResponse> {
