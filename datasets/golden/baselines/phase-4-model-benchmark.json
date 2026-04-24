@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-24T17:41:18.036Z",
+  "timestamp": "2026-04-24T22:49:46.622Z",
   "version": 1,
   "phase": "phase-4",
   "description": "Phase 4 model/provider benchmark over the golden dataset. Local baseline always runs; Ollama and OpenAI run when configured through environment variables.",
