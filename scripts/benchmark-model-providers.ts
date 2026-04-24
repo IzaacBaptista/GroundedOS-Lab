@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+import { loadLocalEnv } from "./load-env";
 import type { DocumentModality } from "@groundedos/core";
 import { ingest } from "../packages/etl/src/index";
 import {
@@ -25,6 +26,8 @@ const DEFAULT_PROVIDERS = ["local-extractive", "ollama", "openai"];
 const DEFAULT_OUTPUT_PATH = "datasets/golden/baselines/phase-4-model-benchmark.json";
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+loadLocalEnv();
 
 type DatasetRegistry = {
   datasets: DatasetEntry[];

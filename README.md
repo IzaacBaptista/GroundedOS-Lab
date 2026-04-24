@@ -780,9 +780,11 @@ The local RAG usage guide is documented in
 [`docs/phase-1-local-rag.md`](./docs/phase-1-local-rag.md).
 The Ollama installation and integration guide is documented in
 [`docs/ollama-setup.md`](./docs/ollama-setup.md).
-Reference environment files live in
+Reference environment files live in [`.env.example`](./.env.example),
 [`apps/api/.env.example`](./apps/api/.env.example) and
-[`apps/web/.env.example`](./apps/web/.env.example).
+[`apps/web/.env.example`](./apps/web/.env.example). Node-side commands load
+local `.env` files from the repository root, and app-specific files when
+applicable; shell-exported variables keep priority.
 
 ### Local RAG commands
 

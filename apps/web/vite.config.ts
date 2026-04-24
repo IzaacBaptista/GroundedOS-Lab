@@ -1,9 +1,12 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { loadLocalEnv } from "../../scripts/load-env";
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_API_BASE_URL = "http://localhost:3001";
+
+loadLocalEnv({ appDir: "apps/web" });
 
 export default defineConfig({
   plugins: [react()],

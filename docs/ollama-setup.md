@@ -143,11 +143,14 @@ Relevant environment variables:
 
 The repository now includes reference env files:
 
+- [`.env.example`](../.env.example)
 - [`apps/api/.env.example`](../apps/api/.env.example)
 - [`apps/web/.env.example`](../apps/web/.env.example)
 
-They are reference files only. The current npm scripts do not auto-load `.env`
-files; GroundedOS reads `process.env` directly.
+They are reference files only. Copy values into local `.env` files when needed.
+Node-side commands load repository-root `.env`/`.env.local` files, and app
+entrypoints also load their app-specific `.env`/`.env.local` files. Variables
+already exported in the shell keep priority.
 
 ## 5. Test GroundedOS Via API
 
