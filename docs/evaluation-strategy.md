@@ -217,6 +217,19 @@ npm run benchmark:models -- --providers local-extractive,ollama,openai
 # Output: datasets/golden/baselines/phase-4-model-benchmark.json
 ```
 
+### Phase 4 prompt A/B test
+
+```bash
+npm run experiment:prompts
+
+# Output: datasets/golden/baselines/phase-4-ab-prompt-test.json
+```
+
+The current A/B artifact reports a winner and confidence interval, but the
+result is not statistically conclusive while the golden dataset contains only
+one query. Add more golden entries before using the winner as a product
+decision.
+
 ---
 
 ## Adding to the golden dataset

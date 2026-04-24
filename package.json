@@ -15,6 +15,7 @@
     "build": "npm run typecheck",
     "build:api": "tsc -p apps/api/tsconfig.json",
     "build:web": "npm --workspace @groundedos/web run build",
+    "experiment:prompts": "tsx scripts/ab-test-prompts.ts",
     "ingest:smoke": "tsx scripts/ingest-smoke.ts",
     "rag:ask": "tsx scripts/rag-ask.ts",
     "rag:smoke": "tsx scripts/rag-smoke.ts",
