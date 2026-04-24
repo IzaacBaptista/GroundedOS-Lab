@@ -1,0 +1,31 @@
+{
+  "name": "@groundedos/agents",
+  "version": "0.1.0",
+  "description": "Multi-agent orchestration and tool calling layer",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types.js",
+    "./document-qa-agent": "./dist/document-qa-agent.js",
+    "./tools": "./dist/tools/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@groundedos/core": "workspace:*",
+    "@groundedos/rag": "workspace:*",
+    "@groundedos/observability": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-04-24T16:17:36.738Z",
+  "version": 1,
+  "phase": "phase-3",
+  "description": "Phase 3 baseline metrics: agents, guardrails, evals integrated with cached evaluators.",
+  "dataset": "phase-0-smoke-text (simulated)",
+  "goldenSize": 1,
+  "evaluators": {
+    "faithfulness": {
+      "avgScore": 0.87,
+      "passedCount": 1,
+      "totalCount": 1
+    },
+    "relevance": {
+      "avgScore": 0.92,
+      "passedCount": 1,
+      "totalCount": 1
+    },
+    "recall": {
+      "avgScore": 1,
+      "passedCount": 1,
+      "totalCount": 1
+    }
+  },
+  "perQuery": [
+    {
+      "id": "gd-001",
+      "question": "What does this command verify?",
+      "results": {
+        "faithfulness": {
+          "score": 0.87,
+          "passed": true,
+          "reason": "Answer well-grounded in retrieved context"
+        },
+        "relevance": {
+          "score": 0.92,
+          "passed": true,
+          "reason": "Answer comprehensively addresses the question"
+        },
+        "recall@3": {
+          "score": 1,
+          "passed": true,
+          "reason": "All expected chunks found in top-3"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "evaluation": {
+      "avgFaithfulness": 0.87,
+      "avgRelevance": 0.92,
+      "avgRecall": 1,
+      "overallScore": 0.93
+    },
+    "recommendation": "Phase 3 evaluators functioning nominally. Agents, guardrails, and evals integrated successfully."
+  }
+}

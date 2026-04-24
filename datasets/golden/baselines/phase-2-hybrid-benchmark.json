@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-04-24T16:02:34.404Z",
+  "version": 1,
+  "description": "Comparison of dense-only vs hybrid retrieval on Phase 0 smoke dataset golden questions. Top-3 recall measures if expected chunk appears in top 3 results.",
+  "dataset": "phase-0-smoke-text",
+  "goldenSize": 1,
+  "topK": 3,
+  "modes": {
+    "denseOnly": {
+      "top3Recall": 1,
+      "avgScore": 0.249136,
+      "totalQueries": 1,
+      "successfulRetrievals": 1
+    },
+    "hybrid": {
+      "top3Recall": 1,
+      "avgScore": 0.278137,
+      "totalQueries": 1,
+      "successfulRetrievals": 1
+    },
+    "improvement": {
+      "top3RecallGain": 0,
+      "avgScoreDense": 0.249136,
+      "avgScoreHybrid": 0.278137
+    }
+  },
+  "perQuery": [
+    {
+      "id": "gd-001",
+      "question": "What does this command verify?",
+      "expectedChunkIds": [
+        "smoke-text-001:section-2:chunk-1"
+      ],
+      "results": {
+        "denseOnly": {
+          "retrieved": [
+            "smoke-text-001:section-2:chunk-1",
+            "smoke-text-001:section-1:chunk-1"
+          ],
+          "scores": [
+            0.24913643956121995,
+            0
+          ],
+          "hit": true,
+          "rank": 1
+        },
+        "hybrid": {
+          "retrieved": [
+            "smoke-text-001:section-2:chunk-1",
+            "smoke-text-001:section-1:chunk-1"
+          ],
+          "scores": [
+            0.278137212536,
+            0.016318834144
+          ],
+          "hit": true,
+          "rank": 1
+        }
+      }
+    }
+  ]
+}

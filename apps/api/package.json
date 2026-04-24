@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
+    "@groundedos/agents": "0.1.0",
     "@groundedos/core": "0.1.0",
     "@groundedos/etl": "0.1.0",
     "@groundedos/memory": "0.1.0",
