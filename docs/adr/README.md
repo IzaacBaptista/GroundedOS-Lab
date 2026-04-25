@@ -55,3 +55,4 @@ You do **not** need an ADR for obvious or easily-reversible choices (e.g. adding
 | [ADR-010](./ADR-010-tradeoff-metrics-dashboard.md) | Trade-off metrics dashboard: in-memory aggregation with API summary endpoint | Accepted |
 | [ADR-011](./ADR-011-session-memory-persistence.md) | Session memory persistence: file-backed per-session memory store | Accepted |
 | [ADR-013](./ADR-013-cost-tracking-strategy.md) | Cost tracking strategy: request-level accounting and budget enforcement | Accepted |
+| [ADR-014](./ADR-014-authentication-strategy.md) | Authentication strategy: JWT + session cookies with resource scoping | Proposed |

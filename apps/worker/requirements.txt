@@ -1,0 +1,2 @@
+redis==5.2.1
+psycopg[binary]==3.2.10

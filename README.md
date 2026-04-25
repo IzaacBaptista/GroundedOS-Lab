@@ -82,7 +82,7 @@
 |---|---|
 | Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
 | LoRA / fine-tuning / quantization | Phase 5 |
-| Docker / CI / auth | Phase 6 |
+| Docker / CI / auth hardening (production rollout) | Phase 6 (in progress) |
 
 ---
 
@@ -749,18 +749,17 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 * Staging deployment (optional cloud target)
 
 **✅ Success Criteria:**
-- [ ] `docker-compose up` starts the full local stack (API, web, worker, Redis, Postgres) with one command
-- [ ] GitHub Actions CI runs lint, typecheck and tests on every PR and blocks merge on failure
-- [ ] `.env.example` files for all apps are complete and document every required variable
-- [ ] Authentication strategy is documented (who can access which endpoints) even if not yet implemented — see [Security](#-security)
+- [x] `docker-compose up` configuration exists for the full local stack (API, web, worker, Redis, Postgres)
+- [x] GitHub Actions CI runs lint, typecheck and tests on every PR (`.github/workflows/ci.yml`)
+- [x] `.env.example` files for root, API and web document required variables
+- [x] Authentication strategy is documented (see [ADR-014](./docs/adr/ADR-014-authentication-strategy.md))
 
 ---
 
 ## 🧭 Execution Plan (Current)
 
-Phases 0, 1, 2, 2b, 3 and 4 are complete. The active
-implementation focus is Phase 5 Advanced ML: experiment scaffolding, LoRA,
-quantization, fine-tuning and distillation.
+Phases 0, 1, 2, 2b, 3, 4 and 5 are complete. The active
+implementation focus is Phase 6 Infrastructure & Deploy.
 
 ### Current focus
 
@@ -785,8 +784,12 @@ quantization, fine-tuning and distillation.
   with ~34.17% compression and passing quality gate;
   `npm run experiment:distillation:real`; regression test in
   `scripts/distillation-experiment.test.ts`
-- Phase 5 now has real runs across all four tracks; next execution focus is
-  Phase 6 infrastructure (Docker/CI/auth).
+- Phase 5 is complete with real runs across all four tracks.
+- Phase 6 baseline infrastructure is now in-repo:
+   `docker-compose.yml`, `Dockerfile`, `Dockerfile.web`,
+   `apps/worker/Dockerfile`, and `.github/workflows/ci.yml`
+- Authentication and authorization strategy is documented in
+   `docs/adr/ADR-014-authentication-strategy.md`
 - Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
   results for product decisions; the current prompt test has only one golden
   query

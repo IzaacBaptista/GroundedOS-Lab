@@ -1,0 +1,141 @@
+services:
+  # PostgreSQL database — persistent storage for indexes, memory, users
+  postgres:
+    image: postgres:16-alpine
+    container_name: groundedos-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-groundedos}
+      POSTGRES_USER: ${POSTGRES_USER:-groundedos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-groundedos-dev-password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - groundedos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-groundedos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - groundedos_network
+
+  # Redis — message queue and cache layer
+  redis:
+    image: redis:7-alpine
+    container_name: groundedos-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-groundedos-dev-password}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - groundedos_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - groundedos_network
+
+  # API server — Node.js backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: groundedos-api
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-groundedos}:${POSTGRES_PASSWORD:-groundedos-dev-password}@postgres:5432/${POSTGRES_DB:-groundedos}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-groundedos}
+      POSTGRES_USER: ${POSTGRES_USER:-groundedos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-groundedos-dev-password}
+      
+      # Queue
+      REDIS_URL: redis://:${REDIS_PASSWORD:-groundedos-dev-password}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-groundedos-dev-password}
+      
+      # GroundedOS Lab
+      GROUNDEDOS_INDEX_DIR: /app/.groundedos/indexes
+      GROUNDEDOS_MEMORY_DIR: /app/.groundedos/memory/sessions
+      
+      # Optional Ollama
+      GROUNDEDOS_OLLAMA_BASE_URL: ${GROUNDEDOS_OLLAMA_BASE_URL:-http://localhost:11434}
+      GROUNDEDOS_OLLAMA_EMBED_MODEL: ${GROUNDEDOS_OLLAMA_EMBED_MODEL:-embeddinggemma}
+      GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS: ${GROUNDEDOS_OLLAMA_EMBED_DIMENSIONS:-768}
+      GROUNDEDOS_OLLAMA_GENERATE_MODEL: ${GROUNDEDOS_OLLAMA_GENERATE_MODEL:-qwen2.5:0.5b}
+      
+      # Auth (Phase 6)
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
+      
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - groundedos_app_data:/app/.groundedos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groundedos_network
+    restart: unless-stopped
+
+  # Web UI — React frontend with Vite
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: groundedos-web
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3001}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+    networks:
+      - groundedos_network
+    restart: unless-stopped
+
+  # Python Worker — asyncio-based task processor for ML jobs
+  worker:
+    build:
+      context: ./apps/worker
+      dockerfile: Dockerfile
+    container_name: groundedos-worker
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:-groundedos-dev-password}@redis:6379
+      POSTGRES_URL: postgresql://${POSTGRES_USER:-groundedos}:${POSTGRES_PASSWORD:-groundedos-dev-password}@postgres:5432/${POSTGRES_DB:-groundedos}
+      GROUNDEDOS_INDEX_DIR: /app/.groundedos/indexes
+      GROUNDEDOS_MEMORY_DIR: /app/.groundedos/memory/sessions
+    volumes:
+      - groundedos_app_data:/app/.groundedos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - groundedos_network
+    restart: unless-stopped
+
+networks:
+  groundedos_network:
+    driver: bridge
+
+volumes:
+  groundedos_postgres_data:
+    driver: local
+  groundedos_redis_data:
+    driver: local
+  groundedos_app_data:
+    driver: local

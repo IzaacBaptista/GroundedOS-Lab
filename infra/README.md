@@ -1,15 +1,37 @@
 # infra
 
-Infrastructure configuration and deployment definitions for all GroundedOS Lab services and components.
+Infrastructure definitions for Phase 6 (Docker, Compose, CI, auth baseline).
 
 ## Responsibilities
 
-- Define container and orchestration configurations (Docker, Compose, Kubernetes)
-- Manage environment-specific configurations (local, staging, production)
-- Provision databases, vector stores and queue services
-- Configure observability stacks (OpenTelemetry, Grafana)
-- Support local-first development with optional cloud integration
+- Define local full-stack orchestration (API, web, worker, Postgres, Redis)
+- Keep environment templates synchronized (`.env.example`, `apps/*/.env.example`)
+- Provide CI checks for build/test/typecheck and Docker build validation
+- Document deployment and security decisions
+
+## Phase 6 Artifacts
+
+- `../docker-compose.yml` — local full stack
+- `../Dockerfile` — API container
+- `../Dockerfile.web` — web container
+- `../apps/worker/Dockerfile` — worker container
+- `../.github/workflows/ci.yml` — CI pipeline
+- `../docs/adr/ADR-014-authentication-strategy.md` — auth strategy
+
+## Quick Start
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Services:
+
+- API: `http://localhost:3001`
+- Web: `http://localhost:3000`
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
 
 ## Status
 
-Planned
+In progress (Phase 6 started)
