@@ -181,6 +181,15 @@ export type RagAskResponse = {
       applied: boolean;
       candidateCount: number;
       returnedCount: number;
+      candidates?: Array<{
+        chunkId: string;
+        sectionId: string;
+        beforeRank: number;
+        afterRank: number;
+        hybridScore: number;
+        lexicalOverlapScore: number;
+        finalScore: number;
+      }>;
     };
     stageMetrics?: Array<{
       stage: "process-query" | "retrieve-chunks" | "rerank-chunks";
@@ -1403,6 +1412,7 @@ async function runLocalRag(
         applied: true,
         candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
         returnedCount: result.output.devMode.resultCount,
+        candidates: getRerankingCandidates(result.output.devMode),
       },
       stageMetrics: buildStageMetrics(result.context, {
         rawQuery: result.output.rawQuery,
@@ -1753,6 +1763,7 @@ async function runPersistedRag(
         applied: true,
         candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
         returnedCount: result.output.devMode.resultCount,
+        candidates: getRerankingCandidates(result.output.devMode),
       },
       stageMetrics: buildStageMetrics(result.context, {
         rawQuery: result.output.rawQuery,
@@ -1966,7 +1977,7 @@ function rerankRetrievalOutput(
   devMode: RetrievalDevModeOutput,
   retrievalQuery: string,
   topK: number
-): RetrievalDevModeOutput {
+): RetrievalDevModeWithRerank {
   if (devMode.results.length <= 1) {
     return {
       ...devMode,
@@ -1974,6 +1985,15 @@ function rerankRetrievalOutput(
       results: devMode.results.slice(0, topK).map((result, index) => ({
         ...result,
         rank: index + 1,
+      })),
+      reranking: devMode.results.slice(0, topK).map((result, index) => ({
+        chunkId: result.chunkId,
+        sectionId: result.sectionId,
+        beforeRank: result.rank,
+        afterRank: index + 1,
+        hybridScore: result.score,
+        lexicalOverlapScore: 0,
+        finalScore: result.score,
       })),
     };
   }
@@ -1999,6 +2019,9 @@ function rerankRetrievalOutput(
 
       return {
         ...result,
+        beforeRank: result.rank,
+        hybridScore: result.score,
+        lexicalOverlapScore: Number(sparseScore.toFixed(12)),
         score: finalScore,
       };
     })
@@ -2019,7 +2042,30 @@ function rerankRetrievalOutput(
     ...devMode,
     resultCount: reranked.length,
     results: reranked,
+    reranking: reranked.map((result) => ({
+      chunkId: result.chunkId,
+      sectionId: result.sectionId,
+      beforeRank: result.beforeRank,
+      afterRank: result.rank,
+      hybridScore: result.hybridScore,
+      lexicalOverlapScore: result.lexicalOverlapScore,
+      finalScore: result.score,
+    })),
   };
+}
+
+type RetrievalDevModeWithRerank = RetrievalDevModeOutput & {
+  reranking?: NonNullable<RagAskResponse["devMode"]["reranking"]>["candidates"];
+};
+
+function getRerankingCandidates(devMode: RetrievalDevModeOutput): NonNullable<
+  NonNullable<RagAskResponse["devMode"]["reranking"]>["candidates"]
+> {
+  const maybe = devMode as RetrievalDevModeOutput & {
+    reranking?: NonNullable<RagAskResponse["devMode"]["reranking"]>["candidates"];
+  };
+
+  return Array.isArray(maybe.reranking) ? maybe.reranking : [];
 }
 
 function resolveRerankCandidateTopK(topK: number): number {

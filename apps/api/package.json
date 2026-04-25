@@ -17,6 +17,7 @@
     "@groundedos/memory": "0.1.0",
     "@groundedos/observability": "0.1.0",
     "@groundedos/rag": "0.1.0",
+    "@groundedos/safety": "0.1.0",
     "@nestjs/common": "^11.1.16",
     "@nestjs/core": "^11.1.16",
     "@nestjs/platform-fastify": "^11.1.16",

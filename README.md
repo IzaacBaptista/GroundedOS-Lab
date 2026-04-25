@@ -769,6 +769,8 @@ quantization, fine-tuning and distillation.
   vectors are quantized to INT8 and compared with FP32-style vectors for
   Recall@1, latency and memory; the latest run includes direct INT8 similarity
   search without dequantizing first over `datasets/golden/phase-5-retrieval.json`
+- Quantization has an automated regression test:
+  `scripts/quantization-experiment.test.ts`
 - Next Phase 5 implementation step: replace the LoRA scaffold or extend
   quantization from vector quantization to model-weight quantization when a
   local model runtime is available

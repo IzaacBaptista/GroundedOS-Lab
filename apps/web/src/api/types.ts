@@ -55,6 +55,35 @@ export interface DevModeResult {
 
 export interface DevModeOutput {
   results: DevModeResult[];
+  hybrid?: {
+    mode: "hybrid";
+    denseWeight: number;
+    sparseWeight: number;
+    candidateCount: number;
+    candidates: Array<{
+      chunkId: string;
+      sectionId: string;
+      denseRank: number;
+      hybridRank: number;
+      denseScore: number;
+      sparseScore: number;
+      combinedScore: number;
+    }>;
+  };
+  reranking?: {
+    applied: boolean;
+    candidateCount: number;
+    returnedCount: number;
+    candidates?: Array<{
+      chunkId: string;
+      sectionId: string;
+      beforeRank: number;
+      afterRank: number;
+      hybridScore: number;
+      lexicalOverlapScore: number;
+      finalScore: number;
+    }>;
+  };
   [key: string]: unknown;
 }
 
@@ -280,6 +309,84 @@ export interface ModelBenchmarkRunResponse {
   providers: string[];
   success: boolean;
   output: string;
+}
+
+export interface LabExperimentMetric {
+  label: string;
+  value: string;
+  numericValue?: number;
+  tone?: "good" | "neutral" | "warn";
+}
+
+export interface LabExperimentVariant {
+  name: string;
+  role: string;
+  metrics: LabExperimentMetric[];
+}
+
+export interface LabExperiment {
+  id: string;
+  concept: string;
+  domain: string;
+  status: "scaffold" | "measured" | "missing";
+  goal: string;
+  artifactPath: string;
+  generatedAt?: string;
+  dataset?: {
+    path: string;
+    entryCount: number;
+    documentRef?: string;
+  };
+  method?: {
+    mode: string;
+    chunkCount?: number;
+    searchPaths?: string[];
+  };
+  variants: LabExperimentVariant[];
+  keyMetrics: LabExperimentMetric[];
+  passed?: boolean;
+  notes?: string;
+  reproduceCommand: string;
+}
+
+export interface LabExperimentsResponse {
+  generatedAt: string;
+  domains: Array<{
+    id: string;
+    name: string;
+    summary: string;
+    experiments: LabExperiment[];
+  }>;
+}
+
+export interface GuardrailCheckItem {
+  id: string;
+  label: string;
+  concept: string;
+  status: "passed" | "sanitized" | "blocked" | "warned";
+  riskLevel: "low" | "medium" | "high" | "none";
+  reason?: string;
+  detectedPatterns: string[];
+  sanitizedChanged: boolean;
+}
+
+export interface GuardrailCheckResponse {
+  generatedAt: string;
+  decision: "allow" | "sanitize" | "block" | "review";
+  blockedBy?: string;
+  summary: {
+    checked: number;
+    blocked: number;
+    sanitized: number;
+    warnings: number;
+  };
+  input: {
+    role: "user" | "assistant";
+    source: "user-input" | "document" | "assistant-output";
+    length: number;
+  };
+  sanitizedText: string;
+  checks: GuardrailCheckItem[];
 }
 
 export interface ApiErrorBody {

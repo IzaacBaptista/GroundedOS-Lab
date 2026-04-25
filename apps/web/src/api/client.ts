@@ -3,6 +3,8 @@ import type {
   EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
+  GuardrailCheckResponse,
+  LabExperimentsResponse,
   ModelBenchmarkResponse,
   ModelBenchmarkPrecheckResponse,
   ModelBenchmarkRunResponse,
@@ -125,6 +127,26 @@ export async function runModelBenchmark(
   });
 
   return parseResponse<ModelBenchmarkRunResponse>(response);
+}
+
+export async function getLabExperiments(): Promise<LabExperimentsResponse> {
+  const response = await fetch(`${API_PREFIX}/lab/experiments`);
+  return parseResponse<LabExperimentsResponse>(response);
+}
+
+export async function runGuardrailCheck(params: {
+  text: string;
+  role?: "user" | "assistant";
+  source?: "user-input" | "document" | "assistant-output";
+  context?: string;
+}): Promise<GuardrailCheckResponse> {
+  const response = await fetch(`${API_PREFIX}/lab/guardrails/check`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  return parseResponse<GuardrailCheckResponse>(response);
 }
 
 export interface AskTextParams {

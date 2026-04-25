@@ -25,6 +25,7 @@ From the repository root:
 
 ```bash
 npm run experiment:quantization
+npx vitest run scripts/quantization-experiment.test.ts
 ```
 
 The script reads `datasets/golden/phase-5-retrieval.json`, loads the registered
@@ -56,3 +57,7 @@ This is vector quantization for the current local RAG retrieval path, not yet
 model-weight quantization. The artifact contract is the same one future model
 quantization runs should preserve: input dataset, environment, precision/method
 settings, quality, latency, memory and candidate-vs-baseline deltas.
+
+The regression test runs the experiment with a temporary output path and asserts
+that direct INT8 search preserves Recall@1 while reducing memory on the Phase 5
+golden set.

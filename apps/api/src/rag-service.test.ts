@@ -63,11 +63,24 @@ describe("askRag", () => {
     expect(output.devMode.workflowContext?.steps["process-query"]?.status).toBe("success");
     expect(output.devMode.hybrid?.mode).toBe("hybrid");
     expect(output.devMode.hybrid?.candidateCount).toBeGreaterThanOrEqual(1);
+    expect(output.devMode.hybrid?.candidates.length).toBeGreaterThanOrEqual(1);
+    expect(output.devMode.hybrid?.candidates[0]).toMatchObject({
+      denseScore: expect.any(Number),
+      sparseScore: expect.any(Number),
+      combinedScore: expect.any(Number),
+    });
     expect(output.devMode.reranking).toMatchObject({
       applied: true,
       returnedCount: 1,
     });
     expect(output.devMode.reranking?.candidateCount).toBeGreaterThanOrEqual(1);
+    expect(output.devMode.reranking?.candidates?.[0]).toMatchObject({
+      beforeRank: expect.any(Number),
+      afterRank: expect.any(Number),
+      hybridScore: expect.any(Number),
+      lexicalOverlapScore: expect.any(Number),
+      finalScore: expect.any(Number),
+    });
     expect(output.devMode.workflowContext?.steps["rerank-chunks"]?.status).toBe("success");
     expect(output.devMode.stageMetrics).toBeDefined();
     expect(output.devMode.stageMetrics?.map((stage) => stage.stage)).toEqual([

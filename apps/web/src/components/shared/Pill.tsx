@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type PillVariant = "green" | "blue" | "amber" | "gray" | "teal";
+export type PillVariant = "green" | "blue" | "amber" | "gray" | "teal" | "red";
 
 const PILL_COLORS: Record<PillVariant, { bg: string; text: string }> = {
   green: { bg: "#EAF3DE", text: "#3B6D11" },
@@ -8,6 +8,7 @@ const PILL_COLORS: Record<PillVariant, { bg: string; text: string }> = {
   amber: { bg: "#FAEEDA", text: "#854F0B" },
   gray: { bg: "#F1EFE8", text: "#444441" },
   teal: { bg: "#E1F5EE", text: "#085041" },
+  red: { bg: "#FBE7E4", text: "#8F241B" },
 };
 
 export function Pill({

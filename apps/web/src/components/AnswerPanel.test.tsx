@@ -54,6 +54,39 @@ const response: RagAskResponse = {
         },
       },
     ],
+    hybrid: {
+      mode: "hybrid",
+      denseWeight: 0.65,
+      sparseWeight: 0.35,
+      candidateCount: 2,
+      candidates: [
+        {
+          chunkId: "doc-1:section-2:chunk-1",
+          sectionId: "section-2",
+          denseRank: 2,
+          hybridRank: 1,
+          denseScore: 0.35,
+          sparseScore: 0.8,
+          combinedScore: 0.5075,
+        },
+      ],
+    },
+    reranking: {
+      applied: true,
+      candidateCount: 2,
+      returnedCount: 1,
+      candidates: [
+        {
+          chunkId: "doc-1:section-2:chunk-1",
+          sectionId: "section-2",
+          beforeRank: 1,
+          afterRank: 1,
+          hybridScore: 0.5075,
+          lexicalOverlapScore: 0.6,
+          finalScore: 0.526,
+        },
+      ],
+    },
     cache: { hit: false, hits: 0, misses: 1 },
     workflowContext: {
       workflowId: "wf-1",
@@ -130,6 +163,9 @@ describe("AnswerPanel", () => {
     );
 
     expect(screen.getByText(/melhor match/i)).toBeTruthy();
+    expect(screen.getAllByText(/retrieval pipeline/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/dense \+ sparse/i)).toBeTruthy();
+    expect(screen.getByText(/combined → reranked final order/i)).toBeTruthy();
     expect(screen.getByText(/dev mode json/i)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: /citações/i }));

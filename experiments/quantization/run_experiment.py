@@ -470,7 +470,12 @@ def main() -> int:
         json.dump(artifact, handle, indent=2)
         handle.write("\n")
 
-    print(f"Wrote {args.output.relative_to(REPO_ROOT)}")
+    try:
+        display_path = args.output.relative_to(REPO_ROOT)
+    except ValueError:
+        display_path = args.output
+
+    print(f"Wrote {display_path}")
     return 0
 
 

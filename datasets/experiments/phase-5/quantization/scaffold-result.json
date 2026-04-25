@@ -3,7 +3,7 @@
   "phase": "phase-5",
   "track": "quantization",
   "mode": "local-lexical-vector-quantization",
-  "generatedAt": "2026-04-25T13:48:02.793432+00:00",
+  "generatedAt": "2026-04-25T14:00:08.921723+00:00",
   "environment": {
     "python": "3.12.3",
     "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
@@ -41,8 +41,8 @@
       "role": "baseline",
       "metrics": {
         "recallAt1": 1.0,
-        "avgLatencyMs": 0.167187,
-        "p95LatencyMs": 0.179043,
+        "avgLatencyMs": 0.165975,
+        "p95LatencyMs": 0.175915,
         "memoryBytes": 3752
       },
       "hyperparameters": {
@@ -117,8 +117,8 @@
       "role": "candidate",
       "metrics": {
         "recallAt1": 1.0,
-        "avgLatencyMs": 0.220275,
-        "p95LatencyMs": 0.182418,
+        "avgLatencyMs": 0.177215,
+        "p95LatencyMs": 0.175004,
         "memoryBytes": 994,
         "memoryReductionRate": 0.735075
       },
@@ -195,8 +195,8 @@
       "role": "candidate",
       "metrics": {
         "recallAt1": 1.0,
-        "avgLatencyMs": 0.154806,
-        "p95LatencyMs": 0.170474,
+        "avgLatencyMs": 0.155197,
+        "p95LatencyMs": 0.168956,
         "memoryBytes": 994,
         "memoryReductionRate": 0.735075
       },
@@ -273,15 +273,15 @@
   "comparison": {
     "dequantizedCandidateVsBaseline": {
       "recallAt1": 0.0,
-      "avgLatencyMs": 0.053088,
-      "p95LatencyMs": 0.003375,
+      "avgLatencyMs": 0.01124,
+      "p95LatencyMs": -0.000911,
       "memoryBytes": -2758,
       "memoryReductionRate": 0.735075
     },
     "directCandidateVsBaseline": {
       "recallAt1": 0.0,
-      "avgLatencyMs": -0.012381,
-      "p95LatencyMs": -0.008569,
+      "avgLatencyMs": -0.010778,
+      "p95LatencyMs": -0.006959,
       "memoryBytes": -2758,
       "memoryReductionRate": 0.735075
     },

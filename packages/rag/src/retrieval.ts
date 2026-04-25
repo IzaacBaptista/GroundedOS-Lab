@@ -59,7 +59,18 @@ export interface RetrievalDevModeOutput {
     denseWeight: number;
     sparseWeight: number;
     candidateCount: number;
+    candidates: RetrievalHybridCandidate[];
   };
+}
+
+export interface RetrievalHybridCandidate {
+  chunkId: string;
+  sectionId: string;
+  denseRank: number;
+  hybridRank: number;
+  denseScore: number;
+  sparseScore: number;
+  combinedScore: number;
 }
 
 export interface RetrievalDevModeResult {
@@ -141,6 +152,7 @@ export async function retrieveForDevMode(
       denseWeight: internal.hybridMeta.denseWeight,
       sparseWeight: internal.hybridMeta.sparseWeight,
       candidateCount: internal.hybridMeta.candidateCount,
+      candidates: internal.hybridMeta.candidates,
     };
   }
 
@@ -153,6 +165,7 @@ type InternalRetrievalResult = {
     denseWeight: number;
     sparseWeight: number;
     candidateCount: number;
+    candidates: RetrievalHybridCandidate[];
   };
 };
 
@@ -209,29 +222,34 @@ async function retrieveInternal(
         denseWeight,
         sparseWeight,
         candidateCount: 0,
+        candidates: [],
       },
     };
   }
 
-  const reranked = validatedDenseCandidates
-    .map((candidate) => {
+  const scoredCandidates = validatedDenseCandidates.map((candidate, index) => {
       const denseScore = normalizeDenseScore(candidate.score);
       const sparseScore = sparseNgramCosine(query, candidate.chunk.text);
       const combined = denseWeight * denseScore + sparseWeight * sparseScore;
 
       return {
         ...candidate,
+        denseRank: index + 1,
+        denseScore: Number(denseScore.toFixed(12)),
+        sparseScore: Number(sparseScore.toFixed(12)),
         score: Number(combined.toFixed(12)),
       };
-    })
+    });
+
+  const sortedCandidates = scoredCandidates
     .sort((left, right) => {
       if (right.score === left.score) {
         return right.chunk.text.length - left.chunk.text.length;
       }
 
       return right.score - left.score;
-    })
-    .slice(0, topK);
+    });
+  const reranked = sortedCandidates.slice(0, topK);
 
   return {
     results: reranked,
@@ -239,6 +257,15 @@ async function retrieveInternal(
       denseWeight,
       sparseWeight,
       candidateCount: validatedDenseCandidates.length,
+      candidates: sortedCandidates.map((candidate, index) => ({
+        chunkId: candidate.chunk.id,
+        sectionId: candidate.chunk.sectionId,
+        denseRank: candidate.denseRank,
+        hybridRank: index + 1,
+        denseScore: candidate.denseScore,
+        sparseScore: candidate.sparseScore,
+        combinedScore: candidate.score,
+      })),
     },
   };
 }

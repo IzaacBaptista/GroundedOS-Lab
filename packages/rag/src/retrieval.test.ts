@@ -248,6 +248,15 @@ describe("retrieval flow", () => {
     expect(output.hybrid).toBeDefined();
     expect(output.hybrid?.mode).toBe("hybrid");
     expect(output.hybrid?.candidateCount).toBeGreaterThanOrEqual(1);
+    expect(output.hybrid?.candidates[0]).toMatchObject({
+      chunkId: "doc-hybrid-dev:section-2:chunk-1",
+      sectionId: "section-2",
+      denseRank: expect.any(Number),
+      hybridRank: 1,
+      denseScore: expect.any(Number),
+      sparseScore: expect.any(Number),
+      combinedScore: expect.any(Number),
+    });
   });
 
   it("improves smoke-style retrieval with hybrid mode when query tokenization diverges", async () => {
