@@ -75,58 +75,38 @@ export async function getModelBenchmark(): Promise<ModelBenchmarkResponse> {
   return parseResponse<ModelBenchmarkResponse>(response);
 }
 
-export async function getModelBenchmarkPrecheck(): Promise<ModelBenchmarkPrecheckResponse> {
+export async function getModelBenchmarkPrecheck(
+  providers: string[] = ["local-extractive", "ollama", "groq"],
+): Promise<ModelBenchmarkPrecheckResponse> {
+  const qs = providers.join(",");
   const response = await fetch(
-    `${API_PREFIX}/rag/metrics/model-benchmark/precheck?providers=local-extractive,ollama,openai`
+    `${API_PREFIX}/rag/metrics/model-benchmark/precheck?providers=${encodeURIComponent(qs)}`
   );
 
   if (response.status === 404) {
     return {
       timestamp: new Date().toISOString(),
-      requestedProviders: ["local-extractive", "ollama", "openai"],
+      requestedProviders: providers as ModelBenchmarkPrecheckResponse["requestedProviders"],
       phase4Ready: false,
       strictMode: false,
-      results: [
-        {
-          provider: "local-extractive",
-          ready: true,
-          checks: [
-            {
-              name: "compat",
-              status: "pass",
-              detail: "Local provider does not require precheck endpoint support.",
-            },
-          ],
-        },
-        {
-          provider: "ollama",
-          ready: false,
-          checks: [
-            {
-              name: "compat",
-              status: "fail",
-              detail:
-                "Precheck endpoint is unavailable in the current API process.",
-            },
-          ],
-          blocker:
-            "API precheck route not found. Restart the API server to load the latest backend routes.",
-        },
-        {
-          provider: "openai",
-          ready: false,
-          checks: [
-            {
-              name: "compat",
-              status: "fail",
-              detail:
-                "Precheck endpoint is unavailable in the current API process.",
-            },
-          ],
-          blocker:
-            "API precheck route not found. Restart the API server to load the latest backend routes.",
-        },
-      ],
+      results: providers.map((p) => ({
+        provider: p as ModelBenchmarkPrecheckResponse["results"][number]["provider"],
+        ready: p === "local-extractive",
+        checks: [
+          {
+            name: "compat",
+            status: (p === "local-extractive" ? "pass" : "fail") as "pass" | "fail" | "warn",
+            detail:
+              p === "local-extractive"
+                ? "Local provider does not require precheck endpoint support."
+                : "Precheck endpoint is unavailable in the current API process.",
+          },
+        ],
+        blocker:
+          p === "local-extractive"
+            ? undefined
+            : "API precheck route not found. Restart the API server to load the latest backend routes.",
+      })),
       nextAction:
         "Restart API (npm run api:dev) and run Precheck again. If needed, restart web dev server too.",
     };
@@ -135,11 +115,13 @@ export async function getModelBenchmarkPrecheck(): Promise<ModelBenchmarkPrechec
   return parseResponse<ModelBenchmarkPrecheckResponse>(response);
 }
 
-export async function runModelBenchmark(): Promise<ModelBenchmarkRunResponse> {
+export async function runModelBenchmark(
+  providers: string[] = ["local-extractive", "ollama", "groq"],
+): Promise<ModelBenchmarkRunResponse> {
   const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark/run`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ providers: ["local-extractive", "ollama", "openai"] }),
+    body: JSON.stringify({ providers }),
   });
 
   return parseResponse<ModelBenchmarkRunResponse>(response);

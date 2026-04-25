@@ -1200,3 +1200,34 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.benchmark-provider-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0 2px;
+  flex-wrap: wrap;
+}
+
+.benchmark-provider-selector__label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.benchmark-provider-selector__option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-text, inherit);
+}
+
+.benchmark-provider-selector__option input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--color-accent, #6c63ff);
+}

@@ -130,6 +130,11 @@ export default function App() {
   const [modelBenchmarkPrecheckMessage, setModelBenchmarkPrecheckMessage] = useState("");
   const [modelBenchmarkPrecheckMessageIsError, setModelBenchmarkPrecheckMessageIsError] =
     useState(false);
+  const [benchmarkProviders, setBenchmarkProviders] = useState<string[]>([
+    "local-extractive",
+    "ollama",
+    "groq",
+  ]);
 
   // App state
   const [appState, setAppState] = useState<AppState>("idle");
@@ -539,7 +544,7 @@ export default function App() {
     setModelBenchmarkPrecheckLoading(true);
 
     try {
-      const precheck = await getModelBenchmarkPrecheck();
+      const precheck = await getModelBenchmarkPrecheck(benchmarkProviders);
       setModelBenchmarkPrecheck(precheck);
       reportModelBenchmarkPrecheckMessage(
         precheck.phase4Ready
@@ -554,13 +559,13 @@ export default function App() {
     } finally {
       setModelBenchmarkPrecheckLoading(false);
     }
-  }, [reportModelBenchmarkPrecheckMessage]);
+  }, [reportModelBenchmarkPrecheckMessage, benchmarkProviders]);
 
   const executeModelBenchmarkRun = useCallback(async () => {
     setModelBenchmarkRunLoading(true);
 
     try {
-      const response = await runModelBenchmark();
+      const response = await runModelBenchmark(benchmarkProviders);
       reportModelBenchmarkMessage(
         response.success
           ? "Benchmark run completed. Artifact updated."
@@ -576,7 +581,7 @@ export default function App() {
     } finally {
       setModelBenchmarkRunLoading(false);
     }
-  }, [loadModelBenchmark, loadModelBenchmarkPrecheck, reportModelBenchmarkMessage]);
+  }, [loadModelBenchmark, loadModelBenchmarkPrecheck, reportModelBenchmarkMessage, benchmarkProviders]);
 
   useEffect(() => {
     if (outputTab !== "embeddings") {
@@ -902,6 +907,8 @@ export default function App() {
           modelBenchmarkMessageIsError={modelBenchmarkMessageIsError}
           modelBenchmarkPrecheckMessage={modelBenchmarkPrecheckMessage}
           modelBenchmarkPrecheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
+          benchmarkProviders={benchmarkProviders}
+          onChangeBenchmarkProviders={setBenchmarkProviders}
         />
       </section>
     </main>
@@ -939,6 +946,8 @@ interface ResultPanelProps {
   modelBenchmarkMessageIsError: boolean;
   modelBenchmarkPrecheckMessage: string;
   modelBenchmarkPrecheckMessageIsError: boolean;
+  benchmarkProviders: string[];
+  onChangeBenchmarkProviders: (providers: string[]) => void;
 }
 
 function ResultPanel({
@@ -972,6 +981,8 @@ function ResultPanel({
   modelBenchmarkMessageIsError,
   modelBenchmarkPrecheckMessage,
   modelBenchmarkPrecheckMessageIsError,
+  benchmarkProviders,
+  onChangeBenchmarkProviders,
 }: ResultPanelProps) {
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
@@ -1168,11 +1179,20 @@ function ResultPanel({
           messageIsError={modelBenchmarkMessageIsError}
           precheckMessage={modelBenchmarkPrecheckMessage}
           precheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
+          providers={benchmarkProviders}
+          onChangeProviders={onChangeBenchmarkProviders}
         />
       )}
     </section>
   );
 }
+
+const BENCHMARK_PROVIDER_OPTIONS = [
+  { id: "local-extractive", label: "local" },
+  { id: "ollama", label: "ollama" },
+  { id: "groq", label: "groq" },
+  { id: "openai", label: "openai" },
+];
 
 function ModelBenchmarkView({
   benchmark,
@@ -1187,6 +1207,8 @@ function ModelBenchmarkView({
   messageIsError,
   precheckMessage,
   precheckMessageIsError,
+  providers,
+  onChangeProviders,
 }: {
   benchmark: ModelBenchmarkResponse | undefined;
   precheck: ModelBenchmarkPrecheckResponse | undefined;
@@ -1200,8 +1222,16 @@ function ModelBenchmarkView({
   messageIsError: boolean;
   precheckMessage: string;
   precheckMessageIsError: boolean;
+  providers: string[];
+  onChangeProviders: (providers: string[]) => void;
 }) {
-  const [selectedProvider, setSelectedProvider] = useState("openai");
+  const toggleProvider = (id: string) => {
+    const next = providers.includes(id)
+      ? providers.filter((p) => p !== id)
+      : [...providers, id];
+    if (next.length > 0) onChangeProviders(next);
+  };
+  const [selectedProvider, setSelectedProvider] = useState("groq");
   const selected =
     benchmark?.providers.find((provider) => provider.provider === selectedProvider) ??
     benchmark?.providers[0];
@@ -1211,7 +1241,7 @@ function ModelBenchmarkView({
       return;
     }
 
-    setSelectedProvider(benchmark.providers[0]?.provider ?? "openai");
+    setSelectedProvider(benchmark.providers[0]?.provider ?? "groq");
   }, [benchmark, selectedProvider]);
 
   return (
@@ -1244,6 +1274,21 @@ function ModelBenchmarkView({
             {loading ? "Refreshing" : "Refresh"}
           </button>
         </div>
+      </div>
+
+      <div className="benchmark-provider-selector">
+        <span className="benchmark-provider-selector__label">Providers:</span>
+        {BENCHMARK_PROVIDER_OPTIONS.map((opt) => (
+          <label key={opt.id} className="benchmark-provider-selector__option">
+            <input
+              type="checkbox"
+              checked={providers.includes(opt.id)}
+              onChange={() => toggleProvider(opt.id)}
+              disabled={runLoading || precheckLoading}
+            />
+            {opt.label}
+          </label>
+        ))}
       </div>
 
       <p
