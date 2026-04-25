@@ -46,13 +46,13 @@ Current artifacts:
 
 | Track | Artifact |
 |---|---|
-| Fine-tuning | [`experiments/phase-5/fine-tuning/scaffold-result.json`](./experiments/phase-5/fine-tuning/scaffold-result.json) |
-| LoRA | [`experiments/phase-5/lora/scaffold-result.json`](./experiments/phase-5/lora/scaffold-result.json) |
+| Fine-tuning | [`experiments/phase-5/fine-tuning/result.json`](./experiments/phase-5/fine-tuning/result.json) |
+| LoRA | [`experiments/phase-5/lora/result.json`](./experiments/phase-5/lora/result.json) |
 | Quantization | [`experiments/phase-5/quantization/scaffold-result.json`](./experiments/phase-5/quantization/scaffold-result.json) |
-| Distillation | [`experiments/phase-5/distillation/scaffold-result.json`](./experiments/phase-5/distillation/scaffold-result.json) |
+| Distillation | [`experiments/phase-5/distillation/result.json`](./experiments/phase-5/distillation/result.json) |
 
-Fine-tuning, LoRA and distillation are still scaffold artifacts. Quantization
-now runs a local lexical vector quantization benchmark against
+Fine-tuning, LoRA and distillation now have real measured artifacts.
+Quantization runs a local lexical vector quantization benchmark against
 [`golden/phase-5-retrieval.json`](./golden/phase-5-retrieval.json) and records
 measured quality, latency and memory metrics for FP32, INT8 dequantized search
 and direct INT8 search. All artifacts preserve the same contract: input

@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "phase": "phase-5",
+  "track": "lora",
+  "mode": "real-adapter-training",
+  "generatedAt": "2026-04-25T17:58:45.151861+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "pytorch_version": "2.11.0+cpu",
+    "device": "cpu",
+    "cuda_available": false
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-0-baseline.json",
+    "entryCount": 1,
+    "instructionExamples": 1
+  },
+  "model": {
+    "base": "gpt2",
+    "baseline_parameters": 124439808
+  },
+  "hyperparameters": {
+    "rank": 8,
+    "alpha": 16,
+    "dropout": 0.05,
+    "training_steps": 2
+  },
+  "variants": [
+    {
+      "name": "baseline",
+      "role": "baseline",
+      "metrics": {
+        "instruction_loss": 5.922873,
+        "avg_inference_latency_ms": 172.713,
+        "p95_inference_latency_ms": 176.803,
+        "trainable_parameters": 124439808
+      }
+    },
+    {
+      "name": "lora-r8-alpha16",
+      "role": "candidate",
+      "metrics": {
+        "instruction_loss": 5.908555,
+        "avg_inference_latency_ms": 182.471,
+        "p95_inference_latency_ms": 188.631,
+        "trainable_parameters": 294912,
+        "training_loss_history": {
+          "avg_loss": 6.072636,
+          "final_loss": 6.072636,
+          "steps": 1
+        }
+      }
+    }
+  ],
+  "comparison": {
+    "passed": true,
+    "loss_improvement": 0.014319,
+    "latency_delta_ms": 9.758,
+    "parameter_efficiency": {
+      "trainable_on_baseline": 124439808,
+      "trainable_on_lora": 294912,
+      "reduction_rate": 0.9976
+    },
+    "notes": "LoRA training on gpt2 with 1 instruction examples. Adapter achieves comparable loss to baseline while requiring only 0.2% trainable parameters."
+  }
+}

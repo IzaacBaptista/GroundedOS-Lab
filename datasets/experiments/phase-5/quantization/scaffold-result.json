@@ -3,7 +3,7 @@
   "phase": "phase-5",
   "track": "quantization",
   "mode": "local-lexical-vector-quantization",
-  "generatedAt": "2026-04-25T14:00:08.921723+00:00",
+  "generatedAt": "2026-04-25T17:52:46.378486+00:00",
   "environment": {
     "python": "3.12.3",
     "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
@@ -25,11 +25,12 @@
   },
   "method": {
     "baseline": "normalized lexical vectors stored as fp32",
-    "candidate": "per-vector symmetric int8 quantization",
+    "candidate": "per-vector symmetric quantization (int8 and int4)",
     "searchPaths": [
       "fp32 cosine",
       "int8 dequantized cosine",
-      "int8 direct normalized dot product"
+      "int8 direct normalized dot product",
+      "int4 direct normalized dot product"
     ],
     "dimensions": 134,
     "chunkCount": 7,
@@ -41,8 +42,8 @@
       "role": "baseline",
       "metrics": {
         "recallAt1": 1.0,
-        "avgLatencyMs": 0.165975,
-        "p95LatencyMs": 0.175915,
+        "avgLatencyMs": 0.087224,
+        "p95LatencyMs": 0.096109,
         "memoryBytes": 3752
       },
       "hyperparameters": {
@@ -117,8 +118,8 @@
       "role": "candidate",
       "metrics": {
         "recallAt1": 1.0,
-        "avgLatencyMs": 0.177215,
-        "p95LatencyMs": 0.175004,
+        "avgLatencyMs": 0.090643,
+        "p95LatencyMs": 0.100634,
         "memoryBytes": 994,
         "memoryReductionRate": 0.735075
       },
@@ -195,8 +196,8 @@
       "role": "candidate",
       "metrics": {
         "recallAt1": 1.0,
-        "avgLatencyMs": 0.155197,
-        "p95LatencyMs": 0.168956,
+        "avgLatencyMs": 0.081785,
+        "p95LatencyMs": 0.090037,
         "memoryBytes": 994,
         "memoryReductionRate": 0.735075
       },
@@ -268,24 +269,110 @@
           "hit": true
         }
       ]
+    },
+    {
+      "name": "lexical-int4-symmetric-direct",
+      "role": "candidate",
+      "metrics": {
+        "recallAt1": 1.0,
+        "avgLatencyMs": 0.075996,
+        "p95LatencyMs": 0.08371,
+        "memoryBytes": 532,
+        "memoryReductionRate": 0.858209
+      },
+      "hyperparameters": {
+        "precision": "int4",
+        "method": "per-vector-symmetric",
+        "dequantizeForSearch": false,
+        "similarity": "normalized-int4-dot-product"
+      },
+      "perQuery": [
+        {
+          "id": "p5-gd-001",
+          "question": "Which pipeline records offsets and preserves lineage metadata?",
+          "topChunkId": "phase-5-retrieval-001:section-2:chunk-1",
+          "topScore": 0.48478,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-2:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-002",
+          "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+          "topChunkId": "phase-5-retrieval-001:section-3:chunk-1",
+          "topScore": 0.432512,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-3:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-003",
+          "question": "Which stage reorders candidate chunks after initial retrieval?",
+          "topChunkId": "phase-5-retrieval-001:section-4:chunk-1",
+          "topScore": 0.433013,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-4:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-004",
+          "question": "How is session memory isolated?",
+          "topChunkId": "phase-5-retrieval-001:section-5:chunk-1",
+          "topScore": 0.420288,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-5:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-005",
+          "question": "Which request metrics feed the trade-offs dashboard?",
+          "topChunkId": "phase-5-retrieval-001:section-6:chunk-1",
+          "topScore": 0.515347,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-6:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-006",
+          "question": "What should a good quantized retrieval path preserve?",
+          "topChunkId": "phase-5-retrieval-001:section-7:chunk-1",
+          "topScore": 0.442326,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-7:chunk-1"
+          ],
+          "hit": true
+        }
+      ]
     }
   ],
   "comparison": {
-    "dequantizedCandidateVsBaseline": {
+    "dequantizedInt8VsBaseline": {
       "recallAt1": 0.0,
-      "avgLatencyMs": 0.01124,
-      "p95LatencyMs": -0.000911,
+      "avgLatencyMs": 0.003419,
+      "p95LatencyMs": 0.004525,
       "memoryBytes": -2758,
       "memoryReductionRate": 0.735075
     },
-    "directCandidateVsBaseline": {
+    "directInt8VsBaseline": {
       "recallAt1": 0.0,
-      "avgLatencyMs": -0.010778,
-      "p95LatencyMs": -0.006959,
+      "avgLatencyMs": -0.005439,
+      "p95LatencyMs": -0.006072,
       "memoryBytes": -2758,
       "memoryReductionRate": 0.735075
+    },
+    "directInt4VsBaseline": {
+      "recallAt1": 0.0,
+      "avgLatencyMs": -0.011228,
+      "p95LatencyMs": -0.012399,
+      "memoryBytes": -3220,
+      "memoryReductionRate": 0.858209
     },
     "passed": true,
-    "notes": "This is a local vector-quantization experiment for the current RAG dataset. Direct INT8 search avoids dequantizing before similarity scoring and keeps the Phase 5 path dependency-free."
+    "notes": "This is a local vector-quantization experiment for the current RAG dataset. Compares INT8 and INT4 symmetric quantization. Direct search avoids dequantizing before similarity scoring and keeps the Phase 5 path dependency-free. INT4 achieves 2x more compression than INT8 with acceptable quality tradeoff."
   }
 }

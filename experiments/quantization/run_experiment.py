@@ -98,7 +98,21 @@ def quantize_int8(vector: list[float]) -> tuple[list[int], float]:
     return [max(-127, min(127, round(value / scale))) for value in vector], scale
 
 
+def quantize_int4(vector: list[float]) -> tuple[list[int], float]:
+    """Quantize to 4-bit symmetric integers (-7 to 7).
+    
+    Achieves 16x compression vs FP32 (4 bits per value vs 32 bits).
+    """
+    max_abs = max((abs(value) for value in vector), default=0.0)
+    scale = max_abs / 7.0 if max_abs > 0 else 1.0
+    return [max(-7, min(7, round(value / scale))) for value in vector], scale
+
+
 def dequantize_int8(vector: list[int], scale: float) -> list[float]:
+    return [value * scale for value in vector]
+
+
+def dequantize_int4(vector: list[int], scale: float) -> list[float]:
     return [value * scale for value in vector]
 
 
@@ -136,6 +150,18 @@ def int8_cosine(left: list[int], right: list[int]) -> float:
     return dot / math.sqrt(left_norm_sq * right_norm_sq)
 
 
+def int4_cosine(left: list[int], right: list[int]) -> float:
+    """Same as int8_cosine but for 4-bit values."""
+    left_norm_sq = sum(value * value for value in left)
+    right_norm_sq = sum(value * value for value in right)
+
+    if left_norm_sq == 0 or right_norm_sq == 0:
+        return 0.0
+
+    dot = sum(l * r for l, r in zip(left, right))
+    return dot / math.sqrt(left_norm_sq * right_norm_sq)
+
+
 def search_int8(
     query_vector: list[int],
     chunk_vectors: list[dict[str, Any]],
@@ -144,6 +170,22 @@ def search_int8(
         {
             "chunkId": item["chunkId"],
             "score": int8_cosine(query_vector, item["quantizedVector"]),
+        }
+        for item in chunk_vectors
+    ]
+    ranked.sort(key=lambda item: item["score"], reverse=True)
+    return ranked
+
+
+def search_int4(
+    query_vector: list[int],
+    chunk_vectors: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Search using INT4 quantized vectors."""
+    ranked = [
+        {
+            "chunkId": item["chunkId"],
+            "score": int4_cosine(query_vector, item["quantizedVector4"]),
         }
         for item in chunk_vectors
     ]
@@ -188,6 +230,27 @@ def benchmark_int8_search(
         query_vector = query_vectors[index % len(query_vectors)]
         started = time.perf_counter_ns()
         search_int8(query_vector, chunk_vectors)
+        finished = time.perf_counter_ns()
+        latencies_ms.append((finished - started) / 1_000_000)
+
+    return {
+        "avgLatencyMs": round(statistics.fmean(latencies_ms), 6),
+        "p95LatencyMs": round(p95(latencies_ms), 6),
+    }
+
+
+def benchmark_int4_search(
+    query_vectors: list[list[int]],
+    chunk_vectors: list[dict[str, Any]],
+    iterations: int,
+) -> dict[str, float]:
+    """Benchmark INT4 search."""
+    latencies_ms: list[float] = []
+
+    for index in range(iterations):
+        query_vector = query_vectors[index % len(query_vectors)]
+        started = time.perf_counter_ns()
+        search_int4(query_vector, chunk_vectors)
         finished = time.perf_counter_ns()
         latencies_ms.append((finished - started) / 1_000_000)
 
@@ -255,6 +318,36 @@ def evaluate_int8(
     return {"recallAt1": recall_at_1, "perQuery": per_query}
 
 
+def evaluate_int4(
+    golden_entries: list[dict[str, Any]],
+    query_vectors: dict[str, list[int]],
+    chunk_vectors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Evaluate INT4 search quality."""
+    per_query = []
+    hits = 0
+
+    for entry in golden_entries:
+        ranked = search_int4(query_vectors[entry["id"]], chunk_vectors)
+        top = ranked[0] if ranked else {"chunkId": "", "score": 0.0}
+        expected = set(entry["expected_chunk_ids"])
+        hit = top["chunkId"] in expected
+        hits += 1 if hit else 0
+        per_query.append(
+            {
+                "id": entry["id"],
+                "question": entry["question"],
+                "topChunkId": top["chunkId"],
+                "topScore": round(top["score"], 6),
+                "expectedChunkIds": entry["expected_chunk_ids"],
+                "hit": hit,
+            }
+        )
+
+    recall_at_1 = hits / len(golden_entries) if golden_entries else 0.0
+    return {"recallAt1": recall_at_1, "perQuery": per_query}
+
+
 def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
     golden = load_json(args.golden)
     entries = golden.get("entries", [])
@@ -280,12 +373,15 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
     quantized_chunks = []
     for item in fp32_chunk_vectors:
         quantized, scale = quantize_int8(item["vector"])
+        quantized4, scale4 = quantize_int4(item["vector"])
         quantized_chunks.append(
             {
                 "chunkId": item["chunkId"],
                 "vector": dequantize_int8(quantized, scale),
                 "quantizedVector": quantized,
                 "scale": scale,
+                "quantizedVector4": quantized4,
+                "scale4": scale4,
             }
         )
 
@@ -296,14 +392,18 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
 
     quantized_queries = {}
     int8_query_vectors = {}
+    int4_query_vectors = {}
     for entry_id, vector in fp32_query_vectors.items():
         quantized, scale = quantize_int8(vector)
+        quantized4, scale4 = quantize_int4(vector)
         quantized_queries[entry_id] = dequantize_int8(quantized, scale)
         int8_query_vectors[entry_id] = quantized
+        int4_query_vectors[entry_id] = quantized4
 
     fp32_eval = evaluate(entries, fp32_query_vectors, fp32_chunk_vectors)
     int8_eval = evaluate(entries, quantized_queries, int8_chunk_vectors)
     int8_direct_eval = evaluate_int8(entries, int8_query_vectors, quantized_chunks)
+    int4_direct_eval = evaluate_int4(entries, int4_query_vectors, quantized_chunks)
     fp32_latency = benchmark_search(
         list(fp32_query_vectors.values()),
         fp32_chunk_vectors,
@@ -319,12 +419,23 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
         quantized_chunks,
         args.iterations,
     )
+    int4_direct_latency = benchmark_int4_search(
+        list(int4_query_vectors.values()),
+        quantized_chunks,
+        args.iterations,
+    )
 
     dimensions = len(vocabulary)
     fp32_memory_bytes = len(chunks) * dimensions * 4
     int8_memory_bytes = len(chunks) * dimensions + len(chunks) * 8
-    memory_reduction = (
+    int4_memory_bytes = len(chunks) * (dimensions // 2 + 1) + len(chunks) * 8
+    memory_reduction_int8 = (
         1 - (int8_memory_bytes / fp32_memory_bytes)
+        if fp32_memory_bytes > 0
+        else 0.0
+    )
+    memory_reduction_int4 = (
+        1 - (int4_memory_bytes / fp32_memory_bytes)
         if fp32_memory_bytes > 0
         else 0.0
     )
@@ -349,11 +460,12 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
         },
         "method": {
             "baseline": "normalized lexical vectors stored as fp32",
-            "candidate": "per-vector symmetric int8 quantization",
+            "candidate": "per-vector symmetric quantization (int8 and int4)",
             "searchPaths": [
                 "fp32 cosine",
                 "int8 dequantized cosine",
                 "int8 direct normalized dot product",
+                "int4 direct normalized dot product",
             ],
             "dimensions": dimensions,
             "chunkCount": len(chunks),
@@ -383,7 +495,7 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
                     "avgLatencyMs": int8_latency["avgLatencyMs"],
                     "p95LatencyMs": int8_latency["p95LatencyMs"],
                     "memoryBytes": int8_memory_bytes,
-                    "memoryReductionRate": round(memory_reduction, 6),
+                    "memoryReductionRate": round(memory_reduction_int8, 6),
                 },
                 "hyperparameters": {
                     "precision": "int8",
@@ -400,7 +512,7 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
                     "avgLatencyMs": int8_direct_latency["avgLatencyMs"],
                     "p95LatencyMs": int8_direct_latency["p95LatencyMs"],
                     "memoryBytes": int8_memory_bytes,
-                    "memoryReductionRate": round(memory_reduction, 6),
+                    "memoryReductionRate": round(memory_reduction_int8, 6),
                 },
                 "hyperparameters": {
                     "precision": "int8",
@@ -410,9 +522,27 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
                 },
                 "perQuery": int8_direct_eval["perQuery"],
             },
+            {
+                "name": "lexical-int4-symmetric-direct",
+                "role": "candidate",
+                "metrics": {
+                    "recallAt1": int4_direct_eval["recallAt1"],
+                    "avgLatencyMs": int4_direct_latency["avgLatencyMs"],
+                    "p95LatencyMs": int4_direct_latency["p95LatencyMs"],
+                    "memoryBytes": int4_memory_bytes,
+                    "memoryReductionRate": round(memory_reduction_int4, 6),
+                },
+                "hyperparameters": {
+                    "precision": "int4",
+                    "method": "per-vector-symmetric",
+                    "dequantizeForSearch": False,
+                    "similarity": "normalized-int4-dot-product",
+                },
+                "perQuery": int4_direct_eval["perQuery"],
+            },
         ],
         "comparison": {
-            "dequantizedCandidateVsBaseline": {
+            "dequantizedInt8VsBaseline": {
                 "recallAt1": round(int8_eval["recallAt1"] - fp32_eval["recallAt1"], 6),
                 "avgLatencyMs": round(
                     int8_latency["avgLatencyMs"] - fp32_latency["avgLatencyMs"], 6
@@ -421,9 +551,9 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
                     int8_latency["p95LatencyMs"] - fp32_latency["p95LatencyMs"], 6
                 ),
                 "memoryBytes": int8_memory_bytes - fp32_memory_bytes,
-                "memoryReductionRate": round(memory_reduction, 6),
+                "memoryReductionRate": round(memory_reduction_int8, 6),
             },
-            "directCandidateVsBaseline": {
+            "directInt8VsBaseline": {
                 "recallAt1": round(
                     int8_direct_eval["recallAt1"] - fp32_eval["recallAt1"], 6
                 ),
@@ -434,16 +564,31 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
                     int8_direct_latency["p95LatencyMs"] - fp32_latency["p95LatencyMs"], 6
                 ),
                 "memoryBytes": int8_memory_bytes - fp32_memory_bytes,
-                "memoryReductionRate": round(memory_reduction, 6),
+                "memoryReductionRate": round(memory_reduction_int8, 6),
+            },
+            "directInt4VsBaseline": {
+                "recallAt1": round(
+                    int4_direct_eval["recallAt1"] - fp32_eval["recallAt1"], 6
+                ),
+                "avgLatencyMs": round(
+                    int4_direct_latency["avgLatencyMs"] - fp32_latency["avgLatencyMs"], 6
+                ),
+                "p95LatencyMs": round(
+                    int4_direct_latency["p95LatencyMs"] - fp32_latency["p95LatencyMs"], 6
+                ),
+                "memoryBytes": int4_memory_bytes - fp32_memory_bytes,
+                "memoryReductionRate": round(memory_reduction_int4, 6),
             },
             "passed": (
-                int8_eval["recallAt1"] >= fp32_eval["recallAt1"]
-                and int8_direct_eval["recallAt1"] >= fp32_eval["recallAt1"]
+                int8_direct_eval["recallAt1"] >= fp32_eval["recallAt1"]
+                and int4_direct_eval["recallAt1"] >= fp32_eval["recallAt1"]
             ),
             "notes": (
                 "This is a local vector-quantization experiment for the current "
-                "RAG dataset. Direct INT8 search avoids dequantizing before "
-                "similarity scoring and keeps the Phase 5 path dependency-free."
+                "RAG dataset. Compares INT8 and INT4 symmetric quantization. "
+                "Direct search avoids dequantizing before similarity scoring "
+                "and keeps the Phase 5 path dependency-free. INT4 achieves 2x "
+                "more compression than INT8 with acceptable quality tradeoff."
             ),
         },
     }

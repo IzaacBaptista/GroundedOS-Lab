@@ -43,6 +43,8 @@ interface Phase5Artifact {
     passed?: boolean;
     notes?: string;
     directCandidateVsBaseline?: Record<string, number>;
+    directInt8VsBaseline?: Record<string, number>;
+    directInt4VsBaseline?: Record<string, number>;
     candidateVsBaseline?: Record<string, number>;
   };
 }
@@ -293,11 +295,16 @@ export class LabService {
   }
 
   private async loadExperiment(meta: (typeof EXPERIMENTS)[number]): Promise<LabExperiment> {
-    const artifactPath = `datasets/experiments/phase-5/${meta.id}/scaffold-result.json`;
-    const fullPath = join(REPO_ROOT, artifactPath);
+    const candidatePaths = [
+      `datasets/experiments/phase-5/${meta.id}/result.json`,
+      `datasets/experiments/phase-5/${meta.id}/scaffold-result.json`,
+    ];
 
-    try {
-      const artifact = JSON.parse(await readFile(fullPath, "utf-8")) as Phase5Artifact;
+    for (const artifactPath of candidatePaths) {
+      const fullPath = join(REPO_ROOT, artifactPath);
+
+      try {
+        const artifact = JSON.parse(await readFile(fullPath, "utf-8")) as Phase5Artifact;
       const measured = isMeasuredArtifact(artifact);
 
       return {
@@ -324,19 +331,22 @@ export class LabService {
         notes: artifact.comparison?.notes,
         reproduceCommand: meta.command,
       };
-    } catch {
-      return {
-        id: meta.id,
-        concept: meta.concept,
-        domain: "Model Optimization",
-        status: "missing",
-        goal: meta.goal,
-        artifactPath,
-        variants: [],
-        keyMetrics: [],
-        reproduceCommand: meta.command,
-      };
+      } catch {
+        continue;
+      }
     }
+
+    return {
+      id: meta.id,
+      concept: meta.concept,
+      domain: "Model Optimization",
+      status: "missing",
+      goal: meta.goal,
+      artifactPath: `datasets/experiments/phase-5/${meta.id}/result.json`,
+      variants: [],
+      keyMetrics: [],
+      reproduceCommand: meta.command,
+    };
   }
 
   private toGuardrailCheckItem(id: string, result: GuardrailResult): GuardrailCheckItem {
@@ -399,6 +409,8 @@ function keyMetricsFor(artifact: Phase5Artifact): LabExperimentMetric[] {
 
   const candidateComparison =
     artifact.comparison?.candidateVsBaseline ??
+    artifact.comparison?.directInt8VsBaseline ??
+    artifact.comparison?.directInt4VsBaseline ??
     artifact.comparison?.directCandidateVsBaseline ??
     {};
 

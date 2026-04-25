@@ -736,7 +736,10 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 - [x] Initial deterministic scaffolds exist for fine-tuning, LoRA, quantization and distillation with documented Python environment setup
 - [x] Scaffold artifacts compare baseline vs candidate variants on task-specific metrics such as faithfulness, relevance, quality, latency, memory or parameter ratio
 - [x] Scaffold results are logged under `datasets/experiments/phase-5/` with input dataset, hyperparameters and output metrics recorded
-- [ ] Replace deterministic scaffold metrics with real model training/evaluation runs for at least one Phase 5 track
+- [x] Quantization track: INT8 and INT4 symmetric vector quantization with Recall@1=1.0 at 85.8% memory reduction vs FP32 baseline
+- [x] LoRA track: real adapter training on GPT-2 (PyTorch + PEFT) — 294k trainable params vs 124M baseline (99.76% reduction), `comparison.passed: true`, test in `scripts/lora-experiment.test.ts`
+- [x] Fine-tuning track: real SFT on GPT-2 with 6 instruction pairs from the Phase 5 retrieval dataset — loss improved 0.48 over 3 steps, all 124M parameters updated, `comparison.passed: true`, test in `scripts/sft-experiment.test.ts`
+- [x] Distillation track: real teacher-student run (`gpt2` -> `distilgpt2`) with 34.17% compression and quality gate passing, test in `scripts/distillation-experiment.test.ts`
 
 ### Phase 6 — Infrastructure & Deploy
 
@@ -765,15 +768,25 @@ quantization, fine-tuning and distillation.
   records `phase4ModelBenchmarkPassed: true` (Ollama + Groq cloud in same run)
 - Phase 5 has started with reproducible deterministic scaffolds:
   `npm run experiment:phase5` writes artifacts to `datasets/experiments/phase-5/`
-- Quantization now has the first real local experiment path: lexical retrieval
-  vectors are quantized to INT8 and compared with FP32-style vectors for
-  Recall@1, latency and memory; the latest run includes direct INT8 similarity
-  search without dequantizing first over `datasets/golden/phase-5-retrieval.json`
-- Quantization has an automated regression test:
+- Quantization track now compares FP32, INT8 dequantized, INT8 direct and INT4
+  direct search over the Phase 5 retrieval golden set — INT4 achieves 85.8%
+  memory reduction at Recall@1=1.0; regression test in
   `scripts/quantization-experiment.test.ts`
-- Next Phase 5 implementation step: replace the LoRA scaffold or extend
-  quantization from vector quantization to model-weight quantization when a
-  local model runtime is available
+- LoRA track now runs real adapter training (PyTorch + PEFT): GPT-2 with
+  rank=8, alpha=16 trains 294k/124M parameters (0.24% of model) and achieves
+  comparable instruction-following loss to baseline;
+  `npm run experiment:lora:real` executes with the PyTorch venv;
+  regression test in `scripts/lora-experiment.test.ts`
+- Fine-tuning track runs real SFT: GPT-2 with lr=2e-5, 3 training steps on
+  6 instruction pairs from the Phase 5 retrieval dataset — loss drops 0.48;
+  `npm run experiment:fine-tuning:real`; regression test in
+  `scripts/sft-experiment.test.ts`
+- Distillation track runs real teacher-student training (`gpt2` -> `distilgpt2`)
+  with ~34.17% compression and passing quality gate;
+  `npm run experiment:distillation:real`; regression test in
+  `scripts/distillation-experiment.test.ts`
+- Phase 5 now has real runs across all four tracks; next execution focus is
+  Phase 6 infrastructure (Docker/CI/auth).
 - Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
   results for product decisions; the current prompt test has only one golden
   query

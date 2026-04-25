@@ -27,7 +27,11 @@ interface QuantizationArtifact {
   }>;
   comparison: {
     passed: boolean;
-    directCandidateVsBaseline: {
+    directInt8VsBaseline: {
+      recallAt1: number;
+      memoryReductionRate: number;
+    };
+    directInt4VsBaseline?: {
       recallAt1: number;
       memoryReductionRate: number;
     };
@@ -70,13 +74,14 @@ describe("Phase 5 quantization experiment", () => {
       expect(artifact.inputDataset.entryCount).toBe(6);
       expect(artifact.method.chunkCount).toBe(7);
       expect(artifact.method.searchPaths).toContain("int8 direct normalized dot product");
+      expect(artifact.method.searchPaths).toContain("int4 direct normalized dot product");
       expect(artifact.comparison.passed).toBe(true);
       expect(fp32.metrics.recallAt1).toBe(1);
       expect(int8Direct.metrics.recallAt1).toBe(fp32.metrics.recallAt1);
       expect(int8Direct.metrics.memoryBytes).toBeLessThan(fp32.metrics.memoryBytes);
-      expect(artifact.comparison.directCandidateVsBaseline.recallAt1).toBe(0);
+      expect(artifact.comparison.directInt8VsBaseline.recallAt1).toBe(0);
       expect(
-        artifact.comparison.directCandidateVsBaseline.memoryReductionRate
+        artifact.comparison.directInt8VsBaseline.memoryReductionRate
       ).toBeGreaterThan(0.7);
     } finally {
       await rm(tempDir, { recursive: true, force: true });

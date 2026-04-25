@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "phase": "phase-5",
+  "track": "fine-tuning",
+  "mode": "real-sft",
+  "generatedAt": "2026-04-25T18:35:51.047459+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "pytorch_version": "2.11.0+cpu",
+    "device": "cpu",
+    "cuda_available": false
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-5-retrieval.json",
+    "entryCount": 6,
+    "instructionPairs": 6
+  },
+  "model": {
+    "base": "gpt2",
+    "total_parameters": 124439808
+  },
+  "hyperparameters": {
+    "learning_rate": 2e-05,
+    "training_steps": 3,
+    "optimizer": "AdamW"
+  },
+  "variants": [
+    {
+      "name": "baseline",
+      "role": "baseline",
+      "metrics": {
+        "instruction_loss": 5.416073,
+        "avg_inference_latency_ms": 193.551,
+        "p95_inference_latency_ms": 193.881,
+        "trainable_parameters": 124439808
+      }
+    },
+    {
+      "name": "sft-full",
+      "role": "candidate",
+      "metrics": {
+        "instruction_loss": 4.938337,
+        "avg_inference_latency_ms": 186.814,
+        "p95_inference_latency_ms": 186.146,
+        "trainable_parameters": 124439808,
+        "training_loss_history": {
+          "losses": [
+            5.486274,
+            5.65969,
+            5.384075
+          ],
+          "avg_loss": 5.510013,
+          "final_loss": 5.384075,
+          "steps": 3
+        }
+      }
+    }
+  ],
+  "comparison": {
+    "passed": true,
+    "loss_improvement": 0.477736,
+    "latency_delta_ms": -6.737,
+    "vs_lora": {
+      "sft_trainable_pct": 100.0,
+      "lora_trainable_pct_typical": 0.24,
+      "note": "SFT updates 100% of parameters vs LoRA's ~0.24%. LoRA is preferred for compute-constrained environments. SFT may converge faster when enough data is available."
+    },
+    "notes": "SFT on gpt2 with 6 instruction pairs. Loss improved by 0.4777 over 3 steps. All 124,439,808 parameters updated."
+  }
+}

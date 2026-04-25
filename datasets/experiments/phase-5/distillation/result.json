@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "phase": "phase-5",
+  "track": "distillation",
+  "mode": "real-teacher-student-distillation",
+  "generatedAt": "2026-04-25T19:10:56.688186+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "pytorch_version": "2.11.0+cpu",
+    "device": "cpu",
+    "cuda_available": false
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-5-retrieval.json",
+    "entryCount": 6,
+    "instructionPairs": 6,
+    "documentRef": "phase-5-retrieval-text"
+  },
+  "method": {
+    "teacherModel": "gpt2",
+    "studentModel": "distilgpt2",
+    "trainingSteps": 3,
+    "learningRate": 2e-05,
+    "alpha": 0.5,
+    "temperature": 2.0
+  },
+  "variants": [
+    {
+      "name": "teacher-gpt2",
+      "role": "baseline",
+      "metrics": {
+        "instructionLoss": 5.416073,
+        "avgLatencyMs": 191.870918,
+        "p95LatencyMs": 194.642634,
+        "parameterCount": 124439808
+      }
+    },
+    {
+      "name": "student-distilgpt2-distilled",
+      "role": "candidate",
+      "metrics": {
+        "instructionLoss": 5.383276,
+        "avgLatencyMs": 123.195026,
+        "p95LatencyMs": 125.281003,
+        "parameterCount": 81912576,
+        "parameterRatio": 0.658251,
+        "compressionRate": 0.341749,
+        "trainingAvgLoss": 22.489067,
+        "trainingFinalLoss": 20.329857
+      },
+      "hyperparameters": {
+        "steps": 3,
+        "learningRate": 2e-05,
+        "alpha": 0.5,
+        "temperature": 2.0
+      }
+    }
+  ],
+  "comparison": {
+    "candidateVsBaseline": {
+      "instructionLoss": -0.032797,
+      "avgLatencyMs": -68.675892,
+      "p95LatencyMs": -69.361631,
+      "parameterCount": -42527232,
+      "compressionRate": 0.341749
+    },
+    "passed": true,
+    "notes": "Teacher-student distillation run completed with real logits matching. Student should be significantly smaller while keeping instruction loss within acceptable degradation.",
+    "training": {
+      "steps": 3,
+      "avgTotalLoss": 22.489067,
+      "finalTotalLoss": 20.329857,
+      "avgCrossEntropy": 8.373051,
+      "avgKLDivergence": 9.151271,
+      "lossHistory": [
+        21.482071,
+        25.655273,
+        20.329857
+      ]
+    }
+  }
+}
