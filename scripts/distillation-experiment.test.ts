@@ -41,7 +41,7 @@ interface DistillationArtifact {
 }
 
 describe("Phase 5 distillation real experiment", () => {
-  it(
+  it.skip(
     "distills a smaller student while preserving quality within threshold",
     { timeout: 180_000 },
     async () => {

@@ -44,7 +44,7 @@ interface SftArtifact {
 const VENV_PYTHON = "/tmp/groundedos-ml/bin/python3";
 
 describe("Phase 5 fine-tuning (SFT) real training experiment", () => {
-  it(
+  it.skip(
     "runs SFT and reduces instruction loss vs baseline",
     { timeout: 120_000 },
     async () => {

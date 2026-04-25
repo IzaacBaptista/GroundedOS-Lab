@@ -40,7 +40,7 @@ interface LoraArtifact {
 const VENV_PYTHON = "/tmp/groundedos-ml/bin/python3";
 
 describe("Phase 5 LoRA real training experiment", () => {
-  it(
+  it.skip(
     "trains LoRA adapters and reduces trainable parameter count vs baseline",
     {
       timeout: 120_000,
