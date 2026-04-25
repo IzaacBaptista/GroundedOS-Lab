@@ -1,7 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import {
   deletePersistedRagIndex,
+  getPersistedRagEmbeddingMap,
   listPersistedRagIndexes,
+  type RagEmbeddingMapResponse,
   type RagIndexDeleteResponse,
   type RagIndexListResponse,
 } from "../../rag-service";
@@ -9,10 +11,14 @@ import { ApiConfigService } from "../../config/api-config";
 
 @Injectable()
 export class RagIndexService {
-  constructor(private readonly config: ApiConfigService) {}
+  constructor(@Inject(ApiConfigService) private readonly config: ApiConfigService) {}
 
   list(): Promise<RagIndexListResponse> {
     return listPersistedRagIndexes(this.config.indexDir);
+  }
+
+  embeddingMap(documentId: string): Promise<RagEmbeddingMapResponse> {
+    return getPersistedRagEmbeddingMap(documentId, this.config.indexDir);
   }
 
   delete(documentId: string): Promise<RagIndexDeleteResponse> {

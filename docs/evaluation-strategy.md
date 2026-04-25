@@ -168,6 +168,8 @@ hybrid retrieval improvement signal.
 
 - Each new provider or technique is evaluated against the current baseline before being declared an improvement
 - All benchmarks use the same golden dataset version for cross-phase comparability
+- Phase 4 model/provider benchmarks record skipped providers explicitly when
+  required local model or cloud credentials are not configured.
 
 ---
 
@@ -199,6 +201,34 @@ npm run eval:golden -- --dataset datasets/golden/phase-0-baseline.json
 
 # Output: per-entry pass/fail, aggregate metrics, comparison to previous baseline
 ```
+
+### Phase 4 model/provider benchmark
+
+```bash
+# Runs the local extractive baseline and records Ollama/OpenAI as skipped unless configured.
+npm run benchmark:models
+
+# Roadmap target run: local Ollama plus one cloud provider.
+GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b \
+OPENAI_API_KEY=<key> \
+OPENAI_MODEL=<model> \
+npm run benchmark:models -- --providers local-extractive,ollama,openai
+
+# Output: datasets/golden/baselines/phase-4-model-benchmark.json
+```
+
+### Phase 4 prompt A/B test
+
+```bash
+npm run experiment:prompts
+
+# Output: datasets/golden/baselines/phase-4-ab-prompt-test.json
+```
+
+The current A/B artifact reports a winner and confidence interval, but the
+result is not statistically conclusive while the golden dataset contains only
+one query. Add more golden entries before using the winner as a product
+decision.
 
 ---
 

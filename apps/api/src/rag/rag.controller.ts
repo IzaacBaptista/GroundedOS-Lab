@@ -4,6 +4,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Inject,
   Post,
   Req,
 } from "@nestjs/common";
@@ -31,7 +32,7 @@ type FastifyMultipartRequest = FastifyRequest & {
 
 @Controller("rag")
 export class RagController {
-  constructor(private readonly rag: RagService) {}
+  constructor(@Inject(RagService) private readonly rag: RagService) {}
 
   @Post("ask")
   @HttpCode(HttpStatus.OK)

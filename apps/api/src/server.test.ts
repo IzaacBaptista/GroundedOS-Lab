@@ -204,6 +204,60 @@ describe("api server", () => {
     });
   });
 
+  it("serves GET /rag/indexes/:documentId/embedding-map", async () => {
+    const indexDir = await createTempIndexDir();
+    const app = await createTestServer(indexDir);
+
+    await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      payload: {
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Embedding Map HTTP Test",
+        documentId: "embedding-map-http-test",
+      },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/rag/indexes/embedding-map-http-test/embedding-map",
+    });
+    const body = response.json() as {
+      document: { documentId: string };
+      index: { chunkCount: number };
+      projection: { method: string; xDimension: number; yDimension: number };
+      points: Array<{
+        chunkId: string;
+        x: number;
+        y: number;
+        clusterLabel: string;
+        textPreview: string;
+      }>;
+      clusters: Array<{ label: string; count: number }>;
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.document.documentId).toBe("embedding-map-http-test");
+    expect(body.index.chunkCount).toBe(2);
+    expect(body.projection.method).toBe("variance-dimensions");
+    expect(body.projection.xDimension).toBeGreaterThanOrEqual(0);
+    expect(body.projection.yDimension).toBeGreaterThanOrEqual(0);
+    expect(body.points).toHaveLength(2);
+    expect(body.points[0]).toMatchObject({
+      chunkId: "embedding-map-http-test:section-1:chunk-1",
+      clusterLabel: "section-1",
+      textPreview: "Alpha setup notes.",
+    });
+    expect(body.points.every((point) => point.x >= 0 && point.x <= 100)).toBe(true);
+    expect(body.points.every((point) => point.y >= 0 && point.y <= 100)).toBe(true);
+    expect(body.clusters.map((cluster) => cluster.label)).toEqual([
+      "section-1",
+      "section-2",
+    ]);
+  });
+
   it("returns validation errors as JSON", async () => {
     const app = await createTestServer();
     const response = await app.inject({

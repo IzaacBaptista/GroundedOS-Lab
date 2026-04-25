@@ -1,5 +1,6 @@
-import { Controller, Delete, Get, Param } from "@nestjs/common";
+import { Controller, Delete, Get, Inject, Param } from "@nestjs/common";
 import type {
+  RagEmbeddingMapResponse,
   RagIndexDeleteResponse,
   RagIndexListResponse,
 } from "../../rag-service";
@@ -7,11 +8,16 @@ import { RagIndexService } from "./rag-index.service";
 
 @Controller("rag/indexes")
 export class RagIndexController {
-  constructor(private readonly ragIndex: RagIndexService) {}
+  constructor(@Inject(RagIndexService) private readonly ragIndex: RagIndexService) {}
 
   @Get()
   list(): Promise<RagIndexListResponse> {
     return this.ragIndex.list();
+  }
+
+  @Get(":documentId/embedding-map")
+  embeddingMap(@Param("documentId") documentId: string): Promise<RagEmbeddingMapResponse> {
+    return this.ragIndex.embeddingMap(documentId ?? "");
   }
 
   @Delete(":documentId")

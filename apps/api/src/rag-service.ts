@@ -220,7 +220,116 @@ export type RagIndexDeleteResponse = {
   index: PersistedRagIndexListItem;
 };
 
+export type RagEmbeddingMapPoint = {
+  chunkId: string;
+  documentId: string;
+  sectionId: string;
+  x: number;
+  y: number;
+  clusterLabel: string;
+  textPreview: string;
+  offsets: {
+    startOffset: number;
+    endOffset: number;
+    offsetBasis: string;
+  };
+};
+
+export type RagEmbeddingMapCluster = {
+  label: string;
+  count: number;
+  centroid: {
+    x: number;
+    y: number;
+  };
+};
+
+export type RagEmbeddingMapResponse = {
+  document: RagDocumentSummary;
+  index: RagIndexSummary;
+  projection: {
+    method: "variance-dimensions";
+    xDimension: number;
+    yDimension: number;
+  };
+  points: RagEmbeddingMapPoint[];
+  clusters: RagEmbeddingMapCluster[];
+};
+
 export type RagTradeoffMetricsResponse = TradeoffMetricsSummary;
+
+export type RagModelBenchmarkStatus = "completed" | "skipped" | "error";
+
+export type RagModelBenchmarkQueryRun = {
+  id: string;
+  question: string;
+  status: RagModelBenchmarkStatus;
+  latencyMs: number;
+  answer?: string;
+  error?: string;
+  expectedAnswerContains: string[];
+  containsExpectedAnswer: boolean;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
+  costUsd: number;
+  evals?: {
+    faithfulness: number;
+    relevance: number;
+    quality: number;
+  };
+  retrievedChunkIds: string[];
+};
+
+export type RagModelBenchmarkProviderRun = {
+  provider: string;
+  kind: "local" | "ollama" | "cloud";
+  model: string;
+  status: RagModelBenchmarkStatus;
+  skippedReason?: string;
+  metrics: {
+    requestCount: number;
+    avgLatencyMs: number;
+    p95LatencyMs: number;
+    avgFaithfulness: number;
+    avgRelevance: number;
+    avgQuality: number;
+    containsExpectedAnswerRate: number;
+    avgCostUsd: number;
+    totalCostUsd: number;
+  };
+  perQuery: RagModelBenchmarkQueryRun[];
+};
+
+export type RagModelBenchmarkResponse = {
+  timestamp: string;
+  version: number;
+  phase: string;
+  description: string;
+  dataset: string;
+  goldenSize: number;
+  topK: number;
+  requestedProviders: string[];
+  successCriteria: {
+    atLeastTwoProvidersCompleted: boolean;
+    includesLocalProvider: boolean;
+    includesOllamaProvider: boolean;
+    includesCloudProvider: boolean;
+    phase4ModelBenchmarkPassed: boolean;
+    note: string;
+  };
+  providers: RagModelBenchmarkProviderRun[];
+  summary: {
+    completedProviders: string[];
+    skippedProviders: string[];
+    errorProviders: string[];
+    bestByQuality?: string;
+    bestByLatency?: string;
+    bestByCost?: string;
+  };
+};
 
 export type RagSessionMemoryResponse = {
   sessionId: string;
@@ -545,6 +654,57 @@ export async function listPersistedRagIndexes(indexDir?: string): Promise<RagInd
   };
 }
 
+export async function getPersistedRagEmbeddingMap(
+  documentId: string,
+  indexDir?: string
+): Promise<RagEmbeddingMapResponse> {
+  if (typeof documentId !== "string" || documentId.trim().length === 0) {
+    throw new ApiRequestError("documentId must be a non-empty string.");
+  }
+
+  const saved = await loadRagIndex(documentId.trim(), indexDir);
+  const chunks = saved.record.embeddedChunks;
+  const { xDimension, yDimension } = selectProjectionDimensions(
+    chunks.map((chunk) => chunk.embedding)
+  );
+  const rawPoints = chunks.map((chunk) => ({
+    chunk,
+    x: chunk.embedding[xDimension] ?? 0,
+    y: chunk.embedding[yDimension] ?? 0,
+  }));
+  const xs = rawPoints.map((point) => point.x);
+  const ys = rawPoints.map((point) => point.y);
+  const points: RagEmbeddingMapPoint[] = rawPoints.map(({ chunk, x, y }) => ({
+    chunkId: chunk.id,
+    documentId: chunk.documentId,
+    sectionId: chunk.sectionId,
+    x: normalizeProjectionValue(x, xs),
+    y: normalizeProjectionValue(y, ys),
+    clusterLabel: chunk.sectionId,
+    textPreview: previewChunkText(chunk.text),
+    offsets: {
+      startOffset: chunk.startOffset,
+      endOffset: chunk.endOffset,
+      offsetBasis:
+        typeof chunk.metadata.offsetBasis === "string"
+          ? chunk.metadata.offsetBasis
+          : "document",
+    },
+  }));
+
+  return {
+    document: saved.record.document,
+    index: saved.record.index,
+    projection: {
+      method: "variance-dimensions",
+      xDimension,
+      yDimension,
+    },
+    points,
+    clusters: buildEmbeddingMapClusters(points),
+  };
+}
+
 export async function deletePersistedRagIndex(
   documentId: string,
   indexDir?: string
@@ -560,6 +720,81 @@ export async function deletePersistedRagIndex(
     deleted: true,
     index,
   };
+}
+
+function selectProjectionDimensions(vectors: EmbeddingVector[]): {
+  xDimension: number;
+  yDimension: number;
+} {
+  const dimensions = vectors[0]?.length ?? 0;
+
+  if (dimensions <= 1) {
+    return { xDimension: 0, yDimension: 0 };
+  }
+
+  const variances = Array.from({ length: dimensions }, (_, dimension) => {
+    const values = vectors.map((vector) => vector[dimension] ?? 0);
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    const variance =
+      values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+
+    return { dimension, variance };
+  }).sort((left, right) => right.variance - left.variance || left.dimension - right.dimension);
+
+  return {
+    xDimension: variances[0]?.dimension ?? 0,
+    yDimension: variances[1]?.dimension ?? variances[0]?.dimension ?? 0,
+  };
+}
+
+function normalizeProjectionValue(value: number, values: number[]): number {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    return 50;
+  }
+
+  return Number((8 + ((value - min) / (max - min)) * 84).toFixed(2));
+}
+
+function previewChunkText(text: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+
+  return normalized.length > 160 ? `${normalized.slice(0, 157)}...` : normalized;
+}
+
+function buildEmbeddingMapClusters(
+  points: RagEmbeddingMapPoint[]
+): RagEmbeddingMapCluster[] {
+  const byLabel = new Map<string, RagEmbeddingMapPoint[]>();
+
+  for (const point of points) {
+    const bucket = byLabel.get(point.clusterLabel) ?? [];
+    bucket.push(point);
+    byLabel.set(point.clusterLabel, bucket);
+  }
+
+  return Array.from(byLabel.entries())
+    .map(([label, clusterPoints]) => ({
+      label,
+      count: clusterPoints.length,
+      centroid: {
+        x: Number(
+          (
+            clusterPoints.reduce((sum, point) => sum + point.x, 0) /
+            clusterPoints.length
+          ).toFixed(2)
+        ),
+        y: Number(
+          (
+            clusterPoints.reduce((sum, point) => sum + point.y, 0) /
+            clusterPoints.length
+          ).toFixed(2)
+        ),
+      },
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function normalizeRequest(request: RagAskRequest): Required<

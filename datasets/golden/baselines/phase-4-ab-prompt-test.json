@@ -1,0 +1,131 @@
+{
+  "timestamp": "2026-04-24T17:50:13.055Z",
+  "version": 1,
+  "phase": "phase-4",
+  "description": "Automatic A/B prompt test over the golden dataset using deterministic local answer variants and the Phase 3 evaluators.",
+  "dataset": "phase-0-smoke-text",
+  "topK": 3,
+  "variants": [
+    {
+      "variant": "concise-grounded",
+      "description": "Short answer that only states the top retrieved fact.",
+      "metrics": {
+        "sampleSize": 1,
+        "avgFaithfulness": 1,
+        "avgRelevance": 0.416,
+        "avgRecall": 1,
+        "avgQuality": 0.7664,
+        "expectedAnswerHitRate": 1
+      },
+      "perQuery": [
+        {
+          "id": "gd-001",
+          "question": "What does this command verify?",
+          "answer": "Based on the retrieved context: This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
+          "expectedAnswerContains": [
+            "ETL dispatcher",
+            "NormalizedDocument"
+          ],
+          "expectedAnswerHit": true,
+          "retrievedChunkIds": [
+            "smoke-text-001:section-2:chunk-1",
+            "smoke-text-001:section-1:chunk-1"
+          ],
+          "scores": {
+            "faithfulness": 1,
+            "relevance": 0.416,
+            "recall": 1,
+            "quality": 0.7664
+          }
+        }
+      ]
+    },
+    {
+      "variant": "citation-focused",
+      "description": "Answer plus explicit source/chunk attribution.",
+      "metrics": {
+        "sampleSize": 1,
+        "avgFaithfulness": 0.927,
+        "avgRelevance": 0.416,
+        "avgRecall": 1,
+        "avgQuality": 0.7372,
+        "expectedAnswerHitRate": 1
+      },
+      "perQuery": [
+        {
+          "id": "gd-001",
+          "question": "What does this command verify?",
+          "answer": "Based on the retrieved context: This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument. Source: smoke-text-001 / section-2 / smoke-text-001:section-2:chunk-1.",
+          "expectedAnswerContains": [
+            "ETL dispatcher",
+            "NormalizedDocument"
+          ],
+          "expectedAnswerHit": true,
+          "retrievedChunkIds": [
+            "smoke-text-001:section-2:chunk-1",
+            "smoke-text-001:section-1:chunk-1"
+          ],
+          "scores": {
+            "faithfulness": 0.927,
+            "relevance": 0.416,
+            "recall": 1,
+            "quality": 0.7372
+          }
+        }
+      ]
+    },
+    {
+      "variant": "direct-answer",
+      "description": "Direct answer without explicit grounding language.",
+      "metrics": {
+        "sampleSize": 1,
+        "avgFaithfulness": 1,
+        "avgRelevance": 0.416,
+        "avgRecall": 1,
+        "avgQuality": 0.7664,
+        "expectedAnswerHitRate": 1
+      },
+      "perQuery": [
+        {
+          "id": "gd-001",
+          "question": "What does this command verify?",
+          "answer": "This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
+          "expectedAnswerContains": [
+            "ETL dispatcher",
+            "NormalizedDocument"
+          ],
+          "expectedAnswerHit": true,
+          "retrievedChunkIds": [
+            "smoke-text-001:section-2:chunk-1",
+            "smoke-text-001:section-1:chunk-1"
+          ],
+          "scores": {
+            "faithfulness": 1,
+            "relevance": 0.416,
+            "recall": 1,
+            "quality": 0.7664
+          }
+        }
+      ]
+    }
+  ],
+  "statisticalSummary": {
+    "confidenceLevel": 0.95,
+    "sampleSizePerVariant": 1,
+    "winner": "concise-grounded",
+    "runnerUp": "direct-answer",
+    "qualityDifference": 0,
+    "confidenceInterval95": {
+      "lower": 0,
+      "upper": 0
+    },
+    "statisticallyConclusive": false,
+    "note": "The current golden dataset has one query, so the winner is reported but the confidence interval is not statistically conclusive. Add more golden entries before treating this as a stable product decision."
+  },
+  "successCriteria": {
+    "ranAtLeastTwoVariants": true,
+    "reportsWinner": true,
+    "reportsConfidenceInterval": true,
+    "phase4AbPromptTestPassed": true
+  }
+}

@@ -11,14 +11,19 @@ import {
   askWithFile,
   askWithPersisted,
   askWithText,
+  getEmbeddingMap,
+  getModelBenchmark,
   getTradeoffMetrics,
   indexFile,
   indexText,
 } from "./api/client";
 import type {
   ActiveIndex,
+  EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
+  ModelBenchmarkProviderRun,
+  ModelBenchmarkResponse,
   PersistedRagIndexListItem,
   RagAskResponse,
   SourceMode,
@@ -26,11 +31,11 @@ import type {
 } from "./api/types";
 import { useApiHealth } from "./hooks/useApiHealth";
 import { useIndexList } from "./hooks/useIndexList";
-import {
-  ChunksList,
-  CitationsList,
-  DevModeBlock,
-} from "./components/ResultParts";
+import { AnswerPanel } from "./components/AnswerPanel";
+import { ChunksList } from "./components/ResultParts";
+import { ExplainBox } from "./components/shared/ExplainBox";
+import { Pill } from "./components/shared/Pill";
+import { ScoreBar } from "./components/shared/ScoreBar";
 
 type AppState =
   | "idle"
@@ -55,7 +60,7 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "ollama",
 ];
 
-type ResultMode = "answer" | "compare" | "tradeoffs";
+type ResultMode = "answer" | "compare" | "embeddings" | "models";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -102,6 +107,18 @@ export default function App() {
   const [tradeoffMetricsLoading, setTradeoffMetricsLoading] = useState(false);
   const [tradeoffMessage, setTradeoffMessage] = useState("");
   const [tradeoffMessageIsError, setTradeoffMessageIsError] = useState(false);
+  const [embeddingMap, setEmbeddingMap] = useState<EmbeddingMapResponse | undefined>(
+    undefined
+  );
+  const [embeddingMapLoading, setEmbeddingMapLoading] = useState(false);
+  const [embeddingMapMessage, setEmbeddingMapMessage] = useState("");
+  const [embeddingMapMessageIsError, setEmbeddingMapMessageIsError] = useState(false);
+  const [modelBenchmark, setModelBenchmark] = useState<ModelBenchmarkResponse | undefined>(
+    undefined
+  );
+  const [modelBenchmarkLoading, setModelBenchmarkLoading] = useState(false);
+  const [modelBenchmarkMessage, setModelBenchmarkMessage] = useState("");
+  const [modelBenchmarkMessageIsError, setModelBenchmarkMessageIsError] = useState(false);
 
   // App state
   const [appState, setAppState] = useState<AppState>("idle");
@@ -135,6 +152,16 @@ export default function App() {
   const reportTradeoffMessage = useCallback((text: string, isError = false) => {
     setTradeoffMessage(text);
     setTradeoffMessageIsError(isError);
+  }, []);
+
+  const reportEmbeddingMapMessage = useCallback((text: string, isError = false) => {
+    setEmbeddingMapMessage(text);
+    setEmbeddingMapMessageIsError(isError);
+  }, []);
+
+  const reportModelBenchmarkMessage = useCallback((text: string, isError = false) => {
+    setModelBenchmarkMessage(text);
+    setModelBenchmarkMessageIsError(isError);
   }, []);
 
   const setState = useCallback((next: AppState, detail = "") => {
@@ -404,12 +431,16 @@ export default function App() {
       outputA: undefined,
       outputB: undefined,
     }));
+    setEmbeddingMap(undefined);
+    setModelBenchmark(undefined);
     clearActiveIndex();
     reportMessage("");
     reportCompareMessage(
       "Run Ask while Compare tab is active to compare providers side by side."
     );
     reportTradeoffMessage("");
+    reportEmbeddingMapMessage("");
+    reportModelBenchmarkMessage("");
     setState("idle");
     setOutputTab("answer");
     setSourceMode("file");
@@ -443,13 +474,61 @@ export default function App() {
     }
   }, [reportTradeoffMessage]);
 
-  useEffect(() => {
-    if (outputTab !== "tradeoffs") {
+  const loadEmbeddingMap = useCallback(async () => {
+    if (!activeIndex) {
+      setEmbeddingMap(undefined);
+      reportEmbeddingMapMessage("Select an indexed document to visualize embeddings.");
       return;
     }
 
-    void loadTradeoffs();
-  }, [outputTab, loadTradeoffs]);
+    setEmbeddingMapLoading(true);
+
+    try {
+      const map = await getEmbeddingMap(activeIndex.documentId);
+      setEmbeddingMap(map);
+      reportEmbeddingMapMessage("");
+    } catch (error) {
+      reportEmbeddingMapMessage(
+        error instanceof Error ? error.message : "Failed to load embedding map.",
+        true
+      );
+    } finally {
+      setEmbeddingMapLoading(false);
+    }
+  }, [activeIndex, reportEmbeddingMapMessage]);
+
+  const loadModelBenchmark = useCallback(async () => {
+    setModelBenchmarkLoading(true);
+
+    try {
+      const benchmark = await getModelBenchmark();
+      setModelBenchmark(benchmark);
+      reportModelBenchmarkMessage("");
+    } catch (error) {
+      reportModelBenchmarkMessage(
+        error instanceof Error ? error.message : "Failed to load model benchmark.",
+        true
+      );
+    } finally {
+      setModelBenchmarkLoading(false);
+    }
+  }, [reportModelBenchmarkMessage]);
+
+  useEffect(() => {
+    if (outputTab !== "embeddings") {
+      return;
+    }
+
+    void loadEmbeddingMap();
+  }, [outputTab, loadEmbeddingMap]);
+
+  useEffect(() => {
+    if (outputTab !== "models") {
+      return;
+    }
+
+    void loadModelBenchmark();
+  }, [outputTab, loadModelBenchmark]);
 
   const indexStatus = useMemo(() => {
     if (activeIndex) {
@@ -472,7 +551,7 @@ export default function App() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Phase 1</p>
+          <p className="eyebrow">Phase 4 Lab</p>
           <h1>Local RAG Console</h1>
         </div>
         <div className="topbar__meta">
@@ -730,6 +809,7 @@ export default function App() {
         <ResultPanel
           outputTab={outputTab}
           setOutputTab={setOutputTab}
+          activeIndex={activeIndex}
           result={result}
           compare={compare}
           setCompare={setCompare}
@@ -740,6 +820,16 @@ export default function App() {
           onRefreshTradeoffs={() => void loadTradeoffs()}
           tradeoffMessage={tradeoffMessage}
           tradeoffMessageIsError={tradeoffMessageIsError}
+          embeddingMap={embeddingMap}
+          embeddingMapLoading={embeddingMapLoading}
+          onRefreshEmbeddingMap={() => void loadEmbeddingMap()}
+          embeddingMapMessage={embeddingMapMessage}
+          embeddingMapMessageIsError={embeddingMapMessageIsError}
+          modelBenchmark={modelBenchmark}
+          modelBenchmarkLoading={modelBenchmarkLoading}
+          onRefreshModelBenchmark={() => void loadModelBenchmark()}
+          modelBenchmarkMessage={modelBenchmarkMessage}
+          modelBenchmarkMessageIsError={modelBenchmarkMessageIsError}
         />
       </section>
     </main>
@@ -749,6 +839,7 @@ export default function App() {
 interface ResultPanelProps {
   outputTab: ResultMode;
   setOutputTab: (tab: ResultMode) => void;
+  activeIndex: ActiveIndex | undefined;
   result: RagAskResponse | undefined;
   compare: CompareState;
   setCompare: React.Dispatch<React.SetStateAction<CompareState>>;
@@ -759,11 +850,22 @@ interface ResultPanelProps {
   onRefreshTradeoffs: () => void;
   tradeoffMessage: string;
   tradeoffMessageIsError: boolean;
+  embeddingMap: EmbeddingMapResponse | undefined;
+  embeddingMapLoading: boolean;
+  onRefreshEmbeddingMap: () => void;
+  embeddingMapMessage: string;
+  embeddingMapMessageIsError: boolean;
+  modelBenchmark: ModelBenchmarkResponse | undefined;
+  modelBenchmarkLoading: boolean;
+  onRefreshModelBenchmark: () => void;
+  modelBenchmarkMessage: string;
+  modelBenchmarkMessageIsError: boolean;
 }
 
 function ResultPanel({
   outputTab,
   setOutputTab,
+  activeIndex,
   result,
   compare,
   setCompare,
@@ -774,8 +876,17 @@ function ResultPanel({
   onRefreshTradeoffs,
   tradeoffMessage,
   tradeoffMessageIsError,
+  embeddingMap,
+  embeddingMapLoading,
+  onRefreshEmbeddingMap,
+  embeddingMapMessage,
+  embeddingMapMessageIsError,
+  modelBenchmark,
+  modelBenchmarkLoading,
+  onRefreshModelBenchmark,
+  modelBenchmarkMessage,
+  modelBenchmarkMessageIsError,
 }: ResultPanelProps) {
-  const citations = result?.answer?.citations ?? [];
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
   const resultMeta = result
@@ -788,14 +899,15 @@ function ResultPanel({
       }`
     : outputTab === "compare"
       ? "Compare mode"
-      : "No result";
-
-  const showHint =
-    outputTab === "answer" &&
-    hasResult &&
-    (!result?.answer?.grounded ||
-      results.length === 0 ||
-      results.every((item) => !(item.score > 0)));
+      : outputTab === "embeddings"
+        ? activeIndex
+          ? `${activeIndex.chunkCount} chunks | ${activeIndex.embeddingProvider}`
+          : "No index selected"
+      : outputTab === "models"
+        ? modelBenchmark
+          ? `${modelBenchmark.providers.length} providers | ${modelBenchmark.dataset}`
+          : "No benchmark loaded"
+        : "No result";
 
   return (
     <section className="panel output-panel" aria-label="RAG output">
@@ -824,60 +936,32 @@ function ResultPanel({
           Compare
         </button>
         <button
-          className={`result-tab${outputTab === "tradeoffs" ? " result-tab--active" : ""}`}
+          className={`result-tab${outputTab === "embeddings" ? " result-tab--active" : ""}`}
           type="button"
           role="tab"
-          aria-selected={outputTab === "tradeoffs"}
-          onClick={() => setOutputTab("tradeoffs")}
+          aria-selected={outputTab === "embeddings"}
+          onClick={() => setOutputTab("embeddings")}
         >
-          Trade-offs
+          Embeddings
+        </button>
+        <button
+          className={`result-tab${outputTab === "models" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "models"}
+          onClick={() => setOutputTab("models")}
+        >
+          Models
         </button>
       </div>
 
-      {outputTab === "answer" && !hasResult && (
-        <div className="empty-state">
-          <div className="empty-state__mark" aria-hidden="true" />
-          <p className="empty-state__message">
-            Index a document on the left, then ask a question to see the
-            grounded answer and Dev Mode output here.
-          </p>
-        </div>
-      )}
-
-      {outputTab === "answer" && hasResult && result && (
-        <div className="result-view">
-          <section className="answer-block">
-            <p>{result.answer?.text ?? "No answer returned."}</p>
-          </section>
-
-          {showHint && (
-            <p className="result-hint">
-              No relevant chunks found. Try rephrasing your query.
-            </p>
-          )}
-
-          <section className="output-section">
-            <div className="section-title">
-              <h3>Citations</h3>
-              <span className="count">{citations.length}</span>
-            </div>
-            <div className="result-list">
-              <CitationsList citations={citations} />
-            </div>
-          </section>
-
-          <section className="output-section">
-            <div className="section-title">
-              <h3>Retrieved Chunks</h3>
-              <span className="count">{results.length}</span>
-            </div>
-            <div className="result-list">
-              <ChunksList results={results} />
-            </div>
-          </section>
-
-          <DevModeBlock payload={result} />
-        </div>
+      {outputTab === "answer" && (
+        <AnswerPanel
+          response={result ?? null}
+          tradeoffs={tradeoffMetrics ?? null}
+          tradeoffsLoading={tradeoffMetricsLoading}
+          onRefreshTradeoffs={onRefreshTradeoffs}
+        />
       )}
 
       {outputTab === "compare" && (
@@ -950,87 +1034,313 @@ function ResultPanel({
         </div>
       )}
 
-      {outputTab === "tradeoffs" && (
-        <div className="tradeoffs-view">
+      {outputTab === "embeddings" && (
+        <div className="embedding-view">
           <div className="panel__header">
-            <h3>Request Metrics</h3>
+            <h3>Embedding Map</h3>
             <button
               type="button"
               className="secondary-button"
-              onClick={onRefreshTradeoffs}
-              disabled={tradeoffMetricsLoading}
+              onClick={onRefreshEmbeddingMap}
+              disabled={embeddingMapLoading || !activeIndex}
             >
-              {tradeoffMetricsLoading ? "Refreshing" : "Refresh"}
+              {embeddingMapLoading ? "Refreshing" : "Refresh"}
             </button>
           </div>
 
           <p
-            className={`form-message${tradeoffMessageIsError ? " is-error" : ""}`}
+            className={`form-message${embeddingMapMessageIsError ? " is-error" : ""}`}
             role="status"
             aria-live="polite"
           >
-            {tradeoffMessage}
+            {embeddingMapMessage}
           </p>
 
-          {!tradeoffMetrics && !tradeoffMetricsLoading && (
-            <p className="chunk-text">No trade-off metrics available yet.</p>
+          {!activeIndex && (
+            <p className="chunk-text">Select a persisted index to inspect its chunks.</p>
           )}
 
-          {tradeoffMetrics && (
-            <>
-              <div className="tradeoffs-grid">
-                <MetricCard label="Requests" value={String(tradeoffMetrics.totals.requests)} />
-                <MetricCard
-                  label="Avg latency"
-                  value={`${tradeoffMetrics.totals.avgLatencyMs.toFixed(2)} ms`}
-                />
-                <MetricCard
-                  label="P95 latency"
-                  value={`${tradeoffMetrics.totals.p95LatencyMs.toFixed(2)} ms`}
-                />
-                <MetricCard
-                  label="Avg cost"
-                  value={`$${tradeoffMetrics.totals.avgCostUsd.toFixed(6)}`}
-                />
-                <MetricCard
-                  label="Grounded rate"
-                  value={formatRate(tradeoffMetrics.totals.groundedRate)}
-                />
-                <MetricCard
-                  label="Cache hit rate"
-                  value={formatRate(tradeoffMetrics.totals.cacheHitRate)}
-                />
-              </div>
-
-              <section className="output-section">
-                <div className="section-title">
-                  <h3>By Provider</h3>
-                  <span className="count">{tradeoffMetrics.providers.length}</span>
-                </div>
-                <div className="result-list">
-                  {tradeoffMetrics.providers.length === 0 ? (
-                    <p className="chunk-text">No provider metrics yet.</p>
-                  ) : (
-                    tradeoffMetrics.providers.map((provider) => (
-                      <article key={provider.provider} className="result-row">
-                        <div className="result-row__meta">
-                          <span>{provider.provider}</span>
-                          <span>{provider.requests} requests</span>
-                          <span>avg {provider.avgLatencyMs.toFixed(2)} ms</span>
-                          <span>p95 {provider.p95LatencyMs.toFixed(2)} ms</span>
-                          <span>{formatRate(provider.groundedRate)} grounded</span>
-                          <span>{formatRate(provider.cacheHitRate)} cache hit</span>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </section>
-            </>
+          {activeIndex && !embeddingMap && !embeddingMapLoading && (
+            <p className="chunk-text">No embedding map loaded yet.</p>
           )}
+
+          {embeddingMap && <EmbeddingMapView map={embeddingMap} />}
         </div>
       )}
+
+      {outputTab === "models" && (
+        <ModelBenchmarkView
+          benchmark={modelBenchmark}
+          loading={modelBenchmarkLoading}
+          onRefresh={onRefreshModelBenchmark}
+          message={modelBenchmarkMessage}
+          messageIsError={modelBenchmarkMessageIsError}
+        />
+      )}
     </section>
+  );
+}
+
+function ModelBenchmarkView({
+  benchmark,
+  loading,
+  onRefresh,
+  message,
+  messageIsError,
+}: {
+  benchmark: ModelBenchmarkResponse | undefined;
+  loading: boolean;
+  onRefresh: () => void;
+  message: string;
+  messageIsError: boolean;
+}) {
+  const [selectedProvider, setSelectedProvider] = useState("openai");
+  const selected =
+    benchmark?.providers.find((provider) => provider.provider === selectedProvider) ??
+    benchmark?.providers[0];
+
+  useEffect(() => {
+    if (!benchmark || benchmark.providers.some((provider) => provider.provider === selectedProvider)) {
+      return;
+    }
+
+    setSelectedProvider(benchmark.providers[0]?.provider ?? "openai");
+  }, [benchmark, selectedProvider]);
+
+  return (
+    <div className="models-view">
+      <div className="panel__header">
+        <h3>Model Benchmark</h3>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onRefresh}
+          disabled={loading}
+        >
+          {loading ? "Refreshing" : "Refresh"}
+        </button>
+      </div>
+
+      <p
+        className={`form-message${messageIsError ? " is-error" : ""}`}
+        role="status"
+        aria-live="polite"
+      >
+        {message}
+      </p>
+
+      {!benchmark && !loading && (
+        <p className="chunk-text">No model benchmark available yet.</p>
+      )}
+
+      {benchmark && (
+        <>
+          <div className="benchmark-summary">
+            <MetricCard
+              label="Phase 4"
+              value={benchmark.successCriteria.phase4ModelBenchmarkPassed ? "Passed" : "Pending"}
+            />
+            <MetricCard label="Dataset" value={benchmark.dataset} />
+            <MetricCard label="Golden rows" value={String(benchmark.goldenSize)} />
+          </div>
+
+          <label className="field field--benchmark-provider">
+            <span>Model provider</span>
+            <select
+              value={selected?.provider ?? ""}
+              onChange={(event) => setSelectedProvider(event.target.value)}
+            >
+              {benchmark.providers.map((provider) => (
+                <option key={provider.provider} value={provider.provider}>
+                  {provider.provider}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {selected && <ModelProviderDetails provider={selected} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRun }) {
+  const firstQuery = provider.perQuery[0];
+  const statusVariant =
+    provider.status === "completed"
+      ? "green"
+      : provider.status === "error"
+        ? "amber"
+        : "gray";
+  const providerNote =
+    provider.provider === "openai"
+      ? "OpenAI is the cloud baseline for Phase 4. When quota is available, this row shows real latency, answer quality and estimated cost for the cloud run."
+      : provider.provider === "ollama"
+        ? "Ollama is the local model baseline. It usually costs $0.00 locally but can be slower than lexical extraction."
+        : "The local extractive baseline builds an answer from retrieved text without calling an external model.";
+
+  return (
+    <>
+      <div className="provider-status-row">
+        <Pill variant={statusVariant}>{provider.status}</Pill>
+        <Pill variant="blue">{provider.kind}</Pill>
+        <Pill variant="gray">{provider.model}</Pill>
+      </div>
+
+      <ExplainBox>{providerNote}</ExplainBox>
+
+      <div className="tradeoffs-grid">
+        <MetricCard label="Requests" value={String(provider.metrics.requestCount)} />
+        <MetricCard label="Avg latency" value={`${provider.metrics.avgLatencyMs.toFixed(2)} ms`} />
+        <MetricCard label="P95 latency" value={`${provider.metrics.p95LatencyMs.toFixed(2)} ms`} />
+        <MetricCard label="Avg quality" value={provider.metrics.avgQuality.toFixed(3)} />
+        <MetricCard label="Expected hit" value={formatRate(provider.metrics.containsExpectedAnswerRate)} />
+        <MetricCard label="Total cost" value={`$${provider.metrics.totalCostUsd.toFixed(6)}`} />
+      </div>
+
+      <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+        <ScoreBar
+          score={provider.metrics.avgQuality}
+          maxScore={1}
+          color={provider.metrics.avgQuality > 0.7 ? "#1D9E75" : "#378ADD"}
+        />
+        <ExplainBox>
+          Avg quality combines faithfulness and relevance. A higher score means the provider answered with text that stayed close to the retrieved evidence.
+        </ExplainBox>
+      </div>
+
+      {provider.skippedReason && (
+        <ExplainBox variant="warning">{provider.skippedReason}</ExplainBox>
+      )}
+
+      {firstQuery?.error && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Provider Error</h3>
+          </div>
+          <pre className="provider-error">{firstQuery.error}</pre>
+          <ExplainBox variant="warning">
+            This is provider-specific output. For OpenAI, `insufficient_quota` means the key was loaded and the API was reached, but billing or quota blocked generation.
+          </ExplainBox>
+        </section>
+      )}
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Queries</h3>
+          <span className="count">{provider.perQuery.length}</span>
+        </div>
+        <div className="result-list">
+          {provider.perQuery.map((query) => (
+            <article key={query.id} className="result-row">
+              <div className="result-row__meta">
+                <Pill variant="gray">{query.id}</Pill>
+                <Pill variant={query.status === "completed" ? "green" : "amber"}>
+                  {query.status}
+                </Pill>
+                <Pill variant={query.latencyMs > 500 ? "amber" : "blue"}>
+                  {query.latencyMs.toFixed(2)} ms
+                </Pill>
+                <Pill variant={query.costUsd > 0 ? "amber" : "green"}>
+                  ${query.costUsd.toFixed(6)}
+                </Pill>
+              </div>
+              <p className="chunk-text">{query.question}</p>
+              <p className="chunk-text">{query.answer ?? query.error ?? "No output."}</p>
+              {query.evals && (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <ScoreBar score={query.evals.quality} maxScore={1} color="#1D9E75" />
+                  <ExplainBox>
+                    This per-query score explains how well the model answer matched the expected grounded answer for this benchmark row.
+                  </ExplainBox>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function EmbeddingMapView({ map }: { map: EmbeddingMapResponse }) {
+  const palette = ["#007c72", "#b45f06", "#3b6ea8", "#8f4e8b", "#5f7f2a", "#a33f3f"];
+  const colorFor = (label: string) => {
+    const index = map.clusters.findIndex((cluster) => cluster.label === label);
+    return palette[Math.max(0, index) % palette.length];
+  };
+
+  return (
+    <>
+      <div className="embedding-layout">
+        <div className="embedding-map" role="img" aria-label="Embedding projection">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <rect className="embedding-map__plot" x="0" y="0" width="100" height="100" />
+            {map.clusters.map((cluster) => (
+              <text
+                key={cluster.label}
+                className="embedding-map__label"
+                x={cluster.centroid.x}
+                y={100 - cluster.centroid.y}
+              >
+                {cluster.label}
+              </text>
+            ))}
+            {map.points.map((point) => (
+              <circle
+                key={point.chunkId}
+                cx={point.x}
+                cy={100 - point.y}
+                r="2.2"
+                fill={colorFor(point.clusterLabel)}
+              >
+                <title>{`${point.chunkId}: ${point.textPreview}`}</title>
+              </circle>
+            ))}
+          </svg>
+        </div>
+
+        <section className="embedding-card" aria-label="Embedding clusters">
+          <div className="section-title">
+            <h3>Clusters</h3>
+            <span className="count">{map.clusters.length}</span>
+          </div>
+          <div className="cluster-list">
+            {map.clusters.map((cluster) => (
+              <span key={cluster.label} className="cluster-chip">
+                <span
+                  className="cluster-chip__swatch"
+                  style={{ backgroundColor: colorFor(cluster.label) }}
+                />
+                {cluster.label} · {cluster.count}
+              </span>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="output-section embedding-chunks-section">
+        <div className="section-title">
+          <h3>Chunks</h3>
+          <span className="count">{map.points.length}</span>
+        </div>
+        <div className="result-list embedding-chunks-list">
+          {map.points.map((point) => (
+            <article key={point.chunkId} className="result-row">
+              <div className="result-row__meta">
+                <span>{point.chunkId}</span>
+                <span>{point.clusterLabel}</span>
+                <span>
+                  x {point.x.toFixed(2)} · y {point.y.toFixed(2)}
+                </span>
+              </div>
+              <p className="chunk-text">{point.textPreview}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 

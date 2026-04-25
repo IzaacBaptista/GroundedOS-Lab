@@ -5,12 +5,12 @@
  * POST /agents/execute - Run an agent with given parameters
  */
 
-import { Controller, Post, Body, HttpCode, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, BadRequestException, Inject } from '@nestjs/common';
 import { AgentService, type AgentExecuteRequest, type AgentExecuteResponse } from './agent.service';
 
 @Controller('agents')
 export class AgentsController {
-  constructor(private agentService: AgentService) {}
+  constructor(@Inject(AgentService) private agentService: AgentService) {}
 
   @Post('execute')
   @HttpCode(200)

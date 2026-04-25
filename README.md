@@ -65,13 +65,24 @@
 - `@groundedos/safety` includes prompt-injection, PII, jailbreak, hallucination, prompt-leakage and indirect-injection guardrails
 - `@groundedos/evals` includes faithfulness, relevance and recall evaluators
 
+### Phase 4 — Lab 🚧 In Progress
+
+- Prompt A/B testing is executable with `npm run experiment:prompts`
+- Model/provider benchmarking is executable with `npm run benchmark:models`
+- Persisted-index embedding visualization is available in the web app with
+  section cluster labels
+- The current model benchmark artifact records completed local-extractive and
+   Ollama runs in the same artifact; OpenAI reaches the API but currently fails
+   with `insufficient_quota` in this environment
+- The next Phase 4 milestone is a completed local-vs-cloud benchmark run:
+  Ollama generation plus one cloud provider in the same artifact
+
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
 |---|---|
 | Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
-| Cloud LLM providers (OpenAI, Anthropic) | Phase 4+ local-vs-cloud comparison |
-| A/B prompt testing and embedding visualization in web | Phase 4 |
+| Completed local-vs-cloud benchmark artifact | Phase 4 |
 | LoRA / fine-tuning / quantization | Phase 5 |
 | Docker / CI / auth | Phase 6 |
 
@@ -712,9 +723,9 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 * Model routing
 
 **✅ Success Criteria:**
-- [ ] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval)
-- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline
-- [ ] Embedding visualization renders in the web app with cluster labels for at least one indexed dataset
+- [x] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval) — `npm run experiment:prompts` writes `datasets/golden/baselines/phase-4-ab-prompt-test.json`; current result is not statistically conclusive because the golden dataset has one query
+- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline — `npm run benchmark:models` is implemented and records skipped providers until Ollama/OpenAI are configured
+- [x] Embedding visualization renders in the web app with section cluster labels for persisted indexes
 
 ### Phase 5 — Advanced ML
 
@@ -745,34 +756,36 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 
 ## 🧭 Execution Plan (Current)
 
-To move from architecture scaffold to runnable foundation, the active plan is documented in:
-
-- [`docs/phase-0-mvp-plan.md`](./docs/phase-0-mvp-plan.md)
-- [`docs/phase-1-handoff.md`](./docs/phase-1-handoff.md)
+Phases 0, 1, 2, 2b and the Phase 3 package baseline are complete. The active
+implementation focus is Phase 4 Lab: provider benchmarking, prompt experiments
+and embedding visualization.
 
 ### Current focus
 
-- Phase 1 local RAG foundation is executable through `npm run rag:smoke` and `npm run rag:ask`
-- A local API is available through `npm run api:dev` with `POST /rag/index`
-   `POST /rag/ask`, `GET /rag/indexes`, `DELETE /rag/indexes/:documentId`, and
-   `GET /rag/metrics/tradeoffs`
-  for inline JSON text, multipart text/PDF uploads, persisted local indexes and
-  basic index management. Inline/upload requests can use `api-lexical`
-  (default), `local-hash` or opt-in `ollama` embedding providers
-- A first local web surface is available through `npm run web:dev`, including
-  saved-index management, provider comparison, trade-off metrics and session IDs
-- Agent, safety and eval package baselines are implemented, with `POST /agents/execute`
-  exposing the first document-QA agent path
-- Next focus: start Phase 4 with local-vs-cloud comparison or A/B prompt testing
+- Keep the local RAG/API/web path healthy as the foundation for experiments:
+  `npm run rag:smoke`, `npm run api:dev`, and `npm run web:dev`
+- Run the Phase 4 model/provider benchmark with real providers:
+  `GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b` plus `OPENAI_API_KEY=<key>`
+  and `npm run benchmark:models -- --providers local-extractive,ollama,openai`
+- Treat `datasets/golden/baselines/phase-4-model-benchmark.json` as incomplete
+  until at least one local model provider and one cloud provider complete in the
+  same artifact
+- Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
+  results for product decisions; the current prompt test has only one golden
+  query
+- Use the Embeddings tab in the web app to inspect persisted-index chunk
+  projections and section cluster labels
 - Keep roadmap checkboxes and package READMEs synchronized with implementation status
 
 The local RAG usage guide is documented in
 [`docs/phase-1-local-rag.md`](./docs/phase-1-local-rag.md).
 The Ollama installation and integration guide is documented in
 [`docs/ollama-setup.md`](./docs/ollama-setup.md).
-Reference environment files live in
+Reference environment files live in [`.env.example`](./.env.example),
 [`apps/api/.env.example`](./apps/api/.env.example) and
-[`apps/web/.env.example`](./apps/web/.env.example).
+[`apps/web/.env.example`](./apps/web/.env.example). Node-side commands load
+local `.env` files from the repository root, and app-specific files when
+applicable; shell-exported variables keep priority.
 
 ### Local RAG commands
 

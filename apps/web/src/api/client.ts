@@ -1,7 +1,9 @@
 import type {
   ApiErrorBody,
+  EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
+  ModelBenchmarkResponse,
   RagAskResponse,
   RagIndexDeleteResponse,
   RagIndexListResponse,
@@ -52,9 +54,23 @@ export async function deleteIndex(
   return parseResponse<RagIndexDeleteResponse>(response);
 }
 
+export async function getEmbeddingMap(
+  documentId: string
+): Promise<EmbeddingMapResponse> {
+  const response = await fetch(
+    `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}/embedding-map`
+  );
+  return parseResponse<EmbeddingMapResponse>(response);
+}
+
 export async function getTradeoffMetrics(): Promise<TradeoffMetricsResponse> {
   const response = await fetch(`${API_PREFIX}/rag/metrics/tradeoffs`);
   return parseResponse<TradeoffMetricsResponse>(response);
+}
+
+export async function getModelBenchmark(): Promise<ModelBenchmarkResponse> {
+  const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark`);
+  return parseResponse<ModelBenchmarkResponse>(response);
 }
 
 export interface AskTextParams {

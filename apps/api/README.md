@@ -29,7 +29,8 @@ npm run api:dev
 
 The server listens on `PORT` or `3001` by default.
 Reference environment values live in
-[`apps/api/.env.example`](./.env.example).
+[`apps/api/.env.example`](./.env.example). The API dev server also loads
+repository-root `.env`/`.env.local` files before app-specific env files.
 
 ### Endpoints
 

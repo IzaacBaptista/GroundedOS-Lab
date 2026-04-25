@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import "./config/register-env";
 import multipart from "@fastify/multipart";
 import { validateRagAskResponse } from "@groundedos/core";
 import { NestFactory } from "@nestjs/core";
