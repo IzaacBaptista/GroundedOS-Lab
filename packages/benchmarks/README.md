@@ -24,12 +24,16 @@ local + Ollama execution)
 - The current Phase 2 artifact is committed at
   `datasets/golden/baselines/phase-2-hybrid-benchmark.json`.
 - `npm run benchmark:models` runs the Phase 4 model/provider benchmark. It
-  always runs the local extractive baseline and can run Ollama/OpenAI when
+  always runs the local extractive baseline and can run Ollama/OpenAI/Groq when
   configured.
-- The current Phase 4 baseline artifact is committed at
+- The current Phase 4 artifact is committed at
   `datasets/golden/baselines/phase-4-model-benchmark.json`.
-- In the latest run, `local-extractive` and `ollama` completed; `openai`
-  returned `429 insufficient_quota`.
+- The latest run completed all three requested providers: `local-extractive`,
+  `ollama` (qwen2.5:0.5b) and `groq` (llama-3.1-8b-instant, free tier).
+  `phase4ModelBenchmarkPassed: true`.
+- `npm run benchmark:models:precheck` validates provider readiness before a full
+  benchmark run (Ollama model presence, Ollama API reachability, Groq/OpenAI quota
+  probe).
 
 ## Current limits
 
@@ -37,26 +41,22 @@ local + Ollama execution)
   already saturated in dense-only mode.
 - For this dataset, Phase 2 improvement is measured as no regression in
   Recall@3/MRR plus an improved expected-chunk score.
-- Phase 4 local-vs-cloud success is not complete until at least one local model
-  provider and one cloud provider complete in the same benchmark artifact.
-- Current Phase 4 blocker is cloud provider quota/billing for OpenAI in this
-  environment.
+- Phase 4 local-vs-cloud benchmark is **complete**: `local-extractive`, `ollama`
+  and `groq` all completed in the same artifact (`phase4ModelBenchmarkPassed: true`).
 
 ## Phase 4 provider configuration
 
+Recommended flow:
+
 ```bash
-# Local baseline only; Ollama/OpenAI are recorded as skipped if not configured.
-npm run benchmark:models
+# Validate provider readiness first.
+npm run benchmark:models:precheck -- --providers local-extractive,ollama,groq --strict
+```
 
-# Ollama generation benchmark.
-GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b npm run benchmark:models -- --providers local-extractive,ollama
+```bash
+# Full Phase 4 benchmark (Ollama local + Groq free-tier cloud).
+npm run benchmark:models -- --providers local-extractive,ollama,groq
 
-# OpenAI cloud benchmark using the Responses API.
-OPENAI_API_KEY=... OPENAI_MODEL=gpt-5-mini npm run benchmark:models -- --providers local-extractive,openai
-
-# Roadmap target: Ollama generation plus one cloud provider in the same artifact.
-GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b \
-OPENAI_API_KEY=... \
-OPENAI_MODEL=gpt-5-mini \
-npm run benchmark:models -- --providers local-extractive,ollama,openai
+# Alternative: OpenAI cloud provider (requires paid quota).
+OPENAI_API_KEY=... OPENAI_MODEL=gpt-5-mini npm run benchmark:models -- --providers local-extractive,ollama,openai
 ```

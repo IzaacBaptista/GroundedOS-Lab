@@ -12,6 +12,7 @@
     "api:dev": "tsx apps/api/src/server.ts",
     "benchmark:hybrid": "tsx scripts/benchmark-hybrid-retrieval.ts",
     "benchmark:models": "tsx scripts/benchmark-model-providers.ts",
+    "benchmark:models:precheck": "tsx scripts/benchmark-models-precheck.ts",
     "build": "npm run typecheck",
     "build:api": "tsc -p apps/api/tsconfig.json",
     "build:web": "npm --workspace @groundedos/web run build",

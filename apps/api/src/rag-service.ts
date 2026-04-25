@@ -331,6 +331,41 @@ export type RagModelBenchmarkResponse = {
   };
 };
 
+export type RagModelBenchmarkPrecheckProvider = "local-extractive" | "ollama" | "openai" | "groq";
+
+export type RagModelBenchmarkPrecheckStatus = "pass" | "fail" | "warn";
+
+export type RagModelBenchmarkPrecheckItem = {
+  name: string;
+  status: RagModelBenchmarkPrecheckStatus;
+  detail: string;
+};
+
+export type RagModelBenchmarkPrecheckProviderResult = {
+  provider: RagModelBenchmarkPrecheckProvider;
+  ready: boolean;
+  checks: RagModelBenchmarkPrecheckItem[];
+  blocker?: string;
+};
+
+export type RagModelBenchmarkPrecheckResponse = {
+  timestamp: string;
+  requestedProviders: RagModelBenchmarkPrecheckProvider[];
+  phase4Ready: boolean;
+  strictMode: boolean;
+  results: RagModelBenchmarkPrecheckProviderResult[];
+  nextAction: string;
+};
+
+export type RagModelBenchmarkRunResponse = {
+  startedAt: string;
+  finishedAt: string;
+  command: string;
+  providers: string[];
+  success: boolean;
+  output: string;
+};
+
 export type RagSessionMemoryResponse = {
   sessionId: string;
   count: number;

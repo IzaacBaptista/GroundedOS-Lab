@@ -13,6 +13,8 @@ import {
   askWithText,
   getEmbeddingMap,
   getModelBenchmark,
+  getModelBenchmarkPrecheck,
+  runModelBenchmark,
   getTradeoffMetrics,
   indexFile,
   indexText,
@@ -22,6 +24,7 @@ import type {
   EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
+  ModelBenchmarkPrecheckResponse,
   ModelBenchmarkProviderRun,
   ModelBenchmarkResponse,
   PersistedRagIndexListItem,
@@ -116,9 +119,17 @@ export default function App() {
   const [modelBenchmark, setModelBenchmark] = useState<ModelBenchmarkResponse | undefined>(
     undefined
   );
+  const [modelBenchmarkPrecheck, setModelBenchmarkPrecheck] = useState<
+    ModelBenchmarkPrecheckResponse | undefined
+  >(undefined);
   const [modelBenchmarkLoading, setModelBenchmarkLoading] = useState(false);
+  const [modelBenchmarkPrecheckLoading, setModelBenchmarkPrecheckLoading] = useState(false);
+  const [modelBenchmarkRunLoading, setModelBenchmarkRunLoading] = useState(false);
   const [modelBenchmarkMessage, setModelBenchmarkMessage] = useState("");
   const [modelBenchmarkMessageIsError, setModelBenchmarkMessageIsError] = useState(false);
+  const [modelBenchmarkPrecheckMessage, setModelBenchmarkPrecheckMessage] = useState("");
+  const [modelBenchmarkPrecheckMessageIsError, setModelBenchmarkPrecheckMessageIsError] =
+    useState(false);
 
   // App state
   const [appState, setAppState] = useState<AppState>("idle");
@@ -163,6 +174,14 @@ export default function App() {
     setModelBenchmarkMessage(text);
     setModelBenchmarkMessageIsError(isError);
   }, []);
+
+  const reportModelBenchmarkPrecheckMessage = useCallback(
+    (text: string, isError = false) => {
+      setModelBenchmarkPrecheckMessage(text);
+      setModelBenchmarkPrecheckMessageIsError(isError);
+    },
+    []
+  );
 
   const setState = useCallback((next: AppState, detail = "") => {
     setAppState(next);
@@ -433,6 +452,7 @@ export default function App() {
     }));
     setEmbeddingMap(undefined);
     setModelBenchmark(undefined);
+    setModelBenchmarkPrecheck(undefined);
     clearActiveIndex();
     reportMessage("");
     reportCompareMessage(
@@ -441,6 +461,7 @@ export default function App() {
     reportTradeoffMessage("");
     reportEmbeddingMapMessage("");
     reportModelBenchmarkMessage("");
+    reportModelBenchmarkPrecheckMessage("");
     setState("idle");
     setOutputTab("answer");
     setSourceMode("file");
@@ -514,6 +535,49 @@ export default function App() {
     }
   }, [reportModelBenchmarkMessage]);
 
+  const loadModelBenchmarkPrecheck = useCallback(async () => {
+    setModelBenchmarkPrecheckLoading(true);
+
+    try {
+      const precheck = await getModelBenchmarkPrecheck();
+      setModelBenchmarkPrecheck(precheck);
+      reportModelBenchmarkPrecheckMessage(
+        precheck.phase4Ready
+          ? "Precheck passed. Phase 4 benchmark target is ready."
+          : "Precheck found blockers for Phase 4 benchmark target."
+      );
+    } catch (error) {
+      reportModelBenchmarkPrecheckMessage(
+        error instanceof Error ? error.message : "Failed to run benchmark precheck.",
+        true
+      );
+    } finally {
+      setModelBenchmarkPrecheckLoading(false);
+    }
+  }, [reportModelBenchmarkPrecheckMessage]);
+
+  const executeModelBenchmarkRun = useCallback(async () => {
+    setModelBenchmarkRunLoading(true);
+
+    try {
+      const response = await runModelBenchmark();
+      reportModelBenchmarkMessage(
+        response.success
+          ? "Benchmark run completed. Artifact updated."
+          : "Benchmark run finished with errors. Check provider output."
+      );
+      await loadModelBenchmark();
+      await loadModelBenchmarkPrecheck();
+    } catch (error) {
+      reportModelBenchmarkMessage(
+        error instanceof Error ? error.message : "Failed to run model benchmark.",
+        true
+      );
+    } finally {
+      setModelBenchmarkRunLoading(false);
+    }
+  }, [loadModelBenchmark, loadModelBenchmarkPrecheck, reportModelBenchmarkMessage]);
+
   useEffect(() => {
     if (outputTab !== "embeddings") {
       return;
@@ -528,7 +592,8 @@ export default function App() {
     }
 
     void loadModelBenchmark();
-  }, [outputTab, loadModelBenchmark]);
+    void loadModelBenchmarkPrecheck();
+  }, [outputTab, loadModelBenchmark, loadModelBenchmarkPrecheck]);
 
   const indexStatus = useMemo(() => {
     if (activeIndex) {
@@ -826,10 +891,17 @@ export default function App() {
           embeddingMapMessage={embeddingMapMessage}
           embeddingMapMessageIsError={embeddingMapMessageIsError}
           modelBenchmark={modelBenchmark}
+          modelBenchmarkPrecheck={modelBenchmarkPrecheck}
           modelBenchmarkLoading={modelBenchmarkLoading}
+          modelBenchmarkPrecheckLoading={modelBenchmarkPrecheckLoading}
+          modelBenchmarkRunLoading={modelBenchmarkRunLoading}
           onRefreshModelBenchmark={() => void loadModelBenchmark()}
+          onRunModelBenchmarkPrecheck={() => void loadModelBenchmarkPrecheck()}
+          onRunModelBenchmark={() => void executeModelBenchmarkRun()}
           modelBenchmarkMessage={modelBenchmarkMessage}
           modelBenchmarkMessageIsError={modelBenchmarkMessageIsError}
+          modelBenchmarkPrecheckMessage={modelBenchmarkPrecheckMessage}
+          modelBenchmarkPrecheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
         />
       </section>
     </main>
@@ -856,10 +928,17 @@ interface ResultPanelProps {
   embeddingMapMessage: string;
   embeddingMapMessageIsError: boolean;
   modelBenchmark: ModelBenchmarkResponse | undefined;
+  modelBenchmarkPrecheck: ModelBenchmarkPrecheckResponse | undefined;
   modelBenchmarkLoading: boolean;
+  modelBenchmarkPrecheckLoading: boolean;
+  modelBenchmarkRunLoading: boolean;
   onRefreshModelBenchmark: () => void;
+  onRunModelBenchmarkPrecheck: () => void;
+  onRunModelBenchmark: () => void;
   modelBenchmarkMessage: string;
   modelBenchmarkMessageIsError: boolean;
+  modelBenchmarkPrecheckMessage: string;
+  modelBenchmarkPrecheckMessageIsError: boolean;
 }
 
 function ResultPanel({
@@ -882,10 +961,17 @@ function ResultPanel({
   embeddingMapMessage,
   embeddingMapMessageIsError,
   modelBenchmark,
+  modelBenchmarkPrecheck,
   modelBenchmarkLoading,
+  modelBenchmarkPrecheckLoading,
+  modelBenchmarkRunLoading,
   onRefreshModelBenchmark,
+  onRunModelBenchmarkPrecheck,
+  onRunModelBenchmark,
   modelBenchmarkMessage,
   modelBenchmarkMessageIsError,
+  modelBenchmarkPrecheckMessage,
+  modelBenchmarkPrecheckMessageIsError,
 }: ResultPanelProps) {
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
@@ -1071,10 +1157,17 @@ function ResultPanel({
       {outputTab === "models" && (
         <ModelBenchmarkView
           benchmark={modelBenchmark}
+          precheck={modelBenchmarkPrecheck}
           loading={modelBenchmarkLoading}
+          precheckLoading={modelBenchmarkPrecheckLoading}
+          runLoading={modelBenchmarkRunLoading}
           onRefresh={onRefreshModelBenchmark}
+          onRunPrecheck={onRunModelBenchmarkPrecheck}
+          onRunBenchmark={onRunModelBenchmark}
           message={modelBenchmarkMessage}
           messageIsError={modelBenchmarkMessageIsError}
+          precheckMessage={modelBenchmarkPrecheckMessage}
+          precheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
         />
       )}
     </section>
@@ -1083,16 +1176,30 @@ function ResultPanel({
 
 function ModelBenchmarkView({
   benchmark,
+  precheck,
   loading,
+  precheckLoading,
+  runLoading,
   onRefresh,
+  onRunPrecheck,
+  onRunBenchmark,
   message,
   messageIsError,
+  precheckMessage,
+  precheckMessageIsError,
 }: {
   benchmark: ModelBenchmarkResponse | undefined;
+  precheck: ModelBenchmarkPrecheckResponse | undefined;
   loading: boolean;
+  precheckLoading: boolean;
+  runLoading: boolean;
   onRefresh: () => void;
+  onRunPrecheck: () => void;
+  onRunBenchmark: () => void;
   message: string;
   messageIsError: boolean;
+  precheckMessage: string;
+  precheckMessageIsError: boolean;
 }) {
   const [selectedProvider, setSelectedProvider] = useState("openai");
   const selected =
@@ -1111,14 +1218,32 @@ function ModelBenchmarkView({
     <div className="models-view">
       <div className="panel__header">
         <h3>Model Benchmark</h3>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          {loading ? "Refreshing" : "Refresh"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onRunBenchmark}
+            disabled={runLoading}
+          >
+            {runLoading ? "Running" : "Run Benchmark"}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onRunPrecheck}
+            disabled={precheckLoading}
+          >
+            {precheckLoading ? "Checking" : "Precheck"}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            {loading ? "Refreshing" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       <p
@@ -1128,6 +1253,45 @@ function ModelBenchmarkView({
       >
         {message}
       </p>
+
+      <p
+        className={`form-message${precheckMessageIsError ? " is-error" : ""}`}
+        role="status"
+        aria-live="polite"
+      >
+        {precheckMessage}
+      </p>
+
+      {precheck && (
+        <section className="output-section" style={{ marginTop: 10, paddingTop: 10 }}>
+          <div className="section-title">
+            <h3>Precheck</h3>
+            <Pill variant={precheck.phase4Ready ? "green" : "amber"}>
+              {precheck.phase4Ready ? "Ready" : "Blocked"}
+            </Pill>
+          </div>
+          <div className="result-list">
+            {precheck.results.map((provider) => (
+              <article key={provider.provider} className="result-row">
+                <div className="result-row__meta">
+                  <Pill variant="gray">{provider.provider}</Pill>
+                  <Pill variant={provider.ready ? "green" : "amber"}>
+                    {provider.ready ? "ready" : "blocked"}
+                  </Pill>
+                </div>
+                {provider.checks.map((check) => (
+                  <p key={`${provider.provider}-${check.name}`} className="chunk-text">
+                    {check.name}: {check.detail}
+                  </p>
+                ))}
+                {provider.blocker && (
+                  <ExplainBox variant="warning">{provider.blocker}</ExplainBox>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!benchmark && !loading && (
         <p className="chunk-text">No model benchmark available yet.</p>
@@ -1143,6 +1307,8 @@ function ModelBenchmarkView({
             <MetricCard label="Dataset" value={benchmark.dataset} />
             <MetricCard label="Golden rows" value={String(benchmark.goldenSize)} />
           </div>
+
+          <ModelBenchmarkComparison providers={benchmark.providers} />
 
           <label className="field field--benchmark-provider">
             <span>Model provider</span>
@@ -1161,6 +1327,89 @@ function ModelBenchmarkView({
           {selected && <ModelProviderDetails provider={selected} />}
         </>
       )}
+    </div>
+  );
+}
+
+function ModelBenchmarkComparison({
+  providers,
+}: {
+  providers: ModelBenchmarkResponse["providers"];
+}) {
+  if (providers.length === 0) {
+    return null;
+  }
+
+  const maxLatencyMs = Math.max(...providers.map((provider) => provider.metrics.avgLatencyMs), 1);
+
+  return (
+    <section className="output-section model-compare-section">
+      <div className="section-title">
+        <h3>Provider Comparison</h3>
+        <span className="count">{providers.length}</span>
+      </div>
+      <div className="model-compare-grid">
+        {providers.map((provider) => {
+          const quality = Math.max(0, Math.min(1, provider.metrics.avgQuality));
+          const expectedHit = Math.max(
+            0,
+            Math.min(1, provider.metrics.containsExpectedAnswerRate)
+          );
+          const latencyRatio =
+            maxLatencyMs > 0 ? provider.metrics.avgLatencyMs / maxLatencyMs : 0;
+
+          return (
+            <article key={provider.provider} className="model-compare-card">
+              <div className="result-row__meta">
+                <Pill variant="gray">{provider.provider}</Pill>
+                <Pill variant={provider.status === "completed" ? "green" : "amber"}>
+                  {provider.status}
+                </Pill>
+              </div>
+
+              <MetricLine
+                label="Quality"
+                value={provider.metrics.avgQuality.toFixed(3)}
+                ratio={quality}
+              />
+              <MetricLine
+                label="Expected hit"
+                value={formatRate(provider.metrics.containsExpectedAnswerRate)}
+                ratio={expectedHit}
+              />
+              <MetricLine
+                label="Avg latency"
+                value={`${provider.metrics.avgLatencyMs.toFixed(1)} ms`}
+                ratio={latencyRatio}
+              />
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function MetricLine({
+  label,
+  value,
+  ratio,
+}: {
+  label: string;
+  value: string;
+  ratio: number;
+}) {
+  const safeRatio = Math.max(0.02, Math.min(1, ratio));
+
+  return (
+    <div className="model-metric-line">
+      <div className="model-metric-line__header">
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+      <div className="model-metric-line__bar" aria-hidden="true">
+        <span style={{ width: `${Math.round(safeRatio * 100)}%` }} />
+      </div>
     </div>
   );
 }

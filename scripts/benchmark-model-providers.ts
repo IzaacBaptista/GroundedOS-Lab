@@ -379,8 +379,12 @@ function resolveProviders(ids: string[]): ModelProvider[] {
       return createOpenAiProvider();
     }
 
+    if (id === "groq") {
+      return createGroqProvider();
+    }
+
     throw new Error(
-      `[benchmark-models] Unknown provider "${id}". Supported providers: local-extractive, ollama, openai.`
+      `[benchmark-models] Unknown provider "${id}". Supported providers: local-extractive, ollama, openai, groq.`
     );
   });
 }
@@ -510,6 +514,55 @@ function createOpenAiProvider(): ModelProvider {
         answer,
         inputTokens: body.usage?.input_tokens,
         outputTokens: body.usage?.output_tokens,
+        totalTokens: body.usage?.total_tokens,
+      };
+    },
+  };
+}
+
+function createGroqProvider(): ModelProvider {
+  const apiKey = process.env.GROQ_API_KEY ?? "";
+  const model = process.env.GROQ_MODEL ?? "llama-3.1-8b-instant";
+
+  return {
+    id: "groq",
+    kind: "cloud",
+    model,
+    isConfigured: () => apiKey.trim().length > 0,
+    skipReason: () => "Set GROQ_API_KEY to run the Groq cloud benchmark (free tier available at console.groq.com).",
+    async generate(input) {
+      const response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: buildGroundedPrompt(input.question, input.context) }],
+          max_tokens: 300,
+          temperature: 0,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Groq request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const body = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      };
+      const answer = body.choices?.[0]?.message?.content?.trim();
+
+      if (!answer) {
+        throw new Error("Groq returned an empty response.");
+      }
+
+      return {
+        answer,
+        inputTokens: body.usage?.prompt_tokens,
+        outputTokens: body.usage?.completion_tokens,
         totalTokens: body.usage?.total_tokens,
       };
     },
@@ -762,7 +815,7 @@ function printHelp(): void {
 Options:
   --dataset, -d <id>       Dataset ID from datasets/registry.json
   --top-k, -k <n>          Number of chunks to retrieve (default: ${DEFAULT_TOP_K})
-  --providers, -p <list>   Comma-separated providers: local-extractive,ollama,openai
+  --providers, -p <list>   Comma-separated providers: local-extractive,ollama,openai,groq
   --output, -o <path>      Output artifact path (default: ${DEFAULT_OUTPUT_PATH})
   --help, -h               Show this help
 
@@ -771,5 +824,7 @@ Optional provider environment:
   GROUNDEDOS_OLLAMA_BASE_URL         Defaults to ${DEFAULT_OLLAMA_BASE_URL}
   OPENAI_API_KEY                     Required for provider "openai"
   OPENAI_MODEL                       Defaults to gpt-5-mini
+  GROQ_API_KEY                       Required for provider "groq" (free tier at console.groq.com)
+  GROQ_MODEL                         Defaults to llama-3.1-8b-instant
 `);
 }

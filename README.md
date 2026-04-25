@@ -65,24 +65,22 @@
 - `@groundedos/safety` includes prompt-injection, PII, jailbreak, hallucination, prompt-leakage and indirect-injection guardrails
 - `@groundedos/evals` includes faithfulness, relevance and recall evaluators
 
-### Phase 4 — Lab 🚧 In Progress
+### Phase 4 — Lab ✅ Complete
 
 - Prompt A/B testing is executable with `npm run experiment:prompts`
 - Model/provider benchmarking is executable with `npm run benchmark:models`
 - Persisted-index embedding visualization is available in the web app with
   section cluster labels
-- The current model benchmark artifact records completed local-extractive and
-   Ollama runs in the same artifact; OpenAI reaches the API but currently fails
-   with `insufficient_quota` in this environment
-- The next Phase 4 milestone is a completed local-vs-cloud benchmark run:
-  Ollama generation plus one cloud provider in the same artifact
+- Completed local-vs-cloud benchmark artifact: Ollama (`qwen2.5:0.5b`) + Groq
+  (`llama-3.1-8b-instant`, free-tier cloud) both completed in the same run —
+  `datasets/golden/baselines/phase-4-model-benchmark.json` records
+  `phase4ModelBenchmarkPassed: true`
 
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
 |---|---|
 | Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
-| Completed local-vs-cloud benchmark artifact | Phase 4 |
 | LoRA / fine-tuning / quantization | Phase 5 |
 | Docker / CI / auth | Phase 6 |
 
@@ -724,7 +722,7 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 
 **✅ Success Criteria:**
 - [x] A/B prompt test runs automatically and reports winner with statistical summary (sample size, confidence interval) — `npm run experiment:prompts` writes `datasets/golden/baselines/phase-4-ab-prompt-test.json`; current result is not statistically conclusive because the golden dataset has one query
-- [ ] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline — `npm run benchmark:models` is implemented and records skipped providers until Ollama/OpenAI are configured
+- [x] Benchmark compares at least two models (local Ollama + one cloud provider) on latency, cost and quality using the Phase 0 smoke dataset as the shared baseline — `npm run benchmark:models -- --providers local-extractive,ollama,groq` completed with Ollama (`qwen2.5:0.5b`) + Groq (`llama-3.1-8b-instant`); artifact at `datasets/golden/baselines/phase-4-model-benchmark.json` records `phase4ModelBenchmarkPassed: true`
 - [x] Embedding visualization renders in the web app with section cluster labels for persisted indexes
 
 ### Phase 5 — Advanced ML
@@ -756,20 +754,16 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 
 ## 🧭 Execution Plan (Current)
 
-Phases 0, 1, 2, 2b and the Phase 3 package baseline are complete. The active
-implementation focus is Phase 4 Lab: provider benchmarking, prompt experiments
-and embedding visualization.
+Phases 0, 1, 2, 2b, 3 and 4 are complete. The active
+implementation focus is Phase 5 Advanced ML: experiment scaffolding, LoRA,
+quantization, fine-tuning and distillation.
 
 ### Current focus
 
-- Keep the local RAG/API/web path healthy as the foundation for experiments:
-  `npm run rag:smoke`, `npm run api:dev`, and `npm run web:dev`
-- Run the Phase 4 model/provider benchmark with real providers:
-  `GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b` plus `OPENAI_API_KEY=<key>`
-  and `npm run benchmark:models -- --providers local-extractive,ollama,openai`
-- Treat `datasets/golden/baselines/phase-4-model-benchmark.json` as incomplete
-  until at least one local model provider and one cloud provider complete in the
-  same artifact
+- Phase 4 is closed: `datasets/golden/baselines/phase-4-model-benchmark.json`
+  records `phase4ModelBenchmarkPassed: true` (Ollama + Groq cloud in same run)
+- Start Phase 5: create reproducible experiment notebooks/scripts with documented
+  Python environments in each `experiments/` folder
 - Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
   results for product decisions; the current prompt test has only one golden
   query

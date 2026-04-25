@@ -202,6 +202,19 @@ Response includes:
 - `providers`: per-provider aggregates for quick comparison
 - `recent`: most recent request samples
 
+#### `POST /rag/metrics/model-benchmark/run`
+
+Runs the Phase 4 model benchmark command from the API process and writes the
+artifact to `datasets/golden/baselines/phase-4-model-benchmark.json`.
+
+```bash
+curl -X POST http://localhost:3001/rag/metrics/model-benchmark/run \
+  -H 'content-type: application/json' \
+  -d '{"providers":["local-extractive","ollama","openai"]}'
+```
+
+Response includes `success`, the command used, provider list and process output.
+
 #### `GET /rag/memory/:sessionId`
 
 Returns persisted session memory entries for the provided session.

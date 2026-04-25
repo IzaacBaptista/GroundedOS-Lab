@@ -123,6 +123,55 @@ describe("App", () => {
         });
       }
 
+      if (url.includes("/api/rag/metrics/model-benchmark/precheck")) {
+        return new Response(JSON.stringify({
+          timestamp: "2026-04-24T23:21:46.691Z",
+          requestedProviders: ["local-extractive", "ollama", "openai"],
+          phase4Ready: false,
+          strictMode: false,
+          results: [
+            {
+              provider: "local-extractive",
+              ready: true,
+              checks: [
+                {
+                  name: "baseline",
+                  status: "pass",
+                  detail: "Local extractive provider requires no external dependency.",
+                },
+              ],
+            },
+            {
+              provider: "ollama",
+              ready: true,
+              checks: [
+                {
+                  name: "env",
+                  status: "pass",
+                  detail: "Configured model: qwen2.5:0.5b",
+                },
+              ],
+            },
+            {
+              provider: "openai",
+              ready: false,
+              blocker: "OpenAI quota/billing is insufficient.",
+              checks: [
+                {
+                  name: "quota",
+                  status: "fail",
+                  detail: "OpenAI key is valid but quota/billing is insufficient (429 insufficient_quota).",
+                },
+              ],
+            },
+          ],
+          nextAction: "Resolve failed checks, then run benchmark:models.",
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
       if (url.endsWith("/api/rag/indexes/visual-test/embedding-map")) {
         return new Response(JSON.stringify({
           document: {

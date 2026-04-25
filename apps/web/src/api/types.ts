@@ -249,6 +249,39 @@ export interface ModelBenchmarkResponse {
   };
 }
 
+export type ModelBenchmarkPrecheckProvider = "local-extractive" | "ollama" | "openai" | "groq";
+
+export interface ModelBenchmarkPrecheckItem {
+  name: string;
+  status: "pass" | "fail" | "warn";
+  detail: string;
+}
+
+export interface ModelBenchmarkPrecheckProviderResult {
+  provider: ModelBenchmarkPrecheckProvider;
+  ready: boolean;
+  checks: ModelBenchmarkPrecheckItem[];
+  blocker?: string;
+}
+
+export interface ModelBenchmarkPrecheckResponse {
+  timestamp: string;
+  requestedProviders: ModelBenchmarkPrecheckProvider[];
+  phase4Ready: boolean;
+  strictMode: boolean;
+  results: ModelBenchmarkPrecheckProviderResult[];
+  nextAction: string;
+}
+
+export interface ModelBenchmarkRunResponse {
+  startedAt: string;
+  finishedAt: string;
+  command: string;
+  providers: string[];
+  success: boolean;
+  output: string;
+}
+
 export interface ApiErrorBody {
   error?: { message?: string };
 }

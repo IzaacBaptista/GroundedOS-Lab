@@ -927,6 +927,59 @@ textarea:focus {
   max-width: 280px;
 }
 
+.model-compare-section {
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.model-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.model-compare-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  padding: 10px;
+}
+
+.model-metric-line {
+  display: grid;
+  gap: 6px;
+}
+
+.model-metric-line__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.model-metric-line__header strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.model-metric-line__bar {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-background-secondary);
+  overflow: hidden;
+}
+
+.model-metric-line__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
 .provider-status-row {
   display: flex;
   flex-wrap: wrap;
