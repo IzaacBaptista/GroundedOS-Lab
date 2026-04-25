@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "description": "Golden retrieval questions for Phase 5 quantization and advanced ML experiments. The dataset contains multiple targeted sections so retrieval metrics are less trivial than the Phase 0 smoke baseline.",
+  "entries": [
+    {
+      "id": "p5-gd-001",
+      "question": "Which pipeline records offsets and preserves lineage metadata?",
+      "document_ref": "phase-5-retrieval-text",
+      "expected_answer_contains": [
+        "ingestion pipeline",
+        "lineage metadata",
+        "offsets"
+      ],
+      "expected_chunk_ids": [
+        "phase-5-retrieval-001:section-2:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "phase-5-retrieval-001",
+          "sectionId": "section-2"
+        }
+      ],
+      "notes": "Targets the ingestion and lineage section."
+    },
+    {
+      "id": "p5-gd-002",
+      "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+      "document_ref": "phase-5-retrieval-text",
+      "expected_answer_contains": [
+        "dense vector similarity",
+        "sparse lexical scoring"
+      ],
+      "expected_chunk_ids": [
+        "phase-5-retrieval-001:section-3:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "phase-5-retrieval-001",
+          "sectionId": "section-3"
+        }
+      ],
+      "notes": "Targets the hybrid retrieval section."
+    },
+    {
+      "id": "p5-gd-003",
+      "question": "Which stage reorders candidate chunks after initial retrieval?",
+      "document_ref": "phase-5-retrieval-text",
+      "expected_answer_contains": [
+        "Reranking",
+        "candidate chunks"
+      ],
+      "expected_chunk_ids": [
+        "phase-5-retrieval-001:section-4:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "phase-5-retrieval-001",
+          "sectionId": "section-4"
+        }
+      ],
+      "notes": "Targets the reranking section."
+    },
+    {
+      "id": "p5-gd-004",
+      "question": "How is session memory isolated?",
+      "document_ref": "phase-5-retrieval-text",
+      "expected_answer_contains": [
+        "session identifier",
+        "isolated by session"
+      ],
+      "expected_chunk_ids": [
+        "phase-5-retrieval-001:section-5:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "phase-5-retrieval-001",
+          "sectionId": "section-5"
+        }
+      ],
+      "notes": "Targets the session memory section."
+    },
+    {
+      "id": "p5-gd-005",
+      "question": "Which request metrics feed the trade-offs dashboard?",
+      "document_ref": "phase-5-retrieval-text",
+      "expected_answer_contains": [
+        "provider cost",
+        "latency",
+        "cache status",
+        "budget checks"
+      ],
+      "expected_chunk_ids": [
+        "phase-5-retrieval-001:section-6:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "phase-5-retrieval-001",
+          "sectionId": "section-6"
+        }
+      ],
+      "notes": "Targets the cost tracking section."
+    },
+    {
+      "id": "p5-gd-006",
+      "question": "What should a good quantized retrieval path preserve?",
+      "document_ref": "phase-5-retrieval-text",
+      "expected_answer_contains": [
+        "reduce memory",
+        "preserving Recall@1"
+      ],
+      "expected_chunk_ids": [
+        "phase-5-retrieval-001:section-7:chunk-1"
+      ],
+      "expected_sources": [
+        {
+          "documentId": "phase-5-retrieval-001",
+          "sectionId": "section-7"
+        }
+      ],
+      "notes": "Targets the quantization section."
+    }
+  ]
+}

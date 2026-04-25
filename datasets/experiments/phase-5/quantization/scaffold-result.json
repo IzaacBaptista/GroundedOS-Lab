@@ -1,0 +1,291 @@
+{
+  "version": 3,
+  "phase": "phase-5",
+  "track": "quantization",
+  "mode": "local-lexical-vector-quantization",
+  "generatedAt": "2026-04-25T13:48:02.793432+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "dependencies": "stdlib-only"
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-5-retrieval.json",
+    "entryCount": 6,
+    "entryIds": [
+      "p5-gd-001",
+      "p5-gd-002",
+      "p5-gd-003",
+      "p5-gd-004",
+      "p5-gd-005",
+      "p5-gd-006"
+    ],
+    "documentRef": "phase-5-retrieval-text",
+    "documentPath": "samples/phase-5-retrieval.txt"
+  },
+  "method": {
+    "baseline": "normalized lexical vectors stored as fp32",
+    "candidate": "per-vector symmetric int8 quantization",
+    "searchPaths": [
+      "fp32 cosine",
+      "int8 dequantized cosine",
+      "int8 direct normalized dot product"
+    ],
+    "dimensions": 134,
+    "chunkCount": 7,
+    "benchmarkIterations": 2000
+  },
+  "variants": [
+    {
+      "name": "lexical-fp32",
+      "role": "baseline",
+      "metrics": {
+        "recallAt1": 1.0,
+        "avgLatencyMs": 0.167187,
+        "p95LatencyMs": 0.179043,
+        "memoryBytes": 3752
+      },
+      "hyperparameters": {
+        "precision": "fp32",
+        "normalization": "l2"
+      },
+      "perQuery": [
+        {
+          "id": "p5-gd-001",
+          "question": "Which pipeline records offsets and preserves lineage metadata?",
+          "topChunkId": "phase-5-retrieval-001:section-2:chunk-1",
+          "topScore": 0.47629,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-2:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-002",
+          "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+          "topChunkId": "phase-5-retrieval-001:section-3:chunk-1",
+          "topScore": 0.440959,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-3:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-003",
+          "question": "Which stage reorders candidate chunks after initial retrieval?",
+          "topChunkId": "phase-5-retrieval-001:section-4:chunk-1",
+          "topScore": 0.433013,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-4:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-004",
+          "question": "How is session memory isolated?",
+          "topChunkId": "phase-5-retrieval-001:section-5:chunk-1",
+          "topScore": 0.40161,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-5:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-005",
+          "question": "Which request metrics feed the trade-offs dashboard?",
+          "topChunkId": "phase-5-retrieval-001:section-6:chunk-1",
+          "topScore": 0.505181,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-6:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-006",
+          "question": "What should a good quantized retrieval path preserve?",
+          "topChunkId": "phase-5-retrieval-001:section-7:chunk-1",
+          "topScore": 0.442326,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-7:chunk-1"
+          ],
+          "hit": true
+        }
+      ]
+    },
+    {
+      "name": "lexical-int8-symmetric-dequantized",
+      "role": "candidate",
+      "metrics": {
+        "recallAt1": 1.0,
+        "avgLatencyMs": 0.220275,
+        "p95LatencyMs": 0.182418,
+        "memoryBytes": 994,
+        "memoryReductionRate": 0.735075
+      },
+      "hyperparameters": {
+        "precision": "int8",
+        "method": "per-vector-symmetric",
+        "dequantizeForSearch": true
+      },
+      "perQuery": [
+        {
+          "id": "p5-gd-001",
+          "question": "Which pipeline records offsets and preserves lineage metadata?",
+          "topChunkId": "phase-5-retrieval-001:section-2:chunk-1",
+          "topScore": 0.47684,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-2:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-002",
+          "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+          "topChunkId": "phase-5-retrieval-001:section-3:chunk-1",
+          "topScore": 0.440464,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-3:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-003",
+          "question": "Which stage reorders candidate chunks after initial retrieval?",
+          "topChunkId": "phase-5-retrieval-001:section-4:chunk-1",
+          "topScore": 0.433013,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-4:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-004",
+          "question": "How is session memory isolated?",
+          "topChunkId": "phase-5-retrieval-001:section-5:chunk-1",
+          "topScore": 0.402592,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-5:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-005",
+          "question": "Which request metrics feed the trade-offs dashboard?",
+          "topChunkId": "phase-5-retrieval-001:section-6:chunk-1",
+          "topScore": 0.505838,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-6:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-006",
+          "question": "What should a good quantized retrieval path preserve?",
+          "topChunkId": "phase-5-retrieval-001:section-7:chunk-1",
+          "topScore": 0.442326,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-7:chunk-1"
+          ],
+          "hit": true
+        }
+      ]
+    },
+    {
+      "name": "lexical-int8-symmetric-direct",
+      "role": "candidate",
+      "metrics": {
+        "recallAt1": 1.0,
+        "avgLatencyMs": 0.154806,
+        "p95LatencyMs": 0.170474,
+        "memoryBytes": 994,
+        "memoryReductionRate": 0.735075
+      },
+      "hyperparameters": {
+        "precision": "int8",
+        "method": "per-vector-symmetric",
+        "dequantizeForSearch": false,
+        "similarity": "normalized-int8-dot-product"
+      },
+      "perQuery": [
+        {
+          "id": "p5-gd-001",
+          "question": "Which pipeline records offsets and preserves lineage metadata?",
+          "topChunkId": "phase-5-retrieval-001:section-2:chunk-1",
+          "topScore": 0.47684,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-2:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-002",
+          "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+          "topChunkId": "phase-5-retrieval-001:section-3:chunk-1",
+          "topScore": 0.440464,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-3:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-003",
+          "question": "Which stage reorders candidate chunks after initial retrieval?",
+          "topChunkId": "phase-5-retrieval-001:section-4:chunk-1",
+          "topScore": 0.433013,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-4:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-004",
+          "question": "How is session memory isolated?",
+          "topChunkId": "phase-5-retrieval-001:section-5:chunk-1",
+          "topScore": 0.402592,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-5:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-005",
+          "question": "Which request metrics feed the trade-offs dashboard?",
+          "topChunkId": "phase-5-retrieval-001:section-6:chunk-1",
+          "topScore": 0.505838,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-6:chunk-1"
+          ],
+          "hit": true
+        },
+        {
+          "id": "p5-gd-006",
+          "question": "What should a good quantized retrieval path preserve?",
+          "topChunkId": "phase-5-retrieval-001:section-7:chunk-1",
+          "topScore": 0.442326,
+          "expectedChunkIds": [
+            "phase-5-retrieval-001:section-7:chunk-1"
+          ],
+          "hit": true
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "dequantizedCandidateVsBaseline": {
+      "recallAt1": 0.0,
+      "avgLatencyMs": 0.053088,
+      "p95LatencyMs": 0.003375,
+      "memoryBytes": -2758,
+      "memoryReductionRate": 0.735075
+    },
+    "directCandidateVsBaseline": {
+      "recallAt1": 0.0,
+      "avgLatencyMs": -0.012381,
+      "p95LatencyMs": -0.008569,
+      "memoryBytes": -2758,
+      "memoryReductionRate": 0.735075
+    },
+    "passed": true,
+    "notes": "This is a local vector-quantization experiment for the current RAG dataset. Direct INT8 search avoids dequantizing before similarity scoring and keeps the Phase 5 path dependency-free."
+  }
+}

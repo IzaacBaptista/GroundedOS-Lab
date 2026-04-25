@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "phase": "phase-5",
+  "track": "distillation",
+  "mode": "deterministic-scaffold",
+  "generatedAt": "2026-04-25T13:48:03.078476+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "dependencies": "stdlib-only"
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-0-baseline.json",
+    "entryCount": 1,
+    "entryIds": [
+      "gd-001"
+    ]
+  },
+  "variants": [
+    {
+      "name": "teacher-large",
+      "role": "baseline",
+      "metrics": {
+        "quality": 0.92,
+        "latency_ms": 820.0,
+        "parameter_ratio": 1.0
+      },
+      "hyperparameters": {
+        "teacher": true
+      }
+    },
+    {
+      "name": "student-small-dry-run",
+      "role": "candidate",
+      "metrics": {
+        "quality": 0.84,
+        "latency_ms": 260.0,
+        "parameter_ratio": 0.25
+      },
+      "hyperparameters": {
+        "temperature": 2.0,
+        "alpha": 0.5,
+        "student": true
+      }
+    }
+  ],
+  "comparison": {
+    "candidateVsBaseline": {
+      "latency_ms": -560.0,
+      "parameter_ratio": -0.75,
+      "quality": -0.08
+    },
+    "notes": "Dry-run metrics prove the artifact contract and result logging path. Replace with real training/evaluation metrics when the track gains ML dependencies."
+  }
+}

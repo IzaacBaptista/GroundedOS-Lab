@@ -32,6 +32,32 @@ Datasets are registered in [`registry.json`](./registry.json). Each entry record
 | ID | Modality | Path | Use |
 |---|---|---|---|
 | `phase-0-smoke-text` | `text` | [`samples/phase-0-smoke.txt`](./samples/phase-0-smoke.txt) | Local ETL smoke test |
+| `phase-5-retrieval-text` | `text` | [`samples/phase-5-retrieval.txt`](./samples/phase-5-retrieval.txt) | Multi-section retrieval and quantization evaluation |
+
+## Experiment artifacts
+
+Phase 5 experiments write JSON artifacts under:
+
+```text
+datasets/experiments/phase-5/
+```
+
+Current artifacts:
+
+| Track | Artifact |
+|---|---|
+| Fine-tuning | [`experiments/phase-5/fine-tuning/scaffold-result.json`](./experiments/phase-5/fine-tuning/scaffold-result.json) |
+| LoRA | [`experiments/phase-5/lora/scaffold-result.json`](./experiments/phase-5/lora/scaffold-result.json) |
+| Quantization | [`experiments/phase-5/quantization/scaffold-result.json`](./experiments/phase-5/quantization/scaffold-result.json) |
+| Distillation | [`experiments/phase-5/distillation/scaffold-result.json`](./experiments/phase-5/distillation/scaffold-result.json) |
+
+Fine-tuning, LoRA and distillation are still scaffold artifacts. Quantization
+now runs a local lexical vector quantization benchmark against
+[`golden/phase-5-retrieval.json`](./golden/phase-5-retrieval.json) and records
+measured quality, latency and memory metrics for FP32, INT8 dequantized search
+and direct INT8 search. All artifacts preserve the same contract: input
+dataset, environment, variant hyperparameters, metrics and candidate-vs-baseline
+deltas.
 
 ## Local usage
 
@@ -41,6 +67,7 @@ From the repository root:
 npm run ingest:smoke
 npm run rag:smoke -- --dataset phase-0-smoke-text --query "What does this command verify?"
 npm run rag:ask -- --file datasets/samples/phase-0-smoke.txt --type text --query "What does this command verify?"
+npm run experiment:phase5
 ```
 
 The smoke command reads `phase-0-smoke-text` from the registry, verifies its checksum, runs it through `packages/etl`, and prints the resulting `NormalizedDocument`.

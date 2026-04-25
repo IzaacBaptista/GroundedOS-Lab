@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "phase": "phase-5",
+  "track": "fine-tuning",
+  "mode": "deterministic-scaffold",
+  "generatedAt": "2026-04-25T13:48:01.092327+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "dependencies": "stdlib-only"
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-0-baseline.json",
+    "entryCount": 1,
+    "entryIds": [
+      "gd-001"
+    ]
+  },
+  "variants": [
+    {
+      "name": "base-instruct",
+      "role": "baseline",
+      "metrics": {
+        "faithfulness": 0.87,
+        "relevance": 0.92,
+        "exact_keyword_hit_rate": 1.0
+      },
+      "hyperparameters": {
+        "training": false
+      }
+    },
+    {
+      "name": "sft-candidate-dry-run",
+      "role": "candidate",
+      "metrics": {
+        "faithfulness": 0.9,
+        "relevance": 0.94,
+        "exact_keyword_hit_rate": 1.0
+      },
+      "hyperparameters": {
+        "epochs": 1,
+        "learning_rate": 2e-05,
+        "batch_size": 1
+      }
+    }
+  ],
+  "comparison": {
+    "candidateVsBaseline": {
+      "exact_keyword_hit_rate": 0.0,
+      "faithfulness": 0.03,
+      "relevance": 0.02
+    },
+    "notes": "Dry-run metrics prove the artifact contract and result logging path. Replace with real training/evaluation metrics when the track gains ML dependencies."
+  }
+}

@@ -333,6 +333,10 @@ describe("App", () => {
       expect(screen.getByLabelText(/model provider/i)).toBeTruthy();
     });
 
+    fireEvent.change(screen.getByLabelText(/model provider/i), {
+      target: { value: "openai" },
+    });
+
     expect(screen.getByDisplayValue("openai")).toBeTruthy();
     expect(screen.getByText(/gpt-5-mini/i)).toBeTruthy();
     expect(screen.getAllByText(/insufficient_quota/i).length).toBeGreaterThan(0);

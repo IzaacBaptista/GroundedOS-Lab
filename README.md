@@ -733,9 +733,10 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 * Distillation
 
 **✅ Success Criteria:**
-- [ ] Each `experiments/` folder contains a reproducible notebook or script with a documented environment setup (Python version, dependencies)
-- [ ] Benchmark scores compare base model vs tuned or quantized variant on at least one task-specific metric (e.g. BLEU, F1, or faithfulness)
-- [ ] Results are logged and stored in `datasets/` with the input dataset, hyperparameters and output metrics recorded
+- [x] Initial deterministic scaffolds exist for fine-tuning, LoRA, quantization and distillation with documented Python environment setup
+- [x] Scaffold artifacts compare baseline vs candidate variants on task-specific metrics such as faithfulness, relevance, quality, latency, memory or parameter ratio
+- [x] Scaffold results are logged under `datasets/experiments/phase-5/` with input dataset, hyperparameters and output metrics recorded
+- [ ] Replace deterministic scaffold metrics with real model training/evaluation runs for at least one Phase 5 track
 
 ### Phase 6 — Infrastructure & Deploy
 
@@ -762,8 +763,15 @@ quantization, fine-tuning and distillation.
 
 - Phase 4 is closed: `datasets/golden/baselines/phase-4-model-benchmark.json`
   records `phase4ModelBenchmarkPassed: true` (Ollama + Groq cloud in same run)
-- Start Phase 5: create reproducible experiment notebooks/scripts with documented
-  Python environments in each `experiments/` folder
+- Phase 5 has started with reproducible deterministic scaffolds:
+  `npm run experiment:phase5` writes artifacts to `datasets/experiments/phase-5/`
+- Quantization now has the first real local experiment path: lexical retrieval
+  vectors are quantized to INT8 and compared with FP32-style vectors for
+  Recall@1, latency and memory; the latest run includes direct INT8 similarity
+  search without dequantizing first over `datasets/golden/phase-5-retrieval.json`
+- Next Phase 5 implementation step: replace the LoRA scaffold or extend
+  quantization from vector quantization to model-weight quantization when a
+  local model runtime is available
 - Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
   results for product decisions; the current prompt test has only one golden
   query

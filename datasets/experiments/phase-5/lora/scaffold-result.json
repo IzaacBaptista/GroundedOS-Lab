@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "phase": "phase-5",
+  "track": "lora",
+  "mode": "deterministic-scaffold",
+  "generatedAt": "2026-04-25T13:48:01.296202+00:00",
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-110-generic-x86_64-with-glibc2.39",
+    "dependencies": "stdlib-only"
+  },
+  "inputDataset": {
+    "path": "datasets/golden/phase-0-baseline.json",
+    "entryCount": 1,
+    "entryIds": [
+      "gd-001"
+    ]
+  },
+  "variants": [
+    {
+      "name": "base-instruct",
+      "role": "baseline",
+      "metrics": {
+        "faithfulness": 0.87,
+        "relevance": 0.92,
+        "trainable_parameter_ratio": 1.0
+      },
+      "hyperparameters": {
+        "training": false
+      }
+    },
+    {
+      "name": "lora-r8-alpha16-dry-run",
+      "role": "candidate",
+      "metrics": {
+        "faithfulness": 0.89,
+        "relevance": 0.93,
+        "trainable_parameter_ratio": 0.012
+      },
+      "hyperparameters": {
+        "rank": 8,
+        "alpha": 16,
+        "dropout": 0.05
+      }
+    }
+  ],
+  "comparison": {
+    "candidateVsBaseline": {
+      "faithfulness": 0.02,
+      "relevance": 0.01,
+      "trainable_parameter_ratio": -0.988
+    },
+    "notes": "Dry-run metrics prove the artifact contract and result logging path. Replace with real training/evaluation metrics when the track gains ML dependencies."
+  }
+}

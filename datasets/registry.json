@@ -16,6 +16,22 @@
         "language": "en",
         "tags": ["smoke", "phase-0"]
       }
+    },
+    {
+      "id": "phase-5-retrieval-text",
+      "name": "Phase 5 Retrieval Evaluation Dataset",
+      "description": "Synthetic multi-section document used to evaluate retrieval quality, quantization, and advanced ML experiment artifacts.",
+      "modality": "text",
+      "path": "samples/phase-5-retrieval.txt",
+      "source": "synthetic",
+      "license": "CC0-1.0",
+      "sha256": "874cdfea9c047068467e02c6008767b961e91ca8b51a3ec55775d137c059b86a",
+      "metadata": {
+        "documentId": "phase-5-retrieval-001",
+        "title": "Phase 5 Retrieval Evaluation",
+        "language": "en",
+        "tags": ["phase-5", "retrieval", "quantization"]
+      }
     }
   ]
 }

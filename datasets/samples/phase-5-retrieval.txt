@@ -1,0 +1,13 @@
+GroundedOS Phase 5 retrieval evaluation dataset.
+
+The ingestion pipeline normalizes source documents into sections, preserves lineage metadata, and records offsets so retrieved chunks can be traced back to the original input.
+
+Hybrid retrieval blends dense vector similarity with sparse lexical scoring. The sparse signal helps exact terms such as checksum, lineage, and retention remain visible during ranking.
+
+Reranking reorders candidate chunks after initial retrieval. It uses query overlap and chunk evidence to promote passages that answer the user question more directly.
+
+Session memory stores conversation facts under a caller supplied session identifier. Entries are isolated by session so one user flow does not leak into another.
+
+Cost tracking records estimated provider cost, latency, cache status, and budget checks for each request. These metrics feed the trade-offs dashboard.
+
+Quantization compresses numeric vectors to smaller integer representations. A good quantized retrieval path should reduce memory while preserving Recall@1 on golden questions.
