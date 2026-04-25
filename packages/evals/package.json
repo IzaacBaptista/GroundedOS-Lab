@@ -20,7 +20,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@groundedos/core": "workspace:*"
+    "@groundedos/core": "*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

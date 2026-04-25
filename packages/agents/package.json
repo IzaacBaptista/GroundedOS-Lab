@@ -21,9 +21,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@groundedos/core": "workspace:*",
-    "@groundedos/rag": "workspace:*",
-    "@groundedos/observability": "workspace:*"
+    "@groundedos/core": "*",
+    "@groundedos/rag": "*",
+    "@groundedos/observability": "*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
