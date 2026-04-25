@@ -7,10 +7,10 @@ import { TradeoffsTab } from "./tabs/TradeoffsTab";
 import { WorkflowTab } from "./tabs/WorkflowTab";
 import { ExplainBox } from "./shared/ExplainBox";
 
-type AnswerTab = "chunks" | "citations" | "workflow" | "tradeoffs";
+export type AnswerTab = "chunks" | "citations" | "workflow" | "tradeoffs";
 
 const TABS: Array<{ id: AnswerTab; label: string }> = [
-  { id: "chunks", label: "Chunks recuperados" },
+  { id: "chunks", label: "Cache hit" },
   { id: "citations", label: "Citações" },
   { id: "workflow", label: "Workflow" },
   { id: "tradeoffs", label: "Trade-offs" },
@@ -52,7 +52,7 @@ function getQueryUnderstanding(response: RagAskResponse): QueryUnderstandingShap
 function EmptyTab({ label }: { label: string }) {
   return (
     <ExplainBox variant="info">
-      {label} will appear after you run Ask. The tab is available now so the Dev Mode layout stays stable before and after a request.
+      {label} aparece aqui depois de executar Ask. A estrutura da interface é mantida para facilitar comparação entre queries.
     </ExplainBox>
   );
 }
@@ -62,13 +62,20 @@ export function AnswerPanel({
   tradeoffs,
   tradeoffsLoading,
   onRefreshTradeoffs,
+  activeTab,
+  onActiveTabChange,
+  showTabs = true,
 }: {
   response: RagAskResponse | null;
   tradeoffs: TradeoffMetricsResponse | null;
   tradeoffsLoading: boolean;
   onRefreshTradeoffs: () => void;
+  activeTab?: AnswerTab;
+  onActiveTabChange?: (tab: AnswerTab) => void;
+  showTabs?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<AnswerTab>("chunks");
+  const [internalTab, setInternalTab] = useState<AnswerTab>("chunks");
+  const resolvedTab = activeTab ?? internalTab;
   const answerText =
     response?.answer.text ??
     "Index a document on the left, then ask a question to see grounded Dev Mode output here.";
@@ -97,49 +104,56 @@ export function AnswerPanel({
         </Pill>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Answer Dev Mode views"
-        style={{
-          display: "flex",
-          gap: 4,
-          borderBottom: "0.5px solid var(--color-border-tertiary, var(--line))",
-          marginBottom: "1.25rem",
-          overflowX: "auto",
-        }}
-      >
-        {TABS.map((tab) => {
-          const active = activeTab === tab.id;
+      {showTabs && (
+        <div
+          role="tablist"
+          aria-label="Answer Dev Mode views"
+          style={{
+            display: "flex",
+            gap: 8,
+            borderBottom: "0.5px solid var(--color-border-tertiary, var(--line))",
+            marginBottom: "1.25rem",
+            overflowX: "auto",
+            paddingBottom: 10,
+          }}
+        >
+          {TABS.map((tab) => {
+            const active = resolvedTab === tab.id;
 
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                border: "none",
-                borderBottom: `2px solid ${active ? "var(--color-text-primary, var(--text))" : "transparent"}`,
-                marginBottom: -1,
-                padding: "0.5rem 0.875rem",
-                background: "none",
-                color: active
-                  ? "var(--color-text-primary, var(--text))"
-                  : "var(--color-text-secondary, var(--muted))",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: active ? 500 : 400,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  onActiveTabChange?.(tab.id);
+                  if (!activeTab) {
+                    setInternalTab(tab.id);
+                  }
+                }}
+                style={{
+                  borderRadius: 8,
+                  border: "0.5px solid var(--color-border-tertiary, var(--line))",
+                  padding: "0.4rem 0.875rem",
+                  background: active
+                    ? "var(--color-background-secondary, #F1EFE8)"
+                    : "var(--color-background-primary, var(--panel))",
+                  color: "var(--color-text-primary, var(--text))",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: active ? 600 : 500,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {activeTab === "chunks" && response && (
+      {resolvedTab === "chunks" && response && (
         <ChunksTab
           results={response.devMode.results ?? []}
           embeddingProvider={response.index.embeddingProvider}
@@ -153,9 +167,9 @@ export function AnswerPanel({
         />
       )}
 
-      {activeTab === "chunks" && !response && <EmptyTab label="Retrieved chunks" />}
+      {resolvedTab === "chunks" && !response && <EmptyTab label="Cache hit" />}
 
-      {activeTab === "citations" && response && (
+      {resolvedTab === "citations" && response && (
         <CitationsTab
           citations={response.answer.citations}
           documentTitle={response.document.title}
@@ -163,18 +177,18 @@ export function AnswerPanel({
         />
       )}
 
-      {activeTab === "citations" && !response && <EmptyTab label="Citations" />}
+      {resolvedTab === "citations" && !response && <EmptyTab label="Citações" />}
 
-      {activeTab === "workflow" && response && (
+      {resolvedTab === "workflow" && response && (
         <WorkflowTab
           workflow={getDevWorkflow(response)}
           queryUnderstanding={getQueryUnderstanding(response)}
         />
       )}
 
-      {activeTab === "workflow" && !response && <EmptyTab label="Workflow trace" />}
+      {resolvedTab === "workflow" && !response && <EmptyTab label="Workflow" />}
 
-      {activeTab === "tradeoffs" && (
+      {resolvedTab === "tradeoffs" && (
         <TradeoffsTab
           tradeoffs={tradeoffs ?? undefined}
           loading={tradeoffsLoading}

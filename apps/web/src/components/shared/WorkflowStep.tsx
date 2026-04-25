@@ -1,4 +1,5 @@
 import { ExplainBox } from "./ExplainBox";
+import { explainWorkflowStepConsequence } from "../../utils/explanations";
 
 export const STEP_EXPLANATIONS: Record<string, string> = {
   "normalize-request": "Validated input fields and applied defaults (topK, provider, sessionId).",
@@ -62,6 +63,9 @@ export function WorkflowStep({
         </div>
         <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 11, lineHeight: 1.45 }}>
           {explanation}
+        </div>
+        <div style={{ color: "var(--color-text-tertiary, var(--muted))", fontSize: 10, lineHeight: 1.5, marginTop: 4 }}>
+          {explainWorkflowStepConsequence(name)}
         </div>
         {error && <ExplainBox variant="warning">{error}</ExplainBox>}
       </div>

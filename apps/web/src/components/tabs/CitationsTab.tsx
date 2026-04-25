@@ -1,4 +1,10 @@
 import type { Citation } from "../../api/types";
+import {
+  explainCitationGrounding,
+  explainCitationPosition,
+  explainExtractiveAnswer,
+  explainNoCitations,
+} from "../../utils/explanations";
 import { ExplainBox } from "../shared/ExplainBox";
 import { Pill } from "../shared/Pill";
 
@@ -40,11 +46,19 @@ export function CitationsTab({
 
   return (
     <div>
+      <header style={{ display: "grid", gap: 4, marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 32, fontWeight: 600 }}>Citações e grounding</h3>
+        <p style={{ margin: 0, color: "var(--color-text-secondary, var(--muted))", fontSize: 14 }}>
+          Grounding significa que toda resposta tem origem rastreável. Esta aba mostra exatamente
+          de onde, no documento, veio cada trecho.
+        </p>
+      </header>
+
       <SectionLabel>de onde veio a resposta</SectionLabel>
 
       {citations.length === 0 ? (
         <ExplainBox variant="warning">
-          Esta resposta não trouxe citações. Para uma resposta grounded, cada afirmação importante deve apontar para um trecho recuperado.
+          {explainNoCitations()}
         </ExplainBox>
       ) : (
         <>
@@ -65,8 +79,17 @@ export function CitationsTab({
             ))}
           </div>
 
-          <ExplainBox>
-            Grounding significa que a resposta tem origem rastreável. Cada citação mapeia a resposta para um chunk, arquivo e intervalo de caracteres, reduzindo alucinação por construção.
+          <ExplainBox variant="success" label="o que grounding significa">
+            {citations
+              .map((citation) =>
+                explainCitationGrounding(
+                  citation.chunkId,
+                  sourceLabel(citation.source),
+                  citation.offsets.startOffset,
+                  citation.offsets.endOffset
+                )
+              )
+              .join(" ")}
           </ExplainBox>
 
           <section
@@ -113,6 +136,9 @@ export function CitationsTab({
                     <div style={{ marginTop: 6, color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
                       chars {start}–{end} of ~{totalChars} total
                     </div>
+                    <ExplainBox label="posição no documento">
+                      {explainCitationPosition(start, totalChars)}
+                    </ExplainBox>
                   </article>
                 );
               })}
@@ -132,6 +158,9 @@ export function CitationsTab({
             >
               {answerText || "No cited answer text available."}
             </pre>
+            <ExplainBox label="por que a resposta é este trecho exato">
+              {explainExtractiveAnswer()}
+            </ExplainBox>
           </section>
         </>
       )}

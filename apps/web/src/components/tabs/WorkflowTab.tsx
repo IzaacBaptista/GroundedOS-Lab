@@ -2,6 +2,13 @@ import { ExplainBox } from "../shared/ExplainBox";
 import { Pill } from "../shared/Pill";
 import { ScoreBar } from "../shared/ScoreBar";
 import { WorkflowStep } from "../shared/WorkflowStep";
+import {
+  detectQueryLanguage,
+  explainIntent,
+  explainNoWorkflowTrace,
+  explainTotalDuration,
+  explainWorkflowObservability,
+} from "../../utils/explanations";
 
 type WorkflowShape = {
   workflowId?: string;
@@ -49,11 +56,19 @@ export function WorkflowTab({
 
   return (
     <div>
+      <header style={{ display: "grid", gap: 4, marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 32, fontWeight: 600 }}>Pipeline de execução</h3>
+        <p style={{ margin: 0, color: "var(--color-text-secondary, var(--muted))", fontSize: 14 }}>
+          Cada pergunta passa por etapas em sequência. O workflow mostra o que aconteceu em cada
+          passo, quanto tempo levou e qual decisão foi tomada.
+        </p>
+      </header>
+
       <SectionLabel>o que aconteceu por baixo — passo a passo</SectionLabel>
 
       {!workflow || steps.length === 0 ? (
         <ExplainBox variant="warning">
-          Workflow tracing not available for this request. Enable it in API settings.
+          {explainNoWorkflowTrace()}
         </ExplainBox>
       ) : (
         <section
@@ -67,6 +82,12 @@ export function WorkflowTab({
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
             <Pill variant="gray">{totalDuration.toFixed(1)} ms total</Pill>
           </div>
+          <ExplainBox
+            variant={totalDuration > 1000 ? "warning" : totalDuration < 10 ? "success" : "default"}
+            label="o que a duração total indica"
+          >
+            {explainTotalDuration(totalDuration)}
+          </ExplainBox>
           {steps.map(([name, step]) => (
             <WorkflowStep
               key={name}
@@ -80,7 +101,7 @@ export function WorkflowTab({
       )}
 
       <ExplainBox>
-        Cada linha é um passo rastreável do pipeline. Status, duração e explicação ajudam a diferenciar um sistema observável de uma caixa-preta.
+        {explainWorkflowObservability()}
       </ExplainBox>
 
       {queryUnderstanding && (
@@ -125,9 +146,15 @@ export function WorkflowTab({
               />
             )}
           </div>
-          <ExplainBox>
-            Query understanding transforma a pergunta em sinais de busca: intenção, termos expandidos e confiança determinam como os chunks serão recuperados.
-          </ExplainBox>
+          {queryUnderstanding.intent && typeof queryUnderstanding.confidence === "number" && (
+            <ExplainBox label="o que esse intent significa">
+              {explainIntent(
+                queryUnderstanding.intent,
+                queryUnderstanding.confidence,
+                detectQueryLanguage(queryUnderstanding.original)
+              )}
+            </ExplainBox>
+          )}
         </section>
       )}
     </div>

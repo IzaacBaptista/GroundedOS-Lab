@@ -1,4 +1,15 @@
+import { useState } from "react";
 import type { TradeoffMetricsResponse } from "../../api/types";
+import {
+  explainLatencyCurve,
+  explainNoProviderRows,
+  explainOllamaCacheParadox,
+  explainProviderLatency,
+  explainTradeoffInsight,
+  explainTradeoffsLoading,
+  explainTradeoffMetric,
+  explainZeroCacheRate,
+} from "../../utils/explanations";
 import { ExplainBox } from "../shared/ExplainBox";
 import { ProviderRow } from "../shared/ProviderRow";
 
@@ -20,8 +31,17 @@ function SectionLabel({ children }: { children: string }) {
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
+  const explanation = explainTradeoffMetric(label);
+  const [showExplanation, setShowExplanation] = useState(false);
+
   return (
     <article
+      title={explanation}
+      onMouseEnter={() => setShowExplanation(true)}
+      onMouseLeave={() => setShowExplanation(false)}
+      onFocus={() => setShowExplanation(true)}
+      onBlur={() => setShowExplanation(false)}
+      tabIndex={0}
       style={{
         border: "0.5px solid var(--color-border-tertiary, var(--line))",
         borderRadius: 8,
@@ -30,11 +50,16 @@ function MetricCard({ label, value }: { label: string; value: string }) {
       }}
     >
       <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
-        {label}
+        {label} <span aria-hidden="true">?</span>
       </div>
       <strong style={{ display: "block", marginTop: 4, fontSize: 18 }}>
         {value}
       </strong>
+      {showExplanation && (
+        <ExplainBox label="o que essa métrica significa">
+          {explanation}
+        </ExplainBox>
+      )}
     </article>
   );
 }
@@ -245,21 +270,11 @@ function LatencyCurve({
       <div style={{ fontSize: 11, color: "var(--color-text-tertiary, var(--muted))" }}>
         p95 {Math.max(...recent.map((sample) => sample.latencyMs)).toFixed(1)} ms · samples {recent.length}
       </div>
+      <ExplainBox label="como ler a curva">
+        {explainLatencyCurve(recent.map((sample) => sample.latencyMs))}
+      </ExplainBox>
     </article>
   );
-}
-
-function tradeoffInsight(tradeoffs: TradeoffMetricsResponse): string {
-  const lexical = tradeoffs.providers.find((provider) => provider.provider === "api-lexical");
-  const ollama = tradeoffs.providers.find((provider) => provider.provider === "ollama");
-
-  if (lexical && ollama && ollama.avgLatencyMs > lexical.avgLatencyMs * 10) {
-    const ratio = Math.round(ollama.avgLatencyMs / Math.max(lexical.avgLatencyMs, 1));
-
-    return `Ollama is ${ratio}x slower than api-lexical but may have higher cache hit rate. Slower providers benefit more from caching repeated queries because each avoided request saves more latency. All local providers have $0.00 cost. Cloud providers will show real costs when configured in Phase 4.`;
-  }
-
-  return "All local providers have $0.00 cost. Cloud providers (OpenAI, Anthropic) will show real costs when configured in Phase 4.";
 }
 
 export function TradeoffsTab({
@@ -272,9 +287,30 @@ export function TradeoffsTab({
   onRefresh: () => void;
 }) {
   const maxLatency = Math.max(...(tradeoffs?.providers.map((provider) => provider.avgLatencyMs) ?? [0]));
+  const baselineLatency =
+    tradeoffs?.providers.find((provider) => provider.provider === "api-lexical")?.avgLatencyMs ??
+    tradeoffs?.providers.reduce(
+      (min, provider) => Math.min(min, provider.avgLatencyMs),
+      Number.POSITIVE_INFINITY
+    ) ??
+    1;
+  const lexical = tradeoffs?.providers.find((provider) => provider.provider === "api-lexical");
+  const ollama = tradeoffs?.providers.find((provider) => provider.provider === "ollama");
+  const ollamaRatio =
+    lexical && ollama
+      ? Math.round(ollama.avgLatencyMs / Math.max(lexical.avgLatencyMs, 1))
+      : undefined;
 
   return (
     <div>
+      <header style={{ display: "grid", gap: 4, marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 32, fontWeight: 600 }}>Trade-offs de providers</h3>
+        <p style={{ margin: 0, color: "var(--color-text-secondary, var(--muted))", fontSize: 14 }}>
+          Cada provider de embedding tem um perfil diferente de velocidade, cache e custo. Este
+          painel agrega as requests da sessão para mostrar esse perfil.
+        </p>
+      </header>
+
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <SectionLabel>latência · custo · qualidade — por provider</SectionLabel>
         <button
@@ -290,7 +326,7 @@ export function TradeoffsTab({
 
       {!tradeoffs ? (
         <ExplainBox variant="info">
-          Trade-off metrics are loading or not available yet. Run a few Ask requests to populate provider latency, cache, and cost metrics.
+          {explainTradeoffsLoading()}
         </ExplainBox>
       ) : (
         <>
@@ -333,21 +369,43 @@ export function TradeoffsTab({
             }}
           >
             {tradeoffs.providers.length === 0 ? (
-              <ExplainBox>No provider rows yet. Run Ask to record per-provider samples.</ExplainBox>
+              <ExplainBox>{explainNoProviderRows()}</ExplainBox>
             ) : (
               tradeoffs.providers.map((provider) => (
-                <ProviderRow
-                  key={provider.provider}
-                  provider={provider.provider}
-                  avgLatencyMs={provider.avgLatencyMs}
-                  cacheHitRate={provider.cacheHitRate}
-                  maxLatencyMs={maxLatency}
-                />
+                <div key={provider.provider}>
+                  <ProviderRow
+                    provider={provider.provider}
+                    avgLatencyMs={provider.avgLatencyMs}
+                    cacheHitRate={provider.cacheHitRate}
+                    maxLatencyMs={maxLatency}
+                  />
+                  <ExplainBox label="consequência operacional">
+                    {explainProviderLatency(
+                      provider.provider,
+                      provider.avgLatencyMs,
+                      Number.isFinite(baselineLatency) ? baselineLatency : provider.avgLatencyMs
+                    )}
+                  </ExplainBox>
+                  {provider.cacheHitRate === 0 && provider.requests > 5 && (
+                    <ExplainBox variant="tip" label="como testar o cache">
+                      {explainZeroCacheRate(provider.provider, provider.requests)}
+                    </ExplainBox>
+                  )}
+                  {provider.provider === "ollama" &&
+                    Number.isFinite(baselineLatency) &&
+                    provider.avgLatencyMs > baselineLatency * 100 && (
+                      <ExplainBox variant="warning" label="paradoxo do cache com ollama">
+                        {explainOllamaCacheParadox(provider.provider)}
+                      </ExplainBox>
+                    )}
+                </div>
               ))
             )}
           </section>
 
-          <ExplainBox>{tradeoffInsight(tradeoffs)}</ExplainBox>
+          <ExplainBox>
+            {explainTradeoffInsight(Boolean(lexical && ollama && ollamaRatio && ollamaRatio > 10), ollamaRatio)}
+          </ExplainBox>
         </>
       )}
     </div>

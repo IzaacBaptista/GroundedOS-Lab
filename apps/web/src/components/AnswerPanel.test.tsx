@@ -169,7 +169,7 @@ describe("AnswerPanel", () => {
     expect(screen.getByText(/dev mode json/i)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: /citações/i }));
-    expect(screen.getByText(/grounding significa/i)).toBeTruthy();
+    expect(screen.getAllByText(/grounding significa/i).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("tab", { name: /workflow/i }));
     expect(screen.getByText(/process-query/i)).toBeTruthy();

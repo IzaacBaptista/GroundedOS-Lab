@@ -1,4 +1,5 @@
 import type { Citation, DevModeResult } from "../../api/types";
+import { explainQueryReformulation, explainScore } from "../../utils/explanations";
 import { ExplainBox } from "./ExplainBox";
 import { Pill } from "./Pill";
 import { RankBadge } from "./RankBadge";
@@ -28,40 +29,6 @@ function relevanceLabel(score: number): { label: string; variant: "green" | "blu
   return { label: "baixa relevância", variant: "gray" };
 }
 
-function providerExplanation(provider: string): string {
-  if (provider === "ollama") {
-    return "Ollama usa similaridade semântica: duas frases podem combinar mesmo sem repetir as mesmas palavras, porque o embedding captura significado.";
-  }
-
-  if (provider === "api-lexical" || provider === "local-hash") {
-    return `${provider} usa uma estratégia lexical baseada em tokens. Ela é rápida e local, mas perde relações semânticas quando as palavras não se repetem.`;
-  }
-
-  return `${provider} gerou o vetor usado para comparar a query com este chunk. O score vem dessa comparação.`;
-}
-
-function scoreExplanation({
-  score,
-  provider,
-  rank,
-  isCited,
-}: {
-  score: number;
-  provider: string;
-  rank: number;
-  isCited: boolean;
-}) {
-  if (score === 0) {
-    return `Score zero significa que este chunk não teve sobreposição lexical relevante ou similaridade suficiente para a query. ${providerExplanation(provider)}`;
-  }
-
-  if (score > 0.4) {
-    return `Score alto: os sinais deste chunk batem forte com a pergunta, por isso ele ficou no topo da recuperação. ${providerExplanation(provider)}${rank === 1 && isCited ? " Este chunk também foi citado, então ele produziu a resposta final." : ""}`;
-  }
-
-  return `Score intermediário: este chunk tem algum sinal útil, mas é menos direto que os primeiros resultados. ${providerExplanation(provider)}`;
-}
-
 export function ChunkCard({
   chunk,
   maxScore,
@@ -76,6 +43,7 @@ export function ChunkCard({
   const color = rankColor(chunk.rank);
   const relevance = relevanceLabel(chunk.score);
   const isCited = citations.some((citation) => citation.chunkId === chunk.chunkId);
+  const reformulation = explainQueryReformulation(chunk.score, embeddingProvider);
   const dimensions = (chunk as DevModeResult & { embedding?: { dimensions?: number } }).embedding
     ?.dimensions;
 
@@ -121,14 +89,26 @@ export function ChunkCard({
         “{chunk.text}”
       </p>
 
-      <ExplainBox>
-        {scoreExplanation({
-          score: chunk.score,
-          provider: embeddingProvider,
-          rank: chunk.rank,
-          isCited,
-        })}
+      <ExplainBox
+        variant={chunk.score > 0.4 ? "success" : chunk.score < 0.2 ? "warning" : "default"}
+        label="o que esse score significa"
+      >
+        {explainScore(chunk.score, maxScore, embeddingProvider)}
+        {chunk.rank === 1 && isCited
+          ? " Como este chunk também foi citado, ele produziu a resposta final."
+          : ""}
       </ExplainBox>
+
+      {reformulation && (
+        <details style={{ marginTop: "0.5rem" }}>
+          <summary style={{ cursor: "pointer", color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
+            Quando reformular a query
+          </summary>
+          <ExplainBox variant="tip" label="quando reformular a query">
+            {reformulation}
+          </ExplainBox>
+        </details>
+      )}
 
       <details style={{ marginTop: "0.75rem" }}>
         <summary style={{ cursor: "pointer", color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>

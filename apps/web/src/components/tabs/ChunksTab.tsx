@@ -1,5 +1,13 @@
 import { useState } from "react";
 import type { Citation, DevModeOutput, DevModeResult, RagAskResponse } from "../../api/types";
+import {
+  explainCacheHit,
+  explainCacheMiss,
+  explainCacheSavings,
+  explainHybridScores,
+  explainNoChunks,
+  explainReranking,
+} from "../../utils/explanations";
 import { ChunkCard } from "../shared/ChunkCard";
 import { ExplainBox } from "../shared/ExplainBox";
 import { Pill } from "../shared/Pill";
@@ -21,7 +29,15 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-function CacheStatusBanner({ cache }: { cache: Record<string, unknown> }) {
+function CacheStatusBanner({
+  cache,
+  provider,
+  estimatedLatencyMs,
+}: {
+  cache: Record<string, unknown>;
+  provider: string;
+  estimatedLatencyMs: number;
+}) {
   const hit = Boolean(cache.hit);
   const similarity = typeof cache.similarity === "number" ? cache.similarity : undefined;
   const hits = Number(cache.hits ?? cache.hitCount ?? 0);
@@ -43,10 +59,13 @@ function CacheStatusBanner({ cache }: { cache: Record<string, unknown> }) {
           Cache hit
         </span>
         <span style={{ color: "#3B6D11", fontSize: 12 }}>
-          Similarity {similarity?.toFixed(4) ?? "n/a"} — result served from semantic cache, retrieval skipped
+          Similarity {similarity?.toFixed(4) ?? "n/a"} — resultado servido do cache, retrieval ignorado
         </span>
-        <ExplainBox>
-          Semantic cache stores previous results and reuses them when a new query is similar enough. That avoids embedding and retrieval work for repeated questions.
+        <ExplainBox variant="success" label="o que esse número significa">
+          {explainCacheHit(similarity ?? 1, provider, estimatedLatencyMs)}
+        </ExplainBox>
+        <ExplainBox variant="tip" label="o que o cache economizou">
+          {explainCacheSavings(provider, estimatedLatencyMs)}
         </ExplainBox>
       </div>
     );
@@ -64,8 +83,8 @@ function CacheStatusBanner({ cache }: { cache: Record<string, unknown> }) {
       <span style={{ color: "#444441", fontSize: 12 }}>
         Cache miss — full retrieval pipeline executed · {hits} hits / {misses} misses so far
       </span>
-      <ExplainBox>
-        A miss means no previous query was similar enough, so GroundedOS embedded the query and searched the vector index normally.
+      <ExplainBox label="o que aconteceu">
+        {explainCacheMiss(hits, misses)}
       </ExplainBox>
     </div>
   );
@@ -90,6 +109,7 @@ export function ChunksTab({
   const maxScore = Math.max(...results.map((result) => result.score || 0), 0);
   const json = JSON.stringify(rawPayload, null, 2);
   const devMode = extractDevMode(rawPayload);
+  const estimatedLatencyMs = extractEstimatedLatency(rawPayload, embeddingProvider);
 
   const handleCopy = async () => {
     try {
@@ -104,15 +124,29 @@ export function ChunksTab({
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      <header style={{ display: "grid", gap: 4 }}>
+        <h3 style={{ margin: 0, fontSize: 32, fontWeight: 600 }}>Cache semântico</h3>
+        <p style={{ margin: 0, color: "var(--color-text-secondary, var(--muted))", fontSize: 14 }}>
+          O sistema guarda resultados de queries anteriores. Quando a nova query é parecida o
+          suficiente, serve do cache e evita embedding + retrieval.
+        </p>
+      </header>
+
       <SectionLabel>o que foi encontrado — e por quê</SectionLabel>
 
-      {cache && <CacheStatusBanner cache={cache} />}
+      {cache && (
+        <CacheStatusBanner
+          cache={cache}
+          provider={embeddingProvider}
+          estimatedLatencyMs={estimatedLatencyMs}
+        />
+      )}
 
       {devMode && <RetrievalPipelinePanel devMode={devMode} />}
 
       {results.length === 0 ? (
         <ExplainBox variant="warning">
-          Nenhum chunk foi recuperado. Isso normalmente significa que a query não teve sinal suficiente no índice de {chunkCount} chunks.
+          {explainNoChunks(chunkCount)}
         </ExplainBox>
       ) : (
         results
@@ -177,6 +211,8 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
 
   const hybridCandidates = hybrid?.candidates ?? [];
   const rerankCandidates = reranking?.candidates ?? [];
+  const hybridRankOne = hybridCandidates.find((candidate) => candidate.hybridRank === 1);
+  const finalRankOne = rerankCandidates.find((candidate) => candidate.afterRank === 1);
 
   return (
     <section
@@ -203,15 +239,23 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
         <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
           <SectionLabel>dense + sparse → combined score</SectionLabel>
           {hybridCandidates.slice(0, 6).map((candidate) => (
-            <ScoreBreakdownRow
-              key={candidate.chunkId}
-              label={`${candidate.sectionId} · dense #${candidate.denseRank} → hybrid #${candidate.hybridRank}`}
-              scores={[
-                { label: "dense", value: candidate.denseScore },
-                { label: "sparse", value: candidate.sparseScore },
-                { label: "combined", value: candidate.combinedScore },
-              ]}
-            />
+            <div key={candidate.chunkId}>
+              <ScoreBreakdownRow
+                label={`${candidate.sectionId} · dense #${candidate.denseRank} → hybrid #${candidate.hybridRank}`}
+                scores={[
+                  { label: "dense", value: candidate.denseScore },
+                  { label: "sparse", value: candidate.sparseScore },
+                  { label: "combined", value: candidate.combinedScore },
+                ]}
+              />
+              <ExplainBox label="por que esses sinais importam">
+                {explainHybridScores(
+                  candidate.denseScore,
+                  candidate.sparseScore,
+                  candidate.combinedScore
+                )}
+              </ExplainBox>
+            </div>
           ))}
         </div>
       )}
@@ -233,11 +277,36 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
         </div>
       )}
 
-      <ExplainBox>
-        Hybrid retrieval first blends semantic/dense similarity with sparse lexical signal. Re-ranking then reorders the candidates using direct query overlap so the final answer is grounded in the most answer-like chunks.
-      </ExplainBox>
+      {hybridRankOne && finalRankOne && hybridRankOne.chunkId !== finalRankOne.chunkId && (
+        <ExplainBox
+          variant="warning"
+          label="efeito do re-ranking"
+        >
+          {explainReranking(
+            hybridRankOne.chunkId,
+            finalRankOne.chunkId,
+            finalRankOne.hybridScore,
+            finalRankOne.finalScore
+          )}
+        </ExplainBox>
+      )}
     </section>
   );
+}
+
+function extractEstimatedLatency(payload: unknown, provider: string): number {
+  const maybe = payload as { devMode?: { workflow?: { totalDurationMs?: number } } } | undefined;
+  const total = maybe?.devMode?.workflow?.totalDurationMs;
+
+  if (typeof total === "number" && total > 0) {
+    return total;
+  }
+
+  if (provider === "ollama") {
+    return 1000;
+  }
+
+  return 25;
 }
 
 function ScoreBreakdownRow({
