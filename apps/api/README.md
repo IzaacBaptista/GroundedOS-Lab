@@ -12,12 +12,10 @@ the local AI pipeline.
 
 ## Status
 
-In Progress - local RAG API is implemented for inline JSON text, multipart file
-upload, persisted local document indexes, basic index management, and selectable
-local embedding providers, including an opt-in Ollama semantic provider and
-session-scoped persistent memory. Retrieval executes in hybrid mode (dense +
-sparse lexical blending) by default, followed by an explicit reranking stage
-with per-stage telemetry in Dev Mode.
+Implemented baseline (Phases 1-4) with Phase 6 hardening in progress: local
+RAG API supports inline JSON, multipart uploads, persisted indexes, index
+management, hybrid retrieval + reranking telemetry, optional Ollama embeddings,
+and session-scoped persistent memory.
 
 ## Local usage
 
@@ -236,4 +234,7 @@ pairs and timestamps.
 - `"ollama"` is available as an opt-in local semantic embedding provider, but it
   requires a running Ollama server and a pulled embedding model.
 - OpenAI and Hugging Face providers are not wired yet.
-- No auth, observability or production vector database yet.
+- Authentication strategy is documented (ADR-014), but endpoint protection is
+  not enforced yet.
+- Production observability stack and production vector database are still
+  pending.

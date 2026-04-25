@@ -11,4 +11,5 @@ Experiments studying jailbreak attack patterns and evaluating defense mechanisms
 
 ## Status
 
-Planned
+Backlog (not implemented yet). Directory exists as a Phase 6+ placeholder for
+future red-team fixtures and guardrail stress-test runs.

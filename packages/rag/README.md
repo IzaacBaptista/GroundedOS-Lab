@@ -12,12 +12,10 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-In Progress - Phase 1 chunking, deterministic local embeddings, semantic
-embedding provider interfaces, in-memory vector storage, first retrieval flow
-and Dev Mode retrieval output contract implemented. Phase 2 foundations now
-include query understanding (rewrite/expand/intent), an in-memory semantic
-cache module, and hybrid retrieval mode (dense + sparse lexical re-ranking).
-Context assembly remains planned.
+Implemented baseline (Phases 1-2): chunking, embedding providers, in-memory
+vector store, hybrid retrieval, query understanding, semantic cache and Dev
+Mode retrieval output contract are active. Full LLM context-assembly/routing
+policies remain future work.
 
 ## Current implementation
 

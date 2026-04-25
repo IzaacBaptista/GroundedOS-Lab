@@ -11,7 +11,9 @@ Storage and registry for datasets used in experiments, fine-tuning, benchmarks a
 
 ## Status
 
-🟡 In Progress — Phase 0 includes a minimal local smoke dataset.
+Implemented baseline through Phase 5: registry-backed smoke and retrieval
+datasets plus experiment artifacts are active; Phase 6 focuses on infra/auth
+hardening around these assets.
 
 ## Registry
 

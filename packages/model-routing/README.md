@@ -11,4 +11,6 @@ Intelligent model selection and routing layer. Dispatches requests to the most a
 
 ## Status
 
-Planned
+Scaffold placeholder. Model/provider comparison exists in `packages/benchmarks`
+and scripts; centralized routing policies in this package are planned for later
+Phase 6 hardening.

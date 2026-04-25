@@ -27,6 +27,7 @@ Implemented (Phase 3 baseline)
 ## Current limits
 
 - Current evaluators are deterministic lexical/heuristic scorers.
-- Automated A/B prompt testing and statistical winner reporting are still Phase
-  4 work.
+- Automated A/B prompt testing and statistical winner reporting are available
+  via `@groundedos/experiment-toolkit`; this package keeps the evaluator
+  primitives used by that workflow.
 - Trend reports and external eval dashboards are not implemented yet.

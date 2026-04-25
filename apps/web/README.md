@@ -16,10 +16,9 @@ grounded retrieval workflows.
 
 ## Status
 
-In Progress - local RAG upload and persisted-index surface is implemented,
-including provider selection for new indexes, optional session memory-aware
-asks, provider comparison, and a local Trade-offs metrics tab backed by API
-aggregates.
+Implemented baseline (Phases 1-4) with Phase 6 hardening in progress: local
+RAG upload/index/ask flows are implemented, including provider selection,
+optional session-aware asks, provider comparison and a Trade-offs dashboard.
 
 ## Local usage
 
@@ -43,8 +42,9 @@ repository-root `.env`/`.env.local` files before app-specific env files.
 
 ## Current limits
 
-- Local-development server only; no production build pipeline yet.
-- No authentication or saved question history.
+- Local-development UI is primary; production deployment hardening is tracked in
+  Phase 6.
+- Authentication UX is not enforced yet.
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Session memory is managed by the API under `.groundedos/memory/` when

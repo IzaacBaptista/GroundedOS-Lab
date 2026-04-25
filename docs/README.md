@@ -27,4 +27,5 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 
 ## Status
 
-🟡 In Progress — see linked files above for current status per area.
+Actively maintained — aligned with implemented phases through Phase 5 and
+current Phase 6 infrastructure/auth hardening work.

@@ -763,39 +763,21 @@ implementation focus is Phase 6 Infrastructure & Deploy.
 
 ### Current focus
 
-- Phase 4 is closed: `datasets/golden/baselines/phase-4-model-benchmark.json`
-  records `phase4ModelBenchmarkPassed: true` (Ollama + Groq cloud in same run)
-- Phase 5 has started with reproducible deterministic scaffolds:
-  `npm run experiment:phase5` writes artifacts to `datasets/experiments/phase-5/`
-- Quantization track now compares FP32, INT8 dequantized, INT8 direct and INT4
-  direct search over the Phase 5 retrieval golden set — INT4 achieves 85.8%
-  memory reduction at Recall@1=1.0; regression test in
-  `scripts/quantization-experiment.test.ts`
-- LoRA track now runs real adapter training (PyTorch + PEFT): GPT-2 with
-  rank=8, alpha=16 trains 294k/124M parameters (0.24% of model) and achieves
-  comparable instruction-following loss to baseline;
-  `npm run experiment:lora:real` executes with the PyTorch venv;
-  regression test in `scripts/lora-experiment.test.ts`
-- Fine-tuning track runs real SFT: GPT-2 with lr=2e-5, 3 training steps on
-  6 instruction pairs from the Phase 5 retrieval dataset — loss drops 0.48;
-  `npm run experiment:fine-tuning:real`; regression test in
-  `scripts/sft-experiment.test.ts`
-- Distillation track runs real teacher-student training (`gpt2` -> `distilgpt2`)
-  with ~34.17% compression and passing quality gate;
-  `npm run experiment:distillation:real`; regression test in
-  `scripts/distillation-experiment.test.ts`
-- Phase 5 is complete with real runs across all four tracks.
-- Phase 6 baseline infrastructure is now in-repo:
+- Phase 5 is complete with real runs across quantization, LoRA, fine-tuning
+   and distillation artifacts in `datasets/experiments/phase-5/`.
+- Current implementation focus is Phase 6 hardening:
+   Docker/Compose local stack, CI gate, env standardization and auth rollout.
+- Phase 6 baseline infra already landed:
    `docker-compose.yml`, `Dockerfile`, `Dockerfile.web`,
-   `apps/worker/Dockerfile`, and `.github/workflows/ci.yml`
-- Authentication and authorization strategy is documented in
-   `docs/adr/ADR-014-authentication-strategy.md`
-- Expand `datasets/golden/phase-0-baseline.json` before using A/B prompt test
-  results for product decisions; the current prompt test has only one golden
-  query
-- Use the Embeddings tab in the web app to inspect persisted-index chunk
-  projections and section cluster labels
-- Keep roadmap checkboxes and package READMEs synchronized with implementation status
+   `apps/worker/Dockerfile`, `.github/workflows/ci.yml`.
+- Authentication/authorization design is documented in
+   `docs/adr/ADR-014-authentication-strategy.md`; endpoint enforcement is the
+   next implementation step.
+- Next technical priorities:
+   DB-backed auth/session persistence, queue-backed worker jobs, production
+   observability and deployment hardening.
+- Keep roadmap checkboxes and package READMEs synchronized with implementation
+   status.
 
 The local RAG usage guide is documented in
 [`docs/phase-1-local-rag.md`](./docs/phase-1-local-rag.md).

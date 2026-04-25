@@ -11,7 +11,8 @@ Shared foundational types, utilities and abstractions used across all packages a
 
 ## Status
 
-🟡 In Progress — Phase 0 (Data Foundation), Phase 2 foundations in progress (runtime validation, query contracts, workflow engine)
+Implemented baseline (Phases 0-3). Runtime validation, query contracts and
+workflow primitives are active; Phase 6 focuses on infra/auth hardening.
 
 ## Contents
 

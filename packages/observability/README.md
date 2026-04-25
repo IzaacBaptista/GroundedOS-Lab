@@ -12,9 +12,9 @@ Observability and telemetry package. Instruments the entire AI pipeline for moni
 
 ## Status
 
-In Progress - Phase 2 foundation implemented: per-request cost tracking,
-JSONL ledger persistence, budget enforcement primitives, and an in-memory
-trade-off metrics dashboard store.
+Implemented baseline (Phases 2-4): per-request cost tracking, JSONL ledger
+persistence, budget enforcement primitives, and an in-memory trade-off metrics
+dashboard store.
 
 ## Current implementation
 

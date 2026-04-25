@@ -11,4 +11,5 @@ Experiments to surface, measure and document bias in model outputs across demogr
 
 ## Status
 
-Planned
+Backlog (not implemented yet). Directory exists as a Phase 6+ placeholder for
+future fairness/bias evaluation fixtures and reports.
