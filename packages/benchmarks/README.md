@@ -12,8 +12,8 @@ Benchmarking suite for comparing model performance across latency, cost and outp
 
 ## Status
 
-Implemented baseline (Phase 2 retrieval benchmark, Phase 4 model benchmark
-scaffold)
+Implemented baseline (Phase 2 retrieval benchmark, Phase 4 model benchmark with
+local + Ollama execution)
 
 ## Current implementation
 
@@ -28,6 +28,8 @@ scaffold)
   configured.
 - The current Phase 4 baseline artifact is committed at
   `datasets/golden/baselines/phase-4-model-benchmark.json`.
+- In the latest run, `local-extractive` and `ollama` completed; `openai`
+  returned `429 insufficient_quota`.
 
 ## Current limits
 
@@ -37,6 +39,8 @@ scaffold)
   Recall@3/MRR plus an improved expected-chunk score.
 - Phase 4 local-vs-cloud success is not complete until at least one local model
   provider and one cloud provider complete in the same benchmark artifact.
+- Current Phase 4 blocker is cloud provider quota/billing for OpenAI in this
+  environment.
 
 ## Phase 4 provider configuration
 

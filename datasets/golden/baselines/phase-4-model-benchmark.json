@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-04-24T23:21:46.691Z",
+  "timestamp": "2026-04-25T00:00:07.012Z",
   "version": 1,
   "phase": "phase-4",
   "description": "Phase 4 model/provider benchmark over the golden dataset. Local baseline always runs; Ollama and OpenAI run when configured through environment variables.",
@@ -73,8 +73,8 @@
       "status": "completed",
       "metrics": {
         "requestCount": 1,
-        "avgLatencyMs": 533,
-        "p95LatencyMs": 533,
+        "avgLatencyMs": 1603,
+        "p95LatencyMs": 1603,
         "avgFaithfulness": 1,
         "avgRelevance": 0.416,
         "avgQuality": 0.708,
@@ -87,7 +87,7 @@
           "id": "gd-001",
           "question": "What does this command verify?",
           "status": "completed",
-          "latencyMs": 533,
+          "latencyMs": 1603,
           "answer": "The command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument.",
           "expectedAnswerContains": [
             "ETL dispatcher",
@@ -133,7 +133,7 @@
           "id": "gd-001",
           "question": "What does this command verify?",
           "status": "error",
-          "latencyMs": 2062,
+          "latencyMs": 1419,
           "error": "OpenAI request failed with status 429: {\n  \"error\": {\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.\",\n    \"type\": \"insufficient_quota\",\n    \"param\": null,\n    \"code\": \"insufficient_quota\"\n  }\n}",
           "expectedAnswerContains": [
             "ETL dispatcher",

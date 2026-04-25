@@ -71,8 +71,9 @@
 - Model/provider benchmarking is executable with `npm run benchmark:models`
 - Persisted-index embedding visualization is available in the web app with
   section cluster labels
-- The current model benchmark artifact records a local extractive baseline and
-  explicit skips for Ollama/OpenAI until those providers are configured
+- The current model benchmark artifact records completed local-extractive and
+   Ollama runs in the same artifact; OpenAI reaches the API but currently fails
+   with `insufficient_quota` in this environment
 - The next Phase 4 milestone is a completed local-vs-cloud benchmark run:
   Ollama generation plus one cloud provider in the same artifact
 
