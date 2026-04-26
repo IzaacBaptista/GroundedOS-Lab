@@ -624,6 +624,23 @@ describe("api server", () => {
         deletedCount: expect.any(Number),
         deletedDocumentIds: expect.any(Array),
       });
+
+      const auditLogs = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=20",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditBody = auditLogs.json() as {
+        count: number;
+        events: Array<{ action: string; userId?: string; resource?: string }>;
+      };
+
+      expect(auditLogs.statusCode).toBe(200);
+      expect(auditBody.count).toBeGreaterThanOrEqual(2);
+      expect(auditBody.events.some((event) => event.action === "admin.cost.summary.read")).toBe(true);
+      expect(auditBody.events.some((event) => event.action === "admin.indexes.clear_all")).toBe(true);
     } finally {
       process.env.AUTH_ENFORCEMENT = previousEnforcement;
     }

@@ -1,6 +1,8 @@
 import { Body, Controller, HttpCode, Post, Req, Res } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ApiRequestError } from "../errors";
+import { AuditService } from "../audit/audit.service";
+import { getRequestUser } from "../common/auth-context";
 import { AuthService } from "./auth.service";
 
 export type LoginRequest = {
@@ -14,25 +16,35 @@ export type RefreshRequest = {
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly audit: AuditService
+  ) {}
 
   @Post("login")
   @HttpCode(200)
-  login(
+  async login(
     @Body() body: LoginRequest,
     @Res({ passthrough: true }) reply: FastifyReply
-  ): {
+  ): Promise<{
     accessToken: string;
     refreshToken: string;
     expiresIn: number;
     user: { userId: string; username: string; roles: string[] };
-  } {
+  }> {
     if (!body || typeof body.username !== "string" || typeof body.password !== "string") {
       throw new ApiRequestError("username and password are required.", 400);
     }
 
     const session = this.authService.login(body.username, body.password);
     if (!session) {
+      await this.audit.record({
+        action: "auth.login.failed",
+        resource: "/auth/login",
+        metadata: {
+          username: body.username,
+        },
+      });
       throw new ApiRequestError("invalid credentials.", 401);
     }
 
@@ -45,6 +57,13 @@ export class AuthController {
         maxAgeMs / 1000
       )}${secureCookie ? "; Secure" : ""}`
     );
+
+    await this.audit.record({
+      userId: session.user.userId,
+      username: session.user.username,
+      action: "auth.login.succeeded",
+      resource: "/auth/login",
+    });
 
     return session;
   }
@@ -63,8 +82,19 @@ export class AuthController {
 
     const refreshed = await this.authService.refreshAccessToken(body.refreshToken.trim());
     if (!refreshed) {
+      await this.audit.record({
+        action: "auth.refresh.failed",
+        resource: "/auth/refresh",
+      });
       throw new ApiRequestError("invalid refresh token.", 401);
     }
+
+    await this.audit.record({
+      userId: refreshed.user.userId,
+      username: refreshed.user.username,
+      action: "auth.refresh.succeeded",
+      resource: "/auth/refresh",
+    });
 
     return refreshed;
   }
@@ -75,6 +105,7 @@ export class AuthController {
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply
   ): Promise<{ loggedOut: true; tokenRevoked: boolean }> {
+    const requestUser = getRequestUser(request);
     const token =
       extractBearerToken(request.headers.authorization) ??
       extractCookieValue(request.headers.cookie, "groundedos-session");
@@ -86,6 +117,16 @@ export class AuthController {
       "Set-Cookie",
       `groundedos-session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secureCookie ? "; Secure" : ""}`
     );
+
+    await this.audit.record({
+      userId: requestUser?.userId,
+      username: requestUser?.username,
+      action: "auth.logout",
+      resource: "/auth/logout",
+      metadata: {
+        tokenRevoked,
+      },
+    });
 
     return {
       loggedOut: true,

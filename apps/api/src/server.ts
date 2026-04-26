@@ -13,6 +13,7 @@ import { MULTIPART_LIMITS } from "./common/multipart";
 import type { ApiConfig } from "./config/api-config";
 import { AuthService } from "./auth/auth.service";
 import { createUserRateLimiter } from "./auth/rate-limit-store";
+import { AuditService } from "./audit/audit.service";
 
 const DEFAULT_PORT = 3001;
 
@@ -48,6 +49,7 @@ export async function createApiServer(
 
   const fastify = app.getHttpAdapter().getInstance();
   const authService = app.get(AuthService);
+  const auditService = app.get(AuditService);
   const userRateLimiter = createUserRateLimiter();
   const requestsPerHour = parsePositiveInteger(
     process.env.RATE_LIMIT_REQUESTS_PER_HOUR,
@@ -105,6 +107,18 @@ export async function createApiServer(
       );
 
       if (!rateLimitResult.allowed) {
+        await auditService.record({
+          userId: user.userId,
+          username: user.username,
+          action: "security.rate_limit.exceeded",
+          resource: path,
+          metadata: {
+            method: request.method,
+            limit: requestsPerHour,
+            retryAfterSeconds: rateLimitResult.retryAfterSeconds,
+          },
+        });
+
         reply
           .header("Retry-After", String(rateLimitResult.retryAfterSeconds))
           .header("X-RateLimit-Limit", String(requestsPerHour))
