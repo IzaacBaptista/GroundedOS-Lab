@@ -376,6 +376,49 @@ describe("api server", () => {
       expect(createApiKeyBody.apiKey).toBeTruthy();
       expect(createApiKeyBody.key.label).toBe("integration-key");
 
+      const secondCreateApiKeyResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        payload: {
+          label: "integration-key-2",
+        },
+      });
+      expect(secondCreateApiKeyResponse.statusCode).toBe(201);
+
+      const listFirstPage = await app.inject({
+        method: "GET",
+        url: "/admin/api-keys?limit=1",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listFirstPageBody = listFirstPage.json() as {
+        count: number;
+        nextCursor?: string;
+        keys: Array<{ id: string }>;
+      };
+      expect(listFirstPage.statusCode).toBe(200);
+      expect(listFirstPageBody.count).toBe(1);
+      expect(listFirstPageBody.nextCursor).toBeTruthy();
+
+      const listSecondPage = await app.inject({
+        method: "GET",
+        url: `/admin/api-keys?limit=1&cursor=${encodeURIComponent(listFirstPageBody.nextCursor ?? "")}`,
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listSecondPageBody = listSecondPage.json() as {
+        count: number;
+        keys: Array<{ id: string }>;
+      };
+      expect(listSecondPage.statusCode).toBe(200);
+      expect(listSecondPageBody.count).toBe(1);
+      expect(listSecondPageBody.keys[0]?.id).not.toBe(listFirstPageBody.keys[0]?.id);
+
       const withApiKey = await app.inject({
         method: "GET",
         url: "/rag/indexes",
@@ -822,20 +865,67 @@ describe("api server", () => {
 
       const auditLogs = await app.inject({
         method: "GET",
-        url: "/admin/audit/logs?limit=20",
+        url: "/admin/audit/logs?limit=1",
         headers: {
           authorization: `Bearer ${adminToken}`,
         },
       });
       const auditBody = auditLogs.json() as {
         count: number;
+        nextCursor?: string;
         events: Array<{ action: string; userId?: string; resource?: string }>;
       };
 
       expect(auditLogs.statusCode).toBe(200);
-      expect(auditBody.count).toBeGreaterThanOrEqual(2);
-      expect(auditBody.events.some((event) => event.action === "admin.cost.summary.read")).toBe(true);
-      expect(auditBody.events.some((event) => event.action === "admin.indexes.clear_all")).toBe(true);
+      expect(auditBody.count).toBe(1);
+      expect(auditBody.nextCursor).toBeTruthy();
+
+      const auditLogsPage2 = await app.inject({
+        method: "GET",
+        url: `/admin/audit/logs?limit=1&cursor=${encodeURIComponent(auditBody.nextCursor ?? "")}`,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditBodyPage2 = auditLogsPage2.json() as {
+        count: number;
+        events: Array<{ action: string; userId?: string; resource?: string }>;
+      };
+
+      expect(auditLogsPage2.statusCode).toBe(200);
+      expect(auditBodyPage2.count).toBe(1);
+
+      const costAuditFiltered = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=1&action=admin.cost.summary.read",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const costAuditBody = costAuditFiltered.json() as {
+        count: number;
+        events: Array<{ action: string }>;
+      };
+
+      expect(costAuditFiltered.statusCode).toBe(200);
+      expect(costAuditBody.count).toBeGreaterThanOrEqual(1);
+      expect(costAuditBody.events[0]?.action).toBe("admin.cost.summary.read");
+
+      const clearAuditFiltered = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=1&action=admin.indexes.clear_all",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const clearAuditBody = clearAuditFiltered.json() as {
+        count: number;
+        events: Array<{ action: string }>;
+      };
+
+      expect(clearAuditFiltered.statusCode).toBe(200);
+      expect(clearAuditBody.count).toBeGreaterThanOrEqual(1);
+      expect(clearAuditBody.events[0]?.action).toBe("admin.indexes.clear_all");
     } finally {
       process.env.AUTH_ENFORCEMENT = previousEnforcement;
     }

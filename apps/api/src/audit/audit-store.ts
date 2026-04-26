@@ -17,6 +17,7 @@ export type AuditEventInput = Omit<AuditEvent, "id" | "timestamp">;
 
 export type AuditLogQuery = {
   limit?: number;
+  offset?: number;
   userId?: string;
   action?: string;
 };
@@ -57,9 +58,10 @@ class InMemoryAuditStore implements AuditStore {
 
   async list(query: AuditLogQuery = {}): Promise<AuditEvent[]> {
     const limit = normalizeLimit(query.limit);
+    const offset = normalizeOffset(query.offset);
     return this.events
       .filter((event) => matchesQuery(event, query))
-      .slice(0, limit);
+      .slice(offset, offset + limit);
   }
 }
 
@@ -97,7 +99,8 @@ class OptionalRedisAuditStore implements AuditStore {
 
   async list(query: AuditLogQuery = {}): Promise<AuditEvent[]> {
     const limit = normalizeLimit(query.limit);
-    const scanLimit = Math.max(limit * 5, 200);
+    const offset = normalizeOffset(query.offset);
+    const scanLimit = Math.max((offset + limit) * 10, 500);
 
     const client = await this.getClient();
     if (!client) {
@@ -110,11 +113,11 @@ class OptionalRedisAuditStore implements AuditStore {
         .map((record) => parseAuditEvent(record))
         .filter((event): event is AuditEvent => Boolean(event))
         .filter((event) => matchesQuery(event, query))
-        .slice(0, limit);
+        .slice(offset, offset + limit);
       return parsed;
     } catch {
       this.disabled = true;
-      return this.fallback.list({ ...query, limit });
+      return this.fallback.list({ ...query, limit, offset });
     }
   }
 
@@ -206,6 +209,14 @@ function normalizeLimit(limit: number | undefined): number {
   }
 
   return Math.max(1, Math.min(500, Math.floor(limit ?? 100)));
+}
+
+function normalizeOffset(offset: number | undefined): number {
+  if (!Number.isFinite(offset)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(offset ?? 0));
 }
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {

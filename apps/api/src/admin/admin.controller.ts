@@ -58,15 +58,21 @@ export class AdminController {
   async getAuditLogs(
     @Req() request: FastifyRequest,
     @Query("limit") limitValue?: string,
+    @Query("cursor") cursorValue?: string,
     @Query("action") action?: string,
     @Query("userId") userId?: string
-  ): Promise<{ count: number; events: AuditEvent[] }> {
+  ): Promise<{ count: number; nextCursor?: string; events: AuditEvent[] }> {
     const limit = parseLimit(limitValue);
+    const offset = parseCursor(cursorValue);
+    const probeLimit = Math.min(500, limit + 1);
     const events = await this.audit.list({
-      limit,
+      limit: probeLimit,
+      offset,
       action: normalizeOptionalString(action),
       userId: normalizeOptionalString(userId),
     });
+    const hasMore = events.length > limit;
+    const items = hasMore ? events.slice(0, limit) : events;
 
     const requestUser = getRequestUser(request);
     await this.audit.record({
@@ -76,12 +82,14 @@ export class AdminController {
       resource: "/admin/audit/logs",
       metadata: {
         limit,
+        offset,
       },
     });
 
     return {
-      count: events.length,
-      events,
+      count: items.length,
+      nextCursor: hasMore ? encodeCursor(offset + items.length) : undefined,
+      events: items,
     };
   }
 
@@ -131,9 +139,12 @@ export class AdminController {
 
   @Get("api-keys")
   async listApiKeys(
-    @Req() request: FastifyRequest
+    @Req() request: FastifyRequest,
+    @Query("limit") limitValue?: string,
+    @Query("cursor") cursorValue?: string
   ): Promise<{
     count: number;
+    nextCursor?: string;
     keys: Array<{
       id: string;
       keyPrefix: string;
@@ -146,7 +157,12 @@ export class AdminController {
       revokedAt?: string;
     }>;
   }> {
-    const keys = await this.admin.listApiKeys();
+    const limit = parseLimit(limitValue);
+    const offset = parseCursor(cursorValue);
+    const allKeys = await this.admin.listApiKeys();
+    const page = allKeys.slice(offset, offset + limit + 1);
+    const hasMore = page.length > limit;
+    const keys = hasMore ? page.slice(0, limit) : page;
     const requestUser = getRequestUser(request);
 
     await this.audit.record({
@@ -156,11 +172,14 @@ export class AdminController {
       resource: "/admin/api-keys",
       metadata: {
         count: keys.length,
+        limit,
+        offset,
       },
     });
 
     return {
       count: keys.length,
+      nextCursor: hasMore ? encodeCursor(offset + keys.length) : undefined,
       keys,
     };
   }
@@ -251,4 +270,26 @@ function normalizeOptionalString(value?: string): string | undefined {
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : undefined;
+}
+
+function parseCursor(value?: string): number {
+  if (!value) {
+    return 0;
+  }
+
+  try {
+    const decoded = Buffer.from(value, "base64url").toString("utf8");
+    const parsed = Number(decoded);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return 0;
+    }
+
+    return Math.floor(parsed);
+  } catch {
+    return 0;
+  }
+}
+
+function encodeCursor(offset: number): string {
+  return Buffer.from(String(Math.max(0, Math.floor(offset))), "utf8").toString("base64url");
 }
