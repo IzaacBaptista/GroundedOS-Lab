@@ -12,6 +12,7 @@ import { ApiExceptionFilter } from "./common/api-exception.filter";
 import { MULTIPART_LIMITS } from "./common/multipart";
 import type { ApiConfig } from "./config/api-config";
 import { AuthService } from "./auth/auth.service";
+import { createUserRateLimiter } from "./auth/rate-limit-store";
 
 const DEFAULT_PORT = 3001;
 
@@ -47,6 +48,12 @@ export async function createApiServer(
 
   const fastify = app.getHttpAdapter().getInstance();
   const authService = app.get(AuthService);
+  const userRateLimiter = createUserRateLimiter();
+  const requestsPerHour = parsePositiveInteger(
+    process.env.RATE_LIMIT_REQUESTS_PER_HOUR,
+    1000
+  );
+  const rateLimitWindowMs = 60 * 60 * 1000;
 
   fastify.addHook("preHandler", async (request, reply) => {
     const authEnforcementEnabled =
@@ -88,6 +95,32 @@ export async function createApiServer(
         },
       });
       return;
+    }
+
+    if (requestsPerHour > 0) {
+      const rateLimitResult = await userRateLimiter.consume(
+        user.userId,
+        requestsPerHour,
+        rateLimitWindowMs
+      );
+
+      if (!rateLimitResult.allowed) {
+        reply
+          .header("Retry-After", String(rateLimitResult.retryAfterSeconds))
+          .header("X-RateLimit-Limit", String(requestsPerHour))
+          .header("X-RateLimit-Remaining", String(rateLimitResult.remaining))
+          .status(429)
+          .send({
+            error: {
+              message: "Rate limit exceeded.",
+            },
+          });
+        return;
+      }
+
+      reply
+        .header("X-RateLimit-Limit", String(requestsPerHour))
+        .header("X-RateLimit-Remaining", String(rateLimitResult.remaining));
     }
 
     if (path.startsWith("/admin") && !user.roles.includes("admin")) {
@@ -184,6 +217,16 @@ function parseAllowedLabRoles(value: string | undefined): string[] {
     .filter((item) => item.length > 0);
 
   return parsed.length > 0 ? parsed : ["admin"];
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
 }
 
 if (process.argv[1]?.endsWith("server.ts")) {

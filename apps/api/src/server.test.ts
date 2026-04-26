@@ -291,6 +291,56 @@ describe("api server", () => {
     }
   });
 
+  it("enforces per-user rate limits on protected endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousRateLimit = process.env.RATE_LIMIT_REQUESTS_PER_HOUR;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.RATE_LIMIT_REQUESTS_PER_HOUR = "1";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const firstProtectedCall = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(firstProtectedCall.statusCode).toBe(200);
+      expect(firstProtectedCall.headers["x-ratelimit-limit"]).toBe("1");
+      expect(firstProtectedCall.headers["x-ratelimit-remaining"]).toBe("0");
+
+      const secondProtectedCall = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+
+      expect(secondProtectedCall.statusCode).toBe(429);
+      expect(secondProtectedCall.headers["retry-after"]).toBeTruthy();
+      expect(secondProtectedCall.json()).toEqual({
+        error: {
+          message: "Rate limit exceeded.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.RATE_LIMIT_REQUESTS_PER_HOUR = previousRateLimit;
+    }
+  });
+
   it("scopes persisted indexes by owner when auth is enabled", async () => {
     const previousEnforcement = process.env.AUTH_ENFORCEMENT;
     process.env.AUTH_ENFORCEMENT = "true";
