@@ -11,6 +11,7 @@ import { AppModule } from "./app.module";
 import { ApiExceptionFilter } from "./common/api-exception.filter";
 import { MULTIPART_LIMITS } from "./common/multipart";
 import type { ApiConfig } from "./config/api-config";
+import { AuthService } from "./auth/auth.service";
 
 const DEFAULT_PORT = 3001;
 
@@ -45,6 +46,55 @@ export async function createApiServer(
   });
 
   const fastify = app.getHttpAdapter().getInstance();
+  const authService = app.get(AuthService);
+
+  fastify.addHook("preHandler", (request, reply, done) => {
+    const authEnforcementEnabled =
+      String(process.env.AUTH_ENFORCEMENT ?? "false").toLowerCase() !== "false";
+
+    if (!authEnforcementEnabled) {
+      done();
+      return;
+    }
+
+    const path = request.url.split("?")[0] ?? "/";
+    const isPublicEndpoint =
+      path === "/health" ||
+      path === "/status" ||
+      path === "/auth/login";
+
+    if (isPublicEndpoint || request.method === "OPTIONS") {
+      done();
+      return;
+    }
+
+    const bearerToken = extractBearerToken(request.headers.authorization);
+    const cookieToken = extractCookieValue(request.headers.cookie, "groundedos-session");
+    const token = bearerToken ?? cookieToken;
+
+    if (!token) {
+      reply.status(401).send({
+        error: {
+          message: "Authentication required.",
+        },
+      });
+      return;
+    }
+
+    const user = authService.verifyAccessToken(token);
+    if (!user) {
+      reply.status(401).send({
+        error: {
+          message: "Invalid or expired token.",
+        },
+      });
+      return;
+    }
+
+    (request as unknown as { user?: unknown }).user = user;
+    done();
+  });
+
   fastify.addHook("onSend", (request, reply, payload, done) => {
     const shouldValidate =
       request.url.startsWith("/rag/ask") && reply.statusCode >= 200 && reply.statusCode < 300;
@@ -69,6 +119,41 @@ export async function createApiServer(
   await app.init();
 
   return app;
+}
+
+function extractBearerToken(header?: string | string[]): string | null {
+  if (!header) {
+    return null;
+  }
+
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) {
+    return null;
+  }
+
+  const [scheme, token] = value.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+
+  return token.trim();
+}
+
+function extractCookieValue(cookieHeader: string | string[] | undefined, key: string): string | null {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const raw = Array.isArray(cookieHeader) ? cookieHeader.join("; ") : cookieHeader;
+  const cookies = raw.split(";").map((item) => item.trim());
+  for (const cookie of cookies) {
+    const [name, ...rest] = cookie.split("=");
+    if (name === key) {
+      return rest.join("=") || null;
+    }
+  }
+
+  return null;
 }
 
 if (process.argv[1]?.endsWith("server.ts")) {

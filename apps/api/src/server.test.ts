@@ -9,6 +9,8 @@ import { createApiServer } from "./server";
 const servers: NestFastifyApplication[] = [];
 const tempDirs: string[] = [];
 
+process.env.AUTH_ENFORCEMENT = "false";
+
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
   await Promise.all(
@@ -29,6 +31,91 @@ describe("api server", () => {
       status: "ok",
       service: "groundedos-api",
     });
+  });
+
+  it("serves POST /auth/login and returns bearer token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const body = response.json() as {
+        accessToken: string;
+        expiresIn: number;
+        user: { userId: string; username: string; roles: string[] };
+      };
+
+      expect(response.statusCode).toBe(200);
+      expect(body.accessToken).toBeTruthy();
+      expect(body.expiresIn).toBeGreaterThan(0);
+      expect(body.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
+      expect(body.user.roles).toContain("admin");
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("blocks protected endpoints when auth is enabled and no token is provided", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Authentication required.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("allows protected endpoints with bearer token when auth is enabled", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        count: expect.any(Number),
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
   });
 
   it("serves JSON POST /rag/ask", async () => {
