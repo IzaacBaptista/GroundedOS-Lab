@@ -2622,10 +2622,14 @@ function EvalsView({ response }: { response: RagAskResponse | undefined }) {
     return <p className="chunk-text">No eval metrics available for this run.</p>;
   }
 
+  const scorers = evals.scorerResults;
+  const history = evals.evalHistory;
+
   return (
     <section className="output-section">
       <div className="section-title">
         <h3>Evaluation Scores</h3>
+        <span className="count">pipeline</span>
       </div>
       <div className="tradeoffs-grid">
         <MetricCard label="Groundedness" value={evals.groundedness.toFixed(3)} />
@@ -2634,6 +2638,85 @@ function EvalsView({ response }: { response: RagAskResponse | undefined }) {
         <MetricCard label="Pipeline score" value={evals.pipelineScore.toFixed(3)} />
         <MetricCard label="Model score" value={evals.modelScore.toFixed(3)} />
       </div>
+
+      {scorers && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Structured Scorers</h3>
+            <span className="count">{scorers.passedCount}/{3} passed · avg {scorers.averageScore.toFixed(3)}</span>
+          </div>
+          <div className="result-list">
+            {(["faithfulness", "relevance", "recall"] as const).map((key) => {
+              const s = scorers[key];
+              if (!s) return null;
+              return (
+                <article key={key} className="result-row">
+                  <div className="result-row__meta">
+                    <span className="result-row__chunk-id">{key}</span>
+                    <span
+                      className="routing-pill"
+                      style={{
+                        background: s.passed ? "var(--color-success, #2d6a2d)" : "var(--color-error, #8b2e2e)",
+                      }}
+                    >
+                      {s.passed ? "PASS" : "FAIL"}
+                    </span>
+                    <span className="result-row__score">{s.score.toFixed(3)}</span>
+                  </div>
+                  {s.reason && <p className="chunk-text">{s.reason}</p>}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {history && history.count > 0 && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Eval Trend</h3>
+            <span className="count">
+              {history.count} total ·{" "}
+              <span
+                style={{
+                  color:
+                    history.trend === "improving"
+                      ? "var(--color-success, #4caf50)"
+                      : history.trend === "declining"
+                        ? "var(--color-error, #f44336)"
+                        : undefined,
+                }}
+              >
+                {history.trend}
+              </span>
+            </span>
+          </div>
+          <div className="tradeoffs-grid">
+            <MetricCard label="Avg pipeline" value={history.avgPipelineScore.toFixed(3)} />
+            <MetricCard label="Avg faithfulness" value={history.avgFaithfulness.toFixed(3)} />
+            <MetricCard label="Avg relevance" value={history.avgRelevance.toFixed(3)} />
+          </div>
+          {history.recent.length > 0 && (
+            <div className="result-list" style={{ marginTop: "0.5rem" }}>
+              {history.recent.map((entry, i) => (
+                <article key={i} className="result-row">
+                  <div className="result-row__meta">
+                    <span className="chunk-text" style={{ maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {entry.query}
+                    </span>
+                    <span className="result-row__score">p={entry.pipelineScore.toFixed(3)}</span>
+                    {entry.scorerResults && (
+                      <span className="cache-badge">
+                        {entry.scorerResults.passedCount}/3 · avg {entry.scorerResults.averageScore.toFixed(3)}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="output-section">
         <div className="section-title">

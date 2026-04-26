@@ -143,6 +143,26 @@ export interface DevModeOutput {
     retrievalAccuracy: number;
     pipelineScore: number;
     modelScore: number;
+    scorerResults?: {
+      faithfulness?: { score: number; passed: boolean; reason?: string };
+      relevance?: { score: number; passed: boolean; reason?: string };
+      recall?: { score: number; passed: boolean; reason?: string };
+      averageScore: number;
+      passedCount: number;
+    };
+    evalHistory?: {
+      count: number;
+      avgPipelineScore: number;
+      avgFaithfulness: number;
+      avgRelevance: number;
+      trend: "improving" | "declining" | "stable";
+      recent: Array<{
+        timestamp: number;
+        query: string;
+        pipelineScore: number;
+        scorerResults?: { averageScore: number; passedCount: number };
+      }>;
+    };
   };
   cacheAwareRetrieval?: {
     influenced: boolean;

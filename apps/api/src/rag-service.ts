@@ -46,7 +46,16 @@ import {
   type RetrievalDevModeOutput,
 } from "@groundedos/rag";
 import { processQuery } from "@groundedos/query-understanding";
+import {
+  FaithfulnessEvaluator,
+  RelevanceEvaluator,
+  RecallEvaluator,
+} from "@groundedos/evals";
 import { ApiRequestError } from "./errors";
+import {
+  recordEvalHistory,
+  getEvalHistorySummary,
+} from "./eval-history-store.js";
 import {
   deleteRagIndex,
   listRagIndexes,
@@ -69,6 +78,11 @@ const tradeoffMetricsStore = new TradeoffMetricsStore();
 const sessionMemoryStore = new FileSessionMemoryStore(
   process.env.GROUNDEDOS_MEMORY_DIR ?? ".groundedos/memory/sessions"
 );
+
+// Singleton eval scorers — reused across requests to avoid allocation overhead
+const faithfulnessEvaluator = new FaithfulnessEvaluator();
+const relevanceEvaluator = new RelevanceEvaluator();
+const recallEvaluator = new RecallEvaluator(3);
 
 export { ApiRequestError } from "./errors";
 
@@ -251,6 +265,26 @@ export type RagAskResponse = {
       retrievalAccuracy: number;
       pipelineScore: number;
       modelScore: number;
+      scorerResults?: {
+        faithfulness?: { score: number; passed: boolean; reason?: string };
+        relevance?: { score: number; passed: boolean; reason?: string };
+        recall?: { score: number; passed: boolean; reason?: string };
+        averageScore: number;
+        passedCount: number;
+      };
+      evalHistory?: {
+        count: number;
+        avgPipelineScore: number;
+        avgFaithfulness: number;
+        avgRelevance: number;
+        trend: "improving" | "declining" | "stable";
+        recent: Array<{
+          timestamp: number;
+          query: string;
+          pipelineScore: number;
+          scorerResults?: { averageScore: number; passedCount: number };
+        }>;
+      };
     };
     costBreakdown?: {
       embeddingsUsd: number;
@@ -1343,6 +1377,13 @@ async function runLocalRag(
       retrievalAccuracy: number;
       pipelineScore: number;
       modelScore: number;
+      scorerResults?: {
+        faithfulness?: { score: number; passed: boolean; reason?: string };
+        relevance?: { score: number; passed: boolean; reason?: string };
+        recall?: { score: number; passed: boolean; reason?: string };
+        averageScore: number;
+        passedCount: number;
+      };
     };
     cacheAwareRetrieval?: {
       influenced: boolean;
@@ -1674,6 +1715,43 @@ async function runLocalRag(
           results: input.devMode.results,
         });
 
+        // Run structured scorers from @groundedos/evals
+        const evalChunkInput = {
+          question: input.rawQuery,
+          answer: finalAnswer.text,
+          retrievedChunks: input.devMode.results.map((item) => ({
+            chunkId: item.chunkId,
+            text: item.text,
+            score: item.score,
+          })),
+        };
+        const [faithResult, relevResult, recallResult] = await Promise.all([
+          faithfulnessEvaluator.evaluate(evalChunkInput),
+          relevanceEvaluator.evaluate(evalChunkInput),
+          recallEvaluator.evaluate(evalChunkInput),
+        ]);
+        const scorerResults = {
+          faithfulness: { score: faithResult.score, passed: faithResult.passed, reason: faithResult.reason },
+          relevance: { score: relevResult.score, passed: relevResult.passed, reason: relevResult.reason },
+          recall: { score: recallResult.score, passed: recallResult.passed, reason: recallResult.reason },
+          averageScore: Number(((faithResult.score + relevResult.score + recallResult.score) / 3).toFixed(3)),
+          passedCount: [faithResult, relevResult, recallResult].filter((r) => r.passed).length,
+        };
+        recordEvalHistory({
+          timestamp: Date.now(),
+          query: input.rawQuery,
+          documentId: input.document.documentId,
+          groundedness: evals.groundedness,
+          answerOverlap: evals.answerOverlap,
+          pipelineScore: evals.pipelineScore,
+          scorerResults,
+        });
+        const evalsWithScorers = {
+          ...evals,
+          scorerResults,
+          evalHistory: getEvalHistorySummary(input.document.documentId),
+        };
+
         const reasoningSummary = buildReasoningSummary(
           options?.reasoningEnabled ?? false,
           input.routingDecision,
@@ -1735,7 +1813,7 @@ async function runLocalRag(
           ...input,
           answer: finalAnswer,
           orchestration,
-          evals,
+          evals: evalsWithScorers,
           reasoningSummary,
           cacheQualityLabel,
           cacheQualityScore,
@@ -1941,6 +2019,13 @@ async function runPersistedRag(
       retrievalAccuracy: number;
       pipelineScore: number;
       modelScore: number;
+      scorerResults?: {
+        faithfulness?: { score: number; passed: boolean; reason?: string };
+        relevance?: { score: number; passed: boolean; reason?: string };
+        recall?: { score: number; passed: boolean; reason?: string };
+        averageScore: number;
+        passedCount: number;
+      };
     };
     cacheAwareRetrieval?: {
       influenced: boolean;
@@ -2247,6 +2332,43 @@ async function runPersistedRag(
           results: input.devMode.results,
         });
 
+        // Run structured scorers from @groundedos/evals
+        const evalChunkInput = {
+          question: input.rawQuery,
+          answer: finalAnswer.text,
+          retrievedChunks: input.devMode.results.map((item) => ({
+            chunkId: item.chunkId,
+            text: item.text,
+            score: item.score,
+          })),
+        };
+        const [faithResult, relevResult, recallResult] = await Promise.all([
+          faithfulnessEvaluator.evaluate(evalChunkInput),
+          relevanceEvaluator.evaluate(evalChunkInput),
+          recallEvaluator.evaluate(evalChunkInput),
+        ]);
+        const scorerResults = {
+          faithfulness: { score: faithResult.score, passed: faithResult.passed, reason: faithResult.reason },
+          relevance: { score: relevResult.score, passed: relevResult.passed, reason: relevResult.reason },
+          recall: { score: recallResult.score, passed: recallResult.passed, reason: recallResult.reason },
+          averageScore: Number(((faithResult.score + relevResult.score + recallResult.score) / 3).toFixed(3)),
+          passedCount: [faithResult, relevResult, recallResult].filter((r) => r.passed).length,
+        };
+        recordEvalHistory({
+          timestamp: Date.now(),
+          query: input.rawQuery,
+          documentId: persistedDocumentId,
+          groundedness: evals.groundedness,
+          answerOverlap: evals.answerOverlap,
+          pipelineScore: evals.pipelineScore,
+          scorerResults,
+        });
+        const evalsWithScorers = {
+          ...evals,
+          scorerResults,
+          evalHistory: getEvalHistorySummary(persistedDocumentId),
+        };
+
         const reasoningSummary = buildReasoningSummary(
           options?.reasoningEnabled ?? false,
           input.routingDecision,
@@ -2308,7 +2430,7 @@ async function runPersistedRag(
           ...input,
           answer: finalAnswer,
           orchestration,
-          evals,
+          evals: evalsWithScorers,
           reasoningSummary,
           cacheQualityLabel,
           cacheQualityScore,
