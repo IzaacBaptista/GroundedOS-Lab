@@ -64,6 +64,62 @@ describe("api server", () => {
     }
   });
 
+  it("serves POST /auth/logout and revokes the active bearer token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const beforeLogout = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(beforeLogout.statusCode).toBe(200);
+
+      const logoutResponse = await app.inject({
+        method: "POST",
+        url: "/auth/logout",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(logoutResponse.statusCode).toBe(200);
+      expect(logoutResponse.json()).toEqual({
+        loggedOut: true,
+        tokenRevoked: true,
+      });
+
+      const afterLogout = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(afterLogout.statusCode).toBe(401);
+      expect(afterLogout.json()).toEqual({
+        error: {
+          message: "Invalid or expired token.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
   it("blocks protected endpoints when auth is enabled and no token is provided", async () => {
     const previousEnforcement = process.env.AUTH_ENFORCEMENT;
     process.env.AUTH_ENFORCEMENT = "true";

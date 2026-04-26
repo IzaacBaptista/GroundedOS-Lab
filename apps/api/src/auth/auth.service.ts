@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export type AuthUser = {
   userId: string;
@@ -21,6 +21,7 @@ export class AuthService {
   private readonly tokenExpiryMs = parseDurationToMs(process.env.JWT_EXPIRY ?? "24h", 24 * 60 * 60 * 1000);
   private readonly adminUsername = process.env.ADMIN_USERNAME ?? "admin";
   private readonly adminPassword = process.env.ADMIN_PASSWORD ?? "admin-password";
+  private readonly revokedTokenHashes = new Map<string, number>();
 
   login(username: string, password: string): { accessToken: string; expiresIn: number; user: AuthUser } | null {
     if (username !== this.adminUsername || password !== this.adminPassword) {
@@ -49,6 +50,12 @@ export class AuthService {
   }
 
   verifyAccessToken(token: string): AuthUser | null {
+    this.pruneRevokedTokens();
+
+    if (this.isTokenRevoked(token)) {
+      return null;
+    }
+
     const parts = token.split(".");
     if (parts.length !== 3) {
       return null;
@@ -87,6 +94,21 @@ export class AuthService {
     }
   }
 
+  revokeToken(token: string): boolean {
+    const claims = this.parseTokenClaims(token);
+    if (!claims || !Number.isFinite(claims.exp)) {
+      return false;
+    }
+
+    const expiresAtMs = claims.exp * 1000;
+    if (expiresAtMs <= Date.now()) {
+      return false;
+    }
+
+    this.revokedTokenHashes.set(hashToken(token), expiresAtMs);
+    return true;
+  }
+
   private signToken(claims: TokenClaims): string {
     const header = { alg: "HS256", typ: "JWT" };
     const encodedHeader = toBase64Url(Buffer.from(JSON.stringify(header), "utf8"));
@@ -95,6 +117,48 @@ export class AuthService {
     const signature = toBase64Url(createHmac("sha256", this.jwtSecret).update(data).digest());
     return `${data}.${signature}`;
   }
+
+  private parseTokenClaims(token: string): TokenClaims | null {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const [encodedHeader, encodedPayload, encodedSignature] = parts;
+    const data = `${encodedHeader}.${encodedPayload}`;
+    const expectedSignature = toBase64Url(
+      createHmac("sha256", this.jwtSecret).update(data).digest()
+    );
+
+    if (!safeEqual(encodedSignature, expectedSignature)) {
+      return null;
+    }
+
+    try {
+      const payloadJson = fromBase64Url(encodedPayload).toString("utf8");
+      return JSON.parse(payloadJson) as TokenClaims;
+    } catch {
+      return null;
+    }
+  }
+
+  private isTokenRevoked(token: string): boolean {
+    const revokedUntil = this.revokedTokenHashes.get(hashToken(token));
+    return typeof revokedUntil === "number" && revokedUntil > Date.now();
+  }
+
+  private pruneRevokedTokens(): void {
+    const now = Date.now();
+    for (const [tokenHash, expiresAt] of this.revokedTokenHashes.entries()) {
+      if (expiresAt <= now) {
+        this.revokedTokenHashes.delete(tokenHash);
+      }
+    }
+  }
+}
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }
 
 function parseDurationToMs(value: string, fallbackMs: number): number {

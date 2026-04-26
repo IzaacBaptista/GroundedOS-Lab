@@ -1,5 +1,5 @@
-import { Body, Controller, HttpCode, Post, Res } from "@nestjs/common";
-import type { FastifyReply } from "fastify";
+import { Body, Controller, HttpCode, Post, Req, Res } from "@nestjs/common";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { ApiRequestError } from "../errors";
 import { AuthService } from "./auth.service";
 
@@ -39,4 +39,63 @@ export class AuthController {
 
     return session;
   }
+
+  @Post("logout")
+  @HttpCode(200)
+  logout(
+    @Req() request: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply
+  ): { loggedOut: true; tokenRevoked: boolean } {
+    const token =
+      extractBearerToken(request.headers.authorization) ??
+      extractCookieValue(request.headers.cookie, "groundedos-session");
+
+    const tokenRevoked = token ? this.authService.revokeToken(token) : false;
+    const secureCookie = String(process.env.FORCE_HTTPS ?? "false").toLowerCase() === "true";
+
+    reply.header(
+      "Set-Cookie",
+      `groundedos-session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secureCookie ? "; Secure" : ""}`
+    );
+
+    return {
+      loggedOut: true,
+      tokenRevoked,
+    };
+  }
+}
+
+function extractBearerToken(header?: string | string[]): string | null {
+  if (!header) {
+    return null;
+  }
+
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) {
+    return null;
+  }
+
+  const [scheme, token] = value.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+
+  return token.trim();
+}
+
+function extractCookieValue(cookieHeader: string | string[] | undefined, key: string): string | null {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const raw = Array.isArray(cookieHeader) ? cookieHeader.join("; ") : cookieHeader;
+  const cookies = raw.split(";").map((item) => item.trim());
+  for (const cookie of cookies) {
+    const [name, ...rest] = cookie.split("=");
+    if (name === key) {
+      return rest.join("=") || null;
+    }
+  }
+
+  return null;
 }
