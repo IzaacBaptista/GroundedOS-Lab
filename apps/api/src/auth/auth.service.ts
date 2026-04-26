@@ -1,5 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createTokenRevocationStore,
+  type TokenRevocationStore,
+} from "./revocation-store";
 
 export type AuthUser = {
   userId: string;
@@ -27,7 +31,7 @@ export class AuthService {
   );
   private readonly adminUsername = process.env.ADMIN_USERNAME ?? "admin";
   private readonly adminPassword = process.env.ADMIN_PASSWORD ?? "admin-password";
-  private readonly revokedTokenHashes = new Map<string, number>();
+  private readonly revocationStore: TokenRevocationStore = createTokenRevocationStore();
 
   login(
     username: string,
@@ -67,12 +71,10 @@ export class AuthService {
     };
   }
 
-  refreshAccessToken(
+  async refreshAccessToken(
     refreshToken: string
-  ): { accessToken: string; expiresIn: number; user: AuthUser } | null {
-    this.pruneRevokedTokens();
-
-    if (this.isTokenRevoked(refreshToken)) {
+  ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser } | null> {
+    if (await this.isTokenRevoked(refreshToken)) {
       return null;
     }
 
@@ -87,7 +89,11 @@ export class AuthService {
       return null;
     }
 
+    // Rotate refresh token: the incoming one is single-use.
+    await this.revokeToken(refreshToken);
+
     const expiresIn = Math.floor(this.tokenExpiryMs / 1000);
+    const refreshExpiresIn = Math.floor(this.refreshTokenExpiryMs / 1000);
     const accessClaims: TokenClaims = {
       sub: claims.sub,
       username: claims.username,
@@ -97,9 +103,19 @@ export class AuthService {
       iat: nowSeconds,
       exp: nowSeconds + expiresIn,
     };
+    const nextRefreshClaims: TokenClaims = {
+      sub: claims.sub,
+      username: claims.username,
+      roles: claims.roles,
+      tokenType: "refresh",
+      jti: randomUUID(),
+      iat: nowSeconds,
+      exp: nowSeconds + refreshExpiresIn,
+    };
 
     return {
       accessToken: this.signToken(accessClaims),
+      refreshToken: this.signToken(nextRefreshClaims),
       expiresIn,
       user: {
         userId: accessClaims.sub,
@@ -109,10 +125,8 @@ export class AuthService {
     };
   }
 
-  verifyAccessToken(token: string): AuthUser | null {
-    this.pruneRevokedTokens();
-
-    if (this.isTokenRevoked(token)) {
+  async verifyAccessToken(token: string): Promise<AuthUser | null> {
+    if (await this.isTokenRevoked(token)) {
       return null;
     }
 
@@ -138,7 +152,7 @@ export class AuthService {
     };
   }
 
-  revokeToken(token: string): boolean {
+  async revokeToken(token: string): Promise<boolean> {
     const claims = this.parseTokenClaims(token);
     if (!claims || !Number.isFinite(claims.exp)) {
       return false;
@@ -149,7 +163,7 @@ export class AuthService {
       return false;
     }
 
-    this.revokedTokenHashes.set(hashToken(token), expiresAtMs);
+    await this.revocationStore.revoke(hashToken(token), expiresAtMs);
     return true;
   }
 
@@ -186,18 +200,8 @@ export class AuthService {
     }
   }
 
-  private isTokenRevoked(token: string): boolean {
-    const revokedUntil = this.revokedTokenHashes.get(hashToken(token));
-    return typeof revokedUntil === "number" && revokedUntil > Date.now();
-  }
-
-  private pruneRevokedTokens(): void {
-    const now = Date.now();
-    for (const [tokenHash, expiresAt] of this.revokedTokenHashes.entries()) {
-      if (expiresAt <= now) {
-        this.revokedTokenHashes.delete(tokenHash);
-      }
-    }
+  private async isTokenRevoked(token: string): Promise<boolean> {
+    return this.revocationStore.isRevoked(hashToken(token));
   }
 }
 

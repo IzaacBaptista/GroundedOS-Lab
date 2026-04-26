@@ -51,16 +51,17 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(200)
-  refresh(@Body() body: RefreshRequest): {
+  async refresh(@Body() body: RefreshRequest): Promise<{
     accessToken: string;
+    refreshToken: string;
     expiresIn: number;
     user: { userId: string; username: string; roles: string[] };
-  } {
+  }> {
     if (!body || typeof body.refreshToken !== "string" || body.refreshToken.trim().length === 0) {
       throw new ApiRequestError("refreshToken is required.", 400);
     }
 
-    const refreshed = this.authService.refreshAccessToken(body.refreshToken.trim());
+    const refreshed = await this.authService.refreshAccessToken(body.refreshToken.trim());
     if (!refreshed) {
       throw new ApiRequestError("invalid refresh token.", 401);
     }
@@ -70,15 +71,15 @@ export class AuthController {
 
   @Post("logout")
   @HttpCode(200)
-  logout(
+  async logout(
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply
-  ): { loggedOut: true; tokenRevoked: boolean } {
+  ): Promise<{ loggedOut: true; tokenRevoked: boolean }> {
     const token =
       extractBearerToken(request.headers.authorization) ??
       extractCookieValue(request.headers.cookie, "groundedos-session");
 
-    const tokenRevoked = token ? this.authService.revokeToken(token) : false;
+    const tokenRevoked = token ? await this.authService.revokeToken(token) : false;
     const secureCookie = String(process.env.FORCE_HTTPS ?? "false").toLowerCase() === "true";
 
     reply.header(

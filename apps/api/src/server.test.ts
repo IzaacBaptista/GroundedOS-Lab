@@ -122,7 +122,7 @@ describe("api server", () => {
     }
   });
 
-  it("serves POST /auth/refresh and issues a new access token", async () => {
+  it("serves POST /auth/refresh and rotates refresh token", async () => {
     const previousEnforcement = process.env.AUTH_ENFORCEMENT;
     process.env.AUTH_ENFORCEMENT = "true";
 
@@ -150,6 +150,7 @@ describe("api server", () => {
       });
       const refreshBody = refreshResponse.json() as {
         accessToken: string;
+        refreshToken: string;
         expiresIn: number;
         user: { username: string };
       };
@@ -157,6 +158,8 @@ describe("api server", () => {
       expect(refreshResponse.statusCode).toBe(200);
       expect(refreshBody.accessToken).toBeTruthy();
       expect(refreshBody.accessToken).not.toBe(loginBody.accessToken);
+      expect(refreshBody.refreshToken).toBeTruthy();
+      expect(refreshBody.refreshToken).not.toBe(loginBody.refreshToken);
       expect(refreshBody.expiresIn).toBeGreaterThan(0);
       expect(refreshBody.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
 
@@ -168,6 +171,29 @@ describe("api server", () => {
         },
       });
       expect(usingRefreshedAccess.statusCode).toBe(200);
+
+      const reusedOldRefresh = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: loginBody.refreshToken,
+        },
+      });
+      expect(reusedOldRefresh.statusCode).toBe(401);
+      expect(reusedOldRefresh.json()).toEqual({
+        error: {
+          message: "invalid refresh token.",
+        },
+      });
+
+      const rotatedRefresh = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: refreshBody.refreshToken,
+        },
+      });
+      expect(rotatedRefresh.statusCode).toBe(200);
     } finally {
       process.env.AUTH_ENFORCEMENT = previousEnforcement;
     }

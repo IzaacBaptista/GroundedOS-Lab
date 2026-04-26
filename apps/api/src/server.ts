@@ -48,12 +48,11 @@ export async function createApiServer(
   const fastify = app.getHttpAdapter().getInstance();
   const authService = app.get(AuthService);
 
-  fastify.addHook("preHandler", (request, reply, done) => {
+  fastify.addHook("preHandler", async (request, reply) => {
     const authEnforcementEnabled =
       String(process.env.AUTH_ENFORCEMENT ?? "false").toLowerCase() !== "false";
 
     if (!authEnforcementEnabled) {
-      done();
       return;
     }
 
@@ -65,7 +64,6 @@ export async function createApiServer(
       path === "/auth/refresh";
 
     if (isPublicEndpoint || request.method === "OPTIONS") {
-      done();
       return;
     }
 
@@ -82,7 +80,7 @@ export async function createApiServer(
       return;
     }
 
-    const user = authService.verifyAccessToken(token);
+    const user = await authService.verifyAccessToken(token);
     if (!user) {
       reply.status(401).send({
         error: {
@@ -116,7 +114,6 @@ export async function createApiServer(
     }
 
     (request as unknown as { user?: unknown }).user = user;
-    done();
   });
 
   fastify.addHook("onSend", (request, reply, payload, done) => {
