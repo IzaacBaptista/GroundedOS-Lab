@@ -1,6 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import {
+  createApiKeyStore,
+  hashApiKey,
+  type StoredApiKey,
+  type ApiKeyStore,
+} from "./api-key-store";
+import {
   createTokenRevocationStore,
   type TokenRevocationStore,
 } from "./revocation-store";
@@ -9,6 +15,22 @@ export type AuthUser = {
   userId: string;
   username: string;
   roles: string[];
+};
+
+export type ApiKeySummary = {
+  id: string;
+  keyPrefix: string;
+  label?: string;
+  userId: string;
+  username: string;
+  roles: string[];
+  createdAt: string;
+  revokedAt?: string;
+};
+
+export type CreatedApiKey = {
+  key: string;
+  summary: ApiKeySummary;
 };
 
 type TokenClaims = {
@@ -32,6 +54,8 @@ export class AuthService {
   private readonly adminUsername = process.env.ADMIN_USERNAME ?? "admin";
   private readonly adminPassword = process.env.ADMIN_PASSWORD ?? "admin-password";
   private readonly revocationStore: TokenRevocationStore = createTokenRevocationStore();
+  private readonly apiKeyStore: ApiKeyStore = createApiKeyStore();
+  private readonly apiKeyPrefix = (process.env.API_KEY_PREFIX ?? "gdos").trim() || "gdos";
 
   login(
     username: string,
@@ -152,6 +176,66 @@ export class AuthService {
     };
   }
 
+  async verifyApiKey(apiKey: string): Promise<AuthUser | null> {
+    const value = apiKey.trim();
+    if (!value) {
+      return null;
+    }
+
+    const current = await this.apiKeyStore.getByHash(hashApiKey(value));
+    if (!current || current.revokedAt) {
+      return null;
+    }
+
+    return {
+      userId: current.userId,
+      username: current.username,
+      roles: current.roles,
+    };
+  }
+
+  async createApiKey(input: {
+    label?: string;
+    user: AuthUser;
+  }): Promise<CreatedApiKey> {
+    const id = randomUUID();
+    const secret = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
+    const key = `${this.apiKeyPrefix}_${id.slice(0, 8)}.${secret}`;
+    const keyPrefix = key.slice(0, Math.min(18, key.length));
+    const createdAt = new Date().toISOString();
+    const record: StoredApiKey = {
+      id,
+      keyHash: hashApiKey(key),
+      keyPrefix,
+      label: normalizeOptionalLabel(input.label),
+      userId: input.user.userId,
+      username: input.user.username,
+      roles: input.user.roles,
+      createdAt,
+    };
+
+    await this.apiKeyStore.create(record);
+
+    return {
+      key,
+      summary: toApiKeySummary(record),
+    };
+  }
+
+  async listApiKeys(): Promise<ApiKeySummary[]> {
+    const records = await this.apiKeyStore.list();
+    return records.map((record) => toApiKeySummary(record));
+  }
+
+  async revokeApiKey(id: string): Promise<boolean> {
+    const normalized = id.trim();
+    if (!normalized) {
+      return false;
+    }
+
+    return this.apiKeyStore.revokeById(normalized);
+  }
+
   async revokeToken(token: string): Promise<boolean> {
     const claims = this.parseTokenClaims(token);
     if (!claims || !Number.isFinite(claims.exp)) {
@@ -252,4 +336,26 @@ function safeEqual(a: string, b: string): boolean {
   }
 
   return timingSafeEqual(aBuffer, bBuffer);
+}
+
+function toApiKeySummary(record: StoredApiKey): ApiKeySummary {
+  return {
+    id: record.id,
+    keyPrefix: record.keyPrefix,
+    label: record.label,
+    userId: record.userId,
+    username: record.username,
+    roles: record.roles,
+    createdAt: record.createdAt,
+    revokedAt: record.revokedAt,
+  };
+}
+
+function normalizeOptionalLabel(value: string | undefined): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }

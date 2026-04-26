@@ -341,6 +341,83 @@ describe("api server", () => {
     }
   });
 
+  it("supports API key authentication for protected endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createApiKeyResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        payload: {
+          label: "integration-key",
+        },
+      });
+      const createApiKeyBody = createApiKeyResponse.json() as {
+        apiKey: string;
+        key: { id: string; label?: string };
+      };
+
+      expect(createApiKeyResponse.statusCode).toBe(201);
+      expect(createApiKeyBody.apiKey).toBeTruthy();
+      expect(createApiKeyBody.key.label).toBe("integration-key");
+
+      const withApiKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": createApiKeyBody.apiKey,
+        },
+      });
+
+      expect(withApiKey.statusCode).toBe(200);
+
+      const revokeResponse = await app.inject({
+        method: "DELETE",
+        url: `/admin/api-keys/${createApiKeyBody.key.id}`,
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(revokeResponse.statusCode).toBe(200);
+      expect(revokeResponse.json()).toEqual({
+        revoked: true,
+        id: createApiKeyBody.key.id,
+      });
+
+      const withRevokedKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": createApiKeyBody.apiKey,
+        },
+      });
+
+      expect(withRevokedKey.statusCode).toBe(401);
+      expect(withRevokedKey.json()).toEqual({
+        error: {
+          message: "Invalid API key.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
   it("scopes persisted indexes by owner when auth is enabled", async () => {
     const previousEnforcement = process.env.AUTH_ENFORCEMENT;
     process.env.AUTH_ENFORCEMENT = "true";

@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Inject, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Param, Post, Query, Req } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import type {
   RagAdminClearIndexesResponse,
@@ -7,7 +7,12 @@ import type {
 import { AuditService } from "../audit/audit.service";
 import type { AuditEvent } from "../audit/audit-store";
 import { getRequestUser } from "../common/auth-context";
+import { ApiRequestError } from "../errors";
 import { AdminService } from "./admin.service";
+
+type CreateApiKeyRequest = {
+  label?: string;
+};
 
 @Controller("admin")
 export class AdminController {
@@ -77,6 +82,108 @@ export class AdminController {
     return {
       count: events.length,
       events,
+    };
+  }
+
+  @Post("api-keys")
+  async createApiKey(
+    @Req() request: FastifyRequest,
+    @Body() body: CreateApiKeyRequest
+  ): Promise<{
+    apiKey: string;
+    key: {
+      id: string;
+      keyPrefix: string;
+      label?: string;
+      userId: string;
+      username: string;
+      roles: string[];
+      createdAt: string;
+      revokedAt?: string;
+    };
+  }> {
+    const requestUser = getRequestUser(request);
+    if (!requestUser) {
+      throw new ApiRequestError("Authentication required.", 401);
+    }
+
+    const created = await this.admin.createApiKey({
+      label: typeof body?.label === "string" ? body.label : undefined,
+      user: requestUser,
+    });
+
+    await this.audit.record({
+      userId: requestUser.userId,
+      username: requestUser.username,
+      action: "admin.api_key.created",
+      resource: "/admin/api-keys",
+      metadata: {
+        keyId: created.summary.id,
+      },
+    });
+
+    return {
+      apiKey: created.key,
+      key: created.summary,
+    };
+  }
+
+  @Get("api-keys")
+  async listApiKeys(
+    @Req() request: FastifyRequest
+  ): Promise<{
+    count: number;
+    keys: Array<{
+      id: string;
+      keyPrefix: string;
+      label?: string;
+      userId: string;
+      username: string;
+      roles: string[];
+      createdAt: string;
+      revokedAt?: string;
+    }>;
+  }> {
+    const keys = await this.admin.listApiKeys();
+    const requestUser = getRequestUser(request);
+
+    await this.audit.record({
+      userId: requestUser?.userId,
+      username: requestUser?.username,
+      action: "admin.api_key.listed",
+      resource: "/admin/api-keys",
+      metadata: {
+        count: keys.length,
+      },
+    });
+
+    return {
+      count: keys.length,
+      keys,
+    };
+  }
+
+  @Delete("api-keys/:id")
+  async revokeApiKey(
+    @Req() request: FastifyRequest,
+    @Param("id") id: string
+  ): Promise<{ revoked: boolean; id: string }> {
+    const revoked = await this.admin.revokeApiKey(id);
+    const requestUser = getRequestUser(request);
+
+    await this.audit.record({
+      userId: requestUser?.userId,
+      username: requestUser?.username,
+      action: revoked ? "admin.api_key.revoked" : "admin.api_key.revoke_missed",
+      resource: `/admin/api-keys/${id}`,
+      metadata: {
+        keyId: id,
+      },
+    });
+
+    return {
+      revoked,
+      id,
     };
   }
 }

@@ -79,21 +79,34 @@ export async function createApiServer(
     const bearerToken = extractBearerToken(request.headers.authorization);
     const cookieToken = extractCookieValue(request.headers.cookie, "groundedos-session");
     const token = bearerToken ?? cookieToken;
+    const apiKey = extractApiKey(request.headers["x-api-key"]);
 
-    if (!token) {
+    let user = null;
+
+    if (token) {
+      user = await authService.verifyAccessToken(token);
+      if (!user) {
+        reply.status(401).send({
+          error: {
+            message: "Invalid or expired token.",
+          },
+        });
+        return;
+      }
+    } else if (apiKey) {
+      user = await authService.verifyApiKey(apiKey);
+      if (!user) {
+        reply.status(401).send({
+          error: {
+            message: "Invalid API key.",
+          },
+        });
+        return;
+      }
+    } else {
       reply.status(401).send({
         error: {
           message: "Authentication required.",
-        },
-      });
-      return;
-    }
-
-    const user = await authService.verifyAccessToken(token);
-    if (!user) {
-      reply.status(401).send({
-        error: {
-          message: "Invalid or expired token.",
         },
       });
       return;
@@ -222,6 +235,20 @@ function extractCookieValue(cookieHeader: string | string[] | undefined, key: st
   }
 
   return null;
+}
+
+function extractApiKey(header: string | string[] | undefined): string | null {
+  if (!header) {
+    return null;
+  }
+
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function parseAllowedLabRoles(value: string | undefined): string[] {
