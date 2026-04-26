@@ -52,7 +52,7 @@ export const CONCEPTS: Concept[] = [
     ],
     relatedFiles: ["docs/concepts/llm.md", "docs/concepts/inference.md"],
     dependsOn: [],
-    nextConcepts: ["Transformer", "Inference", "Context Window"],
+    nextConcepts: ["transformer", "inference", "context-window"],
   },
 
   {
@@ -94,8 +94,8 @@ export const CONCEPTS: Concept[] = [
       "Attention over very long sequences can be computationally expensive.",
     ],
     relatedFiles: ["docs/concepts/llm.md"],
-    dependsOn: ["LLM"],
-    nextConcepts: ["Context Window", "Weights"],
+    dependsOn: ["llm"],
+    nextConcepts: ["context-window", "weights"],
   },
 
   {
@@ -138,8 +138,8 @@ export const CONCEPTS: Concept[] = [
       "Fine-tuning on limited data can overfit.",
     ],
     relatedFiles: ["docs/concepts/fine-tuning.md", "experiments/fine-tuning/"],
-    dependsOn: ["Transformer"],
-    nextConcepts: ["Fine-tuning", "LoRA", "Quantization"],
+    dependsOn: ["transformer"],
+    nextConcepts: ["fine-tuning", "lora", "quantization"],
   },
 
   {
@@ -183,8 +183,8 @@ export const CONCEPTS: Concept[] = [
       "Middle content in long contexts can be overlooked (lost in the middle).",
     ],
     relatedFiles: ["docs/concepts/context-window.md", "packages/rag/"],
-    dependsOn: ["LLM", "Inference"],
-    nextConcepts: ["Context Pruning", "Retrieval"],
+    dependsOn: ["llm", "inference"],
+    nextConcepts: ["context-pruning", "adaptive-rag"],
   },
 
   {
@@ -228,8 +228,8 @@ export const CONCEPTS: Concept[] = [
       "Network latency dominates cloud inference time.",
     ],
     relatedFiles: ["docs/concepts/inference.md", "packages/observability/"],
-    dependsOn: ["LLM", "Transformer"],
-    nextConcepts: ["Latency", "Semantic Caching"],
+    dependsOn: ["llm", "transformer"],
+    nextConcepts: ["observability", "context-engineering"],
   },
 
   // Retrieval & Data
@@ -300,7 +300,7 @@ export const CONCEPTS: Concept[] = [
       "docs/phase-1-rag-internals.md",
     ],
     dependsOn: [],
-    nextConcepts: ["Embeddings", "Chunking", "Grounding"],
+    nextConcepts: ["embeddings", "chunking", "grounding"],
   },
 
   {
@@ -366,8 +366,8 @@ export const CONCEPTS: Concept[] = [
       "docs/concepts/embeddings.md",
       "scripts/benchmark-model-providers.ts",
     ],
-    dependsOn: ["RAG"],
-    nextConcepts: ["Vector Database", "Hybrid Search", "Chunking"],
+    dependsOn: ["rag"],
+    nextConcepts: ["vector-database", "hybrid-search", "chunking"],
   },
 
   {
@@ -424,8 +424,8 @@ export const CONCEPTS: Concept[] = [
       "packages/rag/src/vector-store.ts",
       "docs/concepts/embeddings.md",
     ],
-    dependsOn: ["Embeddings"],
-    nextConcepts: ["Hybrid Search", "Chunking"],
+    dependsOn: ["embeddings"],
+    nextConcepts: ["hybrid-search", "chunking"],
   },
 
   {
@@ -488,8 +488,8 @@ export const CONCEPTS: Concept[] = [
       "packages/rag/src/retrieval.ts",
       "docs/phase-1-rag-internals.md",
     ],
-    dependsOn: ["RAG"],
-    nextConcepts: ["Embeddings", "Grounding", "Data Lineage"],
+    dependsOn: ["rag"],
+    nextConcepts: ["embeddings", "grounding", "data-lineage"],
   },
 
   {
@@ -542,8 +542,8 @@ export const CONCEPTS: Concept[] = [
       "scripts/benchmark-hybrid-retrieval.ts",
       "docs/concepts/hybrid-search.md",
     ],
-    dependsOn: ["Embeddings", "Chunking"],
-    nextConcepts: ["Re-ranking", "Adaptive RAG"],
+    dependsOn: ["embeddings", "chunking"],
+    nextConcepts: ["reranking", "adaptive-rag"],
   },
 
   {
@@ -593,8 +593,8 @@ export const CONCEPTS: Concept[] = [
       "packages/benchmarks/",
       "docs/concepts/hybrid-search.md",
     ],
-    dependsOn: ["Embeddings", "Hybrid Search"],
-    nextConcepts: ["Top-K", "Adaptive RAG"],
+    dependsOn: ["embeddings", "hybrid-search"],
+    nextConcepts: ["temperature-top-p-top-k", "adaptive-rag"],
   },
 
   {
@@ -627,8 +627,8 @@ export const CONCEPTS: Concept[] = [
       "Not all documents benefit from graph structure.",
     ],
     relatedFiles: ["docs/roadmap.md"],
-    dependsOn: ["Chunking"],
-    nextConcepts: ["Adaptive RAG"],
+    dependsOn: ["chunking"],
+    nextConcepts: ["adaptive-rag"],
   },
 
   {
@@ -680,8 +680,8 @@ export const CONCEPTS: Concept[] = [
       "packages/core/src/data-contracts.ts",
       "packages/observe/src/lineage-tracker.ts",
     ],
-    dependsOn: ["Chunking", "Grounding"],
-    nextConcepts: ["Grounding"],
+    dependsOn: ["chunking", "grounding"],
+    nextConcepts: ["grounding"],
   },
 
   // Context & Reasoning (continuing...)
@@ -718,8 +718,8 @@ export const CONCEPTS: Concept[] = [
       "Good prompts are hard to discover.",
     ],
     relatedFiles: ["docs/concepts/prompt-engineering.md"],
-    dependsOn: ["LLM"],
-    nextConcepts: ["Few-shot Learning", "System Prompt"],
+    dependsOn: ["llm"],
+    nextConcepts: ["context-engineering", "system-prompt"],
   },
 
   {
@@ -763,8 +763,8 @@ export const CONCEPTS: Concept[] = [
       "Context relevance is model-dependent.",
     ],
     relatedFiles: ["packages/rag/src/retrieval.ts"],
-    dependsOn: ["Chunking", "RAG"],
-    nextConcepts: ["Context Pruning", "Grounding"],
+    dependsOn: ["chunking", "rag"],
+    nextConcepts: ["context-pruning", "grounding"],
   },
 
   {
@@ -798,8 +798,8 @@ export const CONCEPTS: Concept[] = [
       "Overly constrained system prompts can limit capabilities.",
     ],
     relatedFiles: ["docs/concepts/prompt-engineering.md"],
-    dependsOn: ["Prompt Engineering"],
-    nextConcepts: ["Few-shot Learning"],
+    dependsOn: ["prompt-engineering"],
+    nextConcepts: ["context-engineering"],
   },
 
   {
@@ -861,8 +861,8 @@ export const CONCEPTS: Concept[] = [
       "apps/api/src/rag-service.ts",
       "docs/concepts/grounding.md",
     ],
-    dependsOn: ["RAG", "Chunking", "Data Lineage"],
-    nextConcepts: ["Context Pruning", "Adaptive RAG"],
+    dependsOn: ["rag", "chunking", "data-lineage"],
+    nextConcepts: ["context-pruning", "adaptive-rag"],
   },
 
   {
@@ -898,8 +898,8 @@ export const CONCEPTS: Concept[] = [
       "Pruning strategy depends on question type.",
     ],
     relatedFiles: ["docs/concepts/context-window.md", "packages/rag/"],
-    dependsOn: ["Context Engineering", "Context Window"],
-    nextConcepts: ["Adaptive RAG"],
+    dependsOn: ["context-engineering", "context-window"],
+    nextConcepts: ["adaptive-rag"],
   },
 
   {
@@ -939,13 +939,650 @@ export const CONCEPTS: Concept[] = [
       "packages/rag/src/query-understanding.ts",
       "docs/concepts/adaptive-rag.md",
     ],
-    dependsOn: ["Query Understanding", "RAG"],
+    dependsOn: ["context-engineering", "rag"],
     nextConcepts: [],
   },
 
-  // ... (continuing with remaining concepts)
-  // Data Engineering, Agents, Optimization, Safety, etc.
-  // Due to token limits, I'll create a more complete version  
+  // Data Engineering
+  {
+    id: "etl",
+    title: "etl",
+    category: "Data Engineering",
+    status: "implemented",
+    shortDefinition:
+      "ETL (Extract, Transform, Load) ingests raw files into a standardized schema for downstream processing.",
+    explanation:
+      "ETL pipelines convert diverse document formats (PDF, TXT, images) into `NormalizedDocument` with sections, offsets and lineage metadata. This standardization enables consistent retrieval and evaluation.",
+    whyItMatters:
+      "Poor data standardization leads to retrieval failures and missing lineage. ETL is the foundation of data quality.",
+    howToStudy: [
+      "Understand document normalization schemas.",
+      "Learn about lineage tracking and metadata extraction.",
+      "Study error handling in multimodal ingestion.",
+    ],
+    howToPracticeInProject: [
+      "Run npm run ingest:smoke to process sample files.",
+      "Upload a PDF and a TXT file separately.",
+      "Observe the Uniform Document Schema in Dev Mode.",
+    ],
+    appliedInGroundedOS: [
+      "packages/etl implements the ETL pipeline for Phase 0.",
+      "Supports text and PDF files with automatic section detection.",
+      "Image and audio extractors are registered stubs.",
+    ],
+    visibleInCurrentData: [
+      "Document sections are visible in the Index list with chunk counts.",
+      "Lineage metadata appears in citations (document ID, section, offset).",
+    ],
+    whereToSeeInUI: ["Index list", "Citations tab", "Dev Mode output"],
+    suggestedExperiments: [
+      "Upload different file formats and compare schema output.",
+      "Compare section detection for structured vs unstructured documents.",
+      "Measure ETL processing time for documents of varying sizes.",
+    ],
+    testingSteps: [
+      "1. Abra a aplicação web.",
+      "2. Clique em 'Upload' e escolha um PDF e um TXT.",
+      "3. Clique em 'Index' para processar através do pipeline ETL.",
+      "4. Abra Dev Mode para ver a estrutura NormalizedDocument.",
+      "5. Compare os IDs de seção e offsets entre os dois archivos.",
+    ],
+    tradeoffsAndLimitations: [
+      "Text extraction from PDFs can be error-prone.",
+      "Complex layouts may produce incorrect section boundaries.",
+      "Image and audio extraction are not yet implemented.",
+      "Large documents take longer to process.",
+    ],
+    relatedFiles: [
+      "packages/etl/README.md",
+      "packages/core/src/types/index.ts",
+      "docs/concepts/uniform-document-schema.md",
+    ],
+    dependsOn: [],
+    nextConcepts: ["chunking", "data-lineage"],
+  },
+
+  {
+    id: "uniform-document-schema",
+    title: "Uniform Document Schema",
+    category: "Data Engineering",
+    status: "implemented",
+    shortDefinition:
+      "A standardized structure for documents that enables consistent processing across ingestion, retrieval and evaluation.",
+    explanation:
+      "The Uniform Document Schema defines `SourceDocument` (raw input metadata) and `NormalizedDocument` (processed, queryable form) with sections, offsets, embeddings and lineage. This standardization is the backbone of GroundedOS Lab.",
+    whyItMatters:
+      "Without a uniform schema, each component (ETL, retrieval, eval) would need its own document representation. This creates bugs and inconsistencies.",
+    howToStudy: [
+      "Read packages/core/src/types/index.ts to see the schema definition.",
+      "Understand section hierarchies and offset semantics.",
+      "Learn how lineage is tracked through the pipeline.",
+    ],
+    howToPracticeInProject: [
+      "Upload a document and inspect its NormalizedDocument in Dev Mode.",
+      "Extract a citation and verify it can be traced back to offsets.",
+      "Compare schemas for different input file types.",
+    ],
+    appliedInGroundedOS: [
+      "All documents are converted to NormalizedDocument in the ETL pipeline.",
+      "RAG retrieval operates on standardized NormalizedDocument chunks.",
+      "Citations always reference section IDs, offsets and document IDs from the schema.",
+    ],
+    visibleInCurrentData: [
+      "Document structure in Index list shows section and chunk counts.",
+      "Dev Mode output includes the full NormalizedDocument structure.",
+    ],
+    whereToSeeInUI: ["Dev Mode", "Index list", "Citations"],
+    suggestedExperiments: [
+      "Upload a multi-section PDF and trace chunks to sections.",
+      "Verify offset accuracy by comparing displayed text to source.",
+      "Test retrieval consistency with different section boundaries.",
+    ],
+    testingSteps: [
+      "1. Abra Dev Mode clicando no checkbox no canto superior direito.",
+      "2. Faça upload de um documento.",
+      "3. Clique em Index.",
+      "4. Role para baixo até encontrar a chave 'document' no JSON.",
+      "5. Observe a estrutura NormalizedDocument com seções e offsets.",
+    ],
+    tradeoffsAndLimitations: [
+      "Storing full schema for large documents increases memory usage.",
+      "Complex document hierarchies can be hard to represent.",
+      "Schema changes require migration of persisted indexes.",
+    ],
+    relatedFiles: [
+      "packages/core/src/types/index.ts",
+      "packages/etl/README.md",
+      "docs/concepts/data-lineage.md",
+    ],
+    dependsOn: [],
+    nextConcepts: ["etl", "data-lineage"],
+  },
+
+  // Agents & Execution
+  {
+    id: "tool-calling",
+    title: "Tool Calling",
+    category: "Agents & Execution",
+    status: "partial",
+    shortDefinition:
+      "Tool calling enables an LLM to invoke functions or APIs as part of a reasoning loop, extending its capabilities beyond text generation.",
+    explanation:
+      "Instead of only generating text, tool-calling LLMs can request external function execution. The LLM reasons about which tool to use, the agent executes it, and the result is fed back to continue reasoning.",
+    whyItMatters:
+      "Tool calling is how agents accomplish multi-step tasks. Without it, LLMs are limited to text generation.",
+    howToStudy: [
+      "Understand function definition schemas (OpenAI format, Anthropic format).",
+      "Learn about tool choice strategies (auto, required, none).",
+      "Study execution safety and error handling.",
+    ],
+    howToPracticeInProject: [
+      "Open the Guardrails Playground in Lab mode.",
+      "Observe tool calling in the DocumentQAAgent (internal tools: retrieval, citation).",
+      "Review packages/agents/src/tools.ts for the tool registry.",
+    ],
+    appliedInGroundedOS: [
+      "DocumentQAAgent uses tool calling to invoke retrieval and formatting.",
+      "Guardrails chain uses tools for PII detection and injection defense.",
+      "Tool registry in packages/agents manages available functions.",
+    ],
+    visibleInCurrentData: [
+      "Dev Mode shows tool calls in the workflow steps.",
+      "Guardrails Playground shows executed checks as tool invocations.",
+    ],
+    whereToSeeInUI: ["Lab mode", "Guardrails tab", "Dev Mode"],
+    suggestedExperiments: [
+      "Ask a question that requires both retrieval and synthesis.",
+      "Observe which tools were invoked in Dev Mode.",
+      "Try to trigger multiple tool calls in sequence.",
+    ],
+    testingSteps: [
+      "1. Clique na aba 'Lab' para abrir o Guardrails Playground.",
+      "2. Selecione um exemplo (ex: 'Prompt injection').",
+      "3. Clique em 'Run Safety Check'.",
+      "4. Abra Dev Mode e procure por 'toolCalls' ou 'workflow'.",
+      "5. Observe as ferramentas executadas pelo agente.",
+    ],
+    tradeoffsAndLimitations: [
+      "LLMs sometimes misuse tools or choose wrong functions.",
+      "Tool execution adds latency to the response.",
+      "Tool definitions must be precise to avoid errors.",
+      "Not all LLMs have equally good tool-calling capabilities.",
+    ],
+    relatedFiles: [
+      "packages/agents/src/tools.ts",
+      "packages/safety/src/guardrail-chain.ts",
+      "apps/api/src/agents-service.ts",
+    ],
+    dependsOn: ["llm"],
+    nextConcepts: ["tool-calling", "temperature-top-p-top-k"],
+  },
+
+  // Optimization
+  {
+    id: "fine-tuning",
+    title: "Fine-tuning",
+    category: "Optimization",
+    status: "implemented",
+    shortDefinition:
+      "Fine-tuning adapts a pre-trained model to a specific task by training on task-specific examples.",
+    explanation:
+      "Fine-tuning updates all (or most) model parameters on a small dataset, causing the model to specialize. It's more expensive than LoRA but can achieve greater adaptation.",
+    whyItMatters:
+      "Fine-tuning is the most effective way to adapt models to specialized tasks, but it's also the most resource-intensive.",
+    howToStudy: [
+      "Understand supervised fine-tuning (SFT).",
+      "Learn about instruction-following and alignment.",
+      "Study overfitting prevention strategies.",
+    ],
+    howToPracticeInProject: [
+      "Run npm run experiment:fine-tuning if configured.",
+      "Review results in datasets/experiments/phase-5/",
+      "Compare fine-tuned vs base model outputs on domain tasks.",
+    ],
+    appliedInGroundedOS: [
+      "Phase 5 includes real fine-tuning experiments on GPT-2.",
+      "Results logged in datasets/experiments/phase-5/ with loss curves.",
+      "Integration with LoRA and quantization tracks.",
+    ],
+    visibleInCurrentData: [
+      "Experiment artifacts show training loss progression.",
+      "Comparison metrics include parameter count and inference latency.",
+    ],
+    whereToSeeInUI: ["Lab experiments (future)", "Datasets folder"],
+    suggestedExperiments: [
+      "Run fine-tuning on a custom instruction dataset.",
+      "Compare quality before/after on held-out test set.",
+      "Experiment with different learning rates and epochs.",
+    ],
+    testingSteps: [
+      "1. Abra o terminal na raiz do projeto.",
+      "2. Execute: npm run experiment:fine-tuning",
+      "3. Aguarde a conclusão (pode levar alguns minutos).",
+      "4. Abra datasets/experiments/phase-5/ para ver os resultados.",
+      "5. Compara a métrica 'comparison.passed' com o baseline.",
+    ],
+    tradeoffsAndLimitations: [
+      "High computational cost (GPU/TPU required).",
+      "Risk of overfitting on small datasets.",
+      "All parameters updated = longer training time.",
+      "Model size doesn't change, inference latency unchanged.",
+    ],
+    relatedFiles: [
+      "experiments/fine-tuning/README.md",
+      "scripts/sft-experiment.test.ts",
+      "docs/concepts/fine-tuning.md",
+    ],
+    dependsOn: ["weights", "llm"],
+    nextConcepts: ["lora", "distillation"],
+  },
+
+  {
+    id: "lora",
+    title: "LoRA",
+    category: "Optimization",
+    status: "implemented",
+    shortDefinition:
+      "Low-Rank Adaptation (LoRA) adds small trainable layers to a frozen pre-trained model, dramatically reducing parameters.",
+    explanation:
+      "LoRA freezes the original model and adds low-rank decomposition matrices. Training only these adapters (0.01-1% of original params) while keeping the base model frozen.",
+    whyItMatters:
+      "LoRA enables efficient fine-tuning: orders of magnitude fewer parameters, lower memory cost, and faster training while maintaining quality.",
+    howToStudy: [
+      "Understand low-rank decomposition mathematics.",
+      "Learn how adapters combine with base model weights.",
+      "Study when LoRA is sufficient vs full fine-tuning.",
+    ],
+    howToPracticeInProject: [
+      "Run npm run experiment:lora if configured.",
+      "Review results in datasets/experiments/phase-5/",
+      "Compare trainable params: LoRA vs full fine-tuning.",
+    ],
+    appliedInGroundedOS: [
+      "Phase 5 includes real LoRA experiments using PEFT library.",
+      "Results show 99.76% parameter reduction (294k vs 124M params).",
+      "Integration with model routing for efficient serving.",
+    ],
+    visibleInCurrentData: [
+      "Experiment artifacts show parameter ratio (LoRA / baseline).",
+      "Comparison includes trainable params and inference latency.",
+    ],
+    whereToSeeInUI: ["Lab experiments (future)", "Datasets folder"],
+    suggestedExperiments: [
+      "Train LoRA adapter on domain-specific corpus.",
+      "Vary LoRA rank and observe quality vs size trade-off.",
+      "Stack multiple LoRA adapters for multi-task adaptation.",
+    ],
+    testingSteps: [
+      "1. Abra o terminal na raiz.",
+      "2. Execute: npm run experiment:lora",
+      "3. Aguarde a conclusão.",
+      "4. Abra datasets/experiments/phase-5/ para ver resultados.",
+      "5. Veja 'trainableParamsRatio' para confirmar redução de 99%.",
+    ],
+    tradeoffsAndLimitations: [
+      "Lower rank = less expressiveness but smaller size.",
+      "LoRA layer addition adds minor inference latency.",
+      "Not all architectures support LoRA equally well.",
+      "Quality ceiling may be lower than full fine-tuning.",
+    ],
+    relatedFiles: [
+      "experiments/lora/README.md",
+      "scripts/lora-experiment.test.ts",
+      "docs/concepts/lora.md",
+    ],
+    dependsOn: ["fine-tuning", "weights"],
+    nextConcepts: ["quantization", "distillation"],
+  },
+
+  {
+    id: "quantization",
+    title: "Quantization",
+    category: "Optimization",
+    status: "implemented",
+    shortDefinition:
+      "Quantization reduces model size by using lower-precision numbers (INT8, INT4) instead of FP32.",
+    explanation:
+      "Quantization converts 32-bit floats to 8-bit or 4-bit integers, reducing memory by 4-8x. This trades off precision for size and speed.",
+    whyItMatters:
+      "Quantization is essential for deploying large models on edge devices or resource-constrained environments.",
+    howToStudy: [
+      "Understand fixed-point and floating-point representation.",
+      "Learn about symmetric and asymmetric quantization.",
+      "Study post-training vs quantization-aware training.",
+    ],
+    howToPracticeInProject: [
+      "Run npm run experiment:quantization if configured.",
+      "Review results in datasets/experiments/phase-5/",
+      "Compare memory usage: INT8/INT4 vs FP32.",
+    ],
+    appliedInGroundedOS: [
+      "Phase 5 includes symmetric vector quantization experiments.",
+      "Results show 85.8% memory reduction with Recall@1=1.0.",
+      "Integration with model routing for serving.",
+    ],
+    visibleInCurrentData: [
+      "Experiment artifacts show memory reduction percentage.",
+      "Comparison includes Recall@1 to verify quality maintenance.",
+    ],
+    whereToSeeInUI: ["Lab experiments (future)", "Datasets folder"],
+    suggestedExperiments: [
+      "Quantize embeddings to INT4 and measure retrieval degradation.",
+      "Compare inference latency: FP32 vs quantized.",
+      "Test with different quantization strategies (symmetric, asymmetric).",
+    ],
+    testingSteps: [
+      "1. Execute: npm run experiment:quantization",
+      "2. Aguarde a conclusão.",
+      "3. Abra datasets/experiments/phase-5/ para ver resultados.",
+      "4. Procure por 'memoryReduction' (deve estar ~85%).",
+      "5. Verifique que 'recall@1' mantém-se em 1.0.",
+    ],
+    tradeoffsAndLimitations: [
+      "Lower bit-width reduces precision and can hurt quality.",
+      "Some operations don't support quantization well.",
+      "Inference may not be faster without specialized hardware.",
+      "Re-quantizing requires re-running the pipeline.",
+    ],
+    relatedFiles: [
+      "experiments/quantization/README.md",
+      "docs/concepts/quantization.md",
+      "packages/benchmarks/",
+    ],
+    dependsOn: ["weights"],
+    nextConcepts: ["lora", "distillation"],
+  },
+
+  {
+    id: "distillation",
+    title: "Distillation",
+    category: "Optimization",
+    status: "implemented",
+    shortDefinition:
+      "Distillation trains a smaller 'student' model to mimic a larger 'teacher' model, achieving compression with minimal quality loss.",
+    explanation:
+      "Distillation transfers knowledge from an expensive teacher model to a cheaper student. The student learns from teacher soft targets (probabilities) rather than hard labels.",
+    whyItMatters:
+      "Distillation enables deployment of compact models with near-teacher performance, drastically reducing latency and cost.",
+    howToStudy: [
+      "Understand soft targets and temperature scaling.",
+      "Learn about knowledge transfer mechanisms.",
+      "Study student architecture choices.",
+    ],
+    howToPracticeInProject: [
+      "Run npm run experiment:distillation if configured.",
+      "Review results in datasets/experiments/phase-5/",
+      "Compare student vs teacher on quality and speed.",
+    ],
+    appliedInGroundedOS: [
+      "Phase 5 includes real distillation experiment (GPT-2 → DistilGPT-2).",
+      "Results show 34.17% compression with quality gate passing.",
+      "Integration with model routing for serving.",
+    ],
+    visibleInCurrentData: [
+      "Experiment artifacts show compression rate.",
+      "Comparison includes quality metrics (e.g., loss) and size.",
+    ],
+    whereToSeeInUI: ["Lab experiments (future)", "Datasets folder"],
+    suggestedExperiments: [
+      "Distill a retrieval embedding model to a smaller version.",
+      "Compare teacher vs student latency on large batches.",
+      "Experiment with different temperature and loss weights.",
+    ],
+    testingSteps: [
+      "1. Execute: npm run experiment:distillation",
+      "2. Aguarde a conclusão.",
+      "3. Abra datasets/experiments/phase-5/",
+      "4. Procure por 'compressionRatio' (deve estar ~34%).",
+      "5. Verifique que 'qualityGatePassed' é true.",
+    ],
+    tradeoffsAndLimitations: [
+      "Requires access to teacher model (not always possible).",
+      "Student quality is bounded by teacher.",
+      "Knowledge transfer is not always successful.",
+      "Best results need careful hyperparameter tuning.",
+    ],
+    relatedFiles: [
+      "experiments/distillation/README.md",
+      "scripts/distillation-experiment.test.ts",
+      "docs/concepts/distillation.md",
+    ],
+    dependsOn: ["fine-tuning"],
+    nextConcepts: ["quantization"],
+  },
+
+  // Evaluation & Observability
+  {
+    id: "cost-analysis",
+    title: "Cost Analysis",
+    category: "Evaluation & Observability",
+    status: "implemented",
+    shortDefinition:
+      "Cost analysis tracks and aggregates the financial cost of API calls, model inference and other services.",
+    explanation:
+      "Each request has an associated cost (tokens × price). GroundedOS Lab breaks down cost by provider, model, and stage (retrieval, generation) so users understand where money is spent.",
+    whyItMatters:
+      "Without cost visibility, RAG systems can become expensive without users realizing it. Cost tracking enables budget-conscious optimization.",
+    howToStudy: [
+      "Understand token pricing models (e.g., $0.001 per 1K tokens).",
+      "Learn about request-level vs aggregated cost tracking.",
+      "Study cost allocation across pipeline stages.",
+    ],
+    howToPracticeInProject: [
+      "Make a RAG ask with Groq or OpenAI provider.",
+      "Open Dev Mode and look for 'cost' object.",
+      "Check the Trade-offs tab for cost aggregates.",
+    ],
+    appliedInGroundedOS: [
+      "Per-request cost tracking in packages/observability.",
+      "Cost breakdown by stage: embedding, retrieval, generation.",
+      "Rolling aggregates in trade-off metrics dashboard.",
+    ],
+    visibleInCurrentData: [
+      "Dev Mode shows cost.breakdown with cost per stage.",
+      "Trade-offs tab shows total cost, cost per provider.",
+    ],
+    whereToSeeInUI: ["Dev Mode", "Trade-offs tab", "Latency badges"],
+    suggestedExperiments: [
+      "Compare cost: local vs Ollama vs Groq.",
+      "Ask 10 questions and sum total cost.",
+      "Calculate cost per retrieval vs generation.",
+    ],
+    testingSteps: [
+      "1. Faça upload de um documento.",
+      "2. Clique em Index com um provider (ex: Groq).",
+      "3. Faça uma pergunta.",
+      "4. Abra Dev Mode e procure por 'cost'.",
+      "5. Abra a aba 'Trade-offs' e veja o custo agregado.",
+    ],
+    tradeoffsAndLimitations: [
+      "Cost tracking is approximate (real invoice may differ).",
+      "Requires accurate token counting.",
+      "Price lists change over time.",
+      "Local models may not report accurate cost.",
+    ],
+    relatedFiles: [
+      "packages/observability/src/cost-tracker.ts",
+      "apps/api/src/rag-service.ts",
+      "docs/concepts/cost-analysis.md",
+    ],
+    dependsOn: ["inference"],
+    nextConcepts: ["observability"],
+  },
+
+  {
+    id: "observability",
+    title: "Observability",
+    category: "Evaluation & Observability",
+    status: "implemented",
+    shortDefinition:
+      "Observability instruments the system to provide visibility into latency, errors, resource usage and correctness.",
+    explanation:
+      "Beyond metrics (latency, cost), observability includes distributed tracing, structured logging, and error tracking. GroundedOS Lab exposes per-request observability in Dev Mode.",
+    whyItMatters:
+      "Without observability, debugging production issues is nearly impossible. Observability enables rapid diagnosis of failures.",
+    howToStudy: [
+      "Learn the three pillars: metrics, logs, traces.",
+      "Understand structured logging and trace spans.",
+      "Study sampling strategies for high-volume systems.",
+    ],
+    howToPracticeInProject: [
+      "Navigate to a result.",
+      "Click the Dev Mode checkbox.",
+      "Expand the JSON to see traces and timings.",
+    ],
+    appliedInGroundedOS: [
+      "Dev Mode output is a structured trace of the request.",
+      "packages/observability provides tracing infrastructure.",
+      "Spans for each pipeline stage (chunking, embedding, retrieval, generation).",
+    ],
+    visibleInCurrentData: [
+      "Dev Mode shows duration of each stage in milliseconds.",
+      "Traces include chunk count, scores, providers used.",
+    ],
+    whereToSeeInUI: ["Dev Mode", "Latency badges", "Trade-offs tab"],
+    suggestedExperiments: [
+      "Compare latency across different document sizes.",
+      "Measure latency breakdown: retrieval vs generation.",
+      "Identify the slowest stage in the pipeline.",
+    ],
+    testingSteps: [
+      "1. Faça uma pergunta em uma sessão normal.",
+      "2. Clique no checkbox 'Dev Mode' no canto superior direito.",
+      "3. Localize a chave 'workflow' no JSON.",
+      "4. Expanda cada etapa para ver duration em ms.",
+      "5. Compare com uma pergunta diferente.",
+    ],
+    tradeoffsAndLimitations: [
+      "Tracing overhead can impact performance.",
+      "Storing full traces for every request is expensive.",
+      "Sampling can miss rare issues.",
+      "Privacy concerns with logging full content.",
+    ],
+    relatedFiles: [
+      "packages/observability/src/tracer.ts",
+      "apps/api/src/logging.ts",
+      "docs/phase-1-dev-mode-output.md",
+    ],
+    dependsOn: [],
+    nextConcepts: ["cost-analysis"],
+  },
+
+  // Safety & Reliability
+  {
+    id: "guardrails",
+    title: "Guardrails",
+    category: "Safety & Reliability",
+    status: "implemented",
+    shortDefinition:
+      "Guardrails are safety layers that detect and block harmful inputs, outputs or patterns before they reach the user.",
+    explanation:
+      "Guardrails chain together multiple checks (prompt injection, PII, jailbreak, hallucination) and decide whether to block, sanitize or allow each request.",
+    whyItMatters:
+      "Without guardrails, any LLM can be manipulated to generate harmful content or leak sensitive data. Guardrails are non-negotiable for production systems.",
+    howToStudy: [
+      "Understand prompt injection attack patterns.",
+      "Learn about PII detection and sanitization.",
+      "Study jailbreak and indirect injection vectors.",
+    ],
+    howToPracticeInProject: [
+      "Click the 'Lab' tab to open Guardrails Playground.",
+      "Try each guardrail example (prompt injection, PII, jailbreak).",
+      "Observe which guardrails trigger for each input.",
+    ],
+    appliedInGroundedOS: [
+      "packages/safety implements GuardrailChain with 6 checks.",
+      "Integrated in API and web: guardrails run before retrieval.",
+      "Lab mode Guardrails Playground for red-teaming.",
+    ],
+    visibleInCurrentData: [
+      "Guardrails Playground shows which checks triggered.",
+      "Dev Mode shows guardrail results ('pass', 'block', 'sanitize').",
+    ],
+    whereToSeeInUI: ["Lab tab", "Guardrails Playground", "Dev Mode"],
+    suggestedExperiments: [
+      "Try classic prompt injection: 'Ignore previous instructions'.",
+      "Test PII detection with real email and phone numbers.",
+      "Attempt jailbreak patterns and observe blocking.",
+    ],
+    testingSteps: [
+      "1. Clique na aba 'Lab' para abrir Guardrails Playground.",
+      "2. Selecione o exemplo 'Prompt injection'.",
+      "3. Clique 'Run Safety Check'.",
+      "4. Observe o resultado (deve ser 'blocked').",
+      "5. Experimente com seus próprios inputs.",
+    ],
+    tradeoffsAndLimitations: [
+      "Guardrails can be overly conservative and false-positive.",
+      "Determined attackers can find bypass patterns.",
+      "Regular updates needed as attack patterns evolve.",
+      "Overhead adds latency to requests.",
+    ],
+    relatedFiles: [
+      "packages/safety/src/guardrail-chain.ts",
+      "experiments/jailbreak-defense/README.md",
+      "docs/concepts/guardrails.md",
+    ],
+    dependsOn: [],
+    nextConcepts: ["grounding"],
+  },
+
+  // Generation Control
+  {
+    id: "temperature-top-p-top-k",
+    title: "Temperature / Top-P / Top-K",
+    category: "Generation Control",
+    status: "planned",
+    shortDefinition:
+      "Generation parameters control the randomness and diversity of LLM outputs: temperature adjusts probability distribution, top-P filters by cumulative probability, top-K limits to top-K tokens.",
+    explanation:
+      "Temperature scales logits (lower = more deterministic, higher = more creative). Top-P (nucleus sampling) and top-K limit token choices. Together they control output diversity and quality.",
+    whyItMatters:
+      "Generation parameters directly affect response quality and user experience. RAG often wants low temperature (precise); creative tasks want high temperature.",
+    howToStudy: [
+      "Understand logits and softmax distributions.",
+      "Learn nucleus sampling (Top-P).",
+      "Study the effects of each parameter on output.",
+    ],
+    howToPracticeInProject: [
+      "Future: web UI will expose generation parameter controls.",
+      "Compare outputs with temperature=0 vs 0.9.",
+      "Observe diversity changes with top-p and top-k.",
+    ],
+    appliedInGroundedOS: [
+      "API accepts temperature parameter (planned).",
+      "Model providers (Groq, OpenAI) support these controls.",
+      "Future: benchmarks will test temperature effects on RAG quality.",
+    ],
+    visibleInCurrentData: [
+      "Not yet. Will appear in provider settings (future).",
+    ],
+    whereToSeeInUI: ["Model settings (future)", "Benchmarks (future)"],
+    suggestedExperiments: [
+      "Ask the same question 10 times with temperature=0.",
+      "Repeat with temperature=0.9 and compare consistency.",
+      "Test top-p=[0.9, 0.5] on the same query.",
+    ],
+    testingSteps: [
+      "1. Na versão futura, haverá um painel de 'Generation Settings'.",
+      "2. Configure temperature entre 0 e 1.",
+      "3. Configure top_p entre 0 e 1.",
+      "4. Configure top_k entre 1 e 100.",
+      "5. Compare respostas com diferentes configurações.",
+    ],
+    tradeoffsAndLimitations: [
+      "Higher temperature = more creative but less consistent.",
+      "Lower temperature = more deterministic but can be repetitive.",
+      "Not all providers support all parameters equally.",
+      "Parameters interact: top-p + top-k requires care.",
+    ],
+    relatedFiles: [
+      "packages/model-routing/src/generation-config.ts",
+      "docs/concepts/temperature-top-p-top-k.md",
+    ],
+    dependsOn: ["llm", "inference"],
+    nextConcepts: ["temperature-top-p-top-k", "llm"],
+  },
 ];
 
 export const LEARNING_PATHS: LearningPath[] = [
@@ -967,8 +1604,6 @@ export const LEARNING_PATHS: LearningPath[] = [
     title: "Fundamentos de RAG",
     description: "Construa entendimento de ponta a ponta: da ingestão até respostas ancoradas.",
     conceptIds: [
-      "text",
-      "pdf",
       "chunking",
       "embeddings",
       "vector-database",
@@ -995,13 +1630,11 @@ export const LEARNING_PATHS: LearningPath[] = [
     id: "performance",
     title: "Observabilidade e Performance",
     description: "Meça e reduza latência, custos e gargalos.",
-    conceptIds: [
-      "observability",
-      "cost-analysis",
-      "semantic-caching",
-      "latency",
-      "inference",
-    ],
+     conceptIds: [
+       "observability",
+       "cost-analysis",
+       "inference",
+     ],
     difficulty: "intermediate",
   },
   {
