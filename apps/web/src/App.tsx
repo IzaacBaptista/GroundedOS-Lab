@@ -983,6 +983,25 @@ export default function App() {
         conceptId={conceptModalId}
         onClose={() => setConceptModalId(null)}
         onSelectConcept={setConceptModalId}
+        onRunExperiment={(conceptId) => {
+          // Suggested experiment for each concept
+          const experiments: Record<string, { question: string; topK?: number }> = {
+            "chunking": { question: "Qual é o tamanho típico de um chunk?" },
+            "embeddings": { question: "Como os embeddings medem similaridade semântica?" },
+            "vector-database": { question: "Qual é a velocidade de recuperação com muitos documentos?" },
+            "rag": { question: "Como o RAG garante respostas baseadas em documentos?" },
+            "grounding": { question: "Como verificar se uma resposta foi fundamentada?" },
+          };
+          const exp = experiments[conceptId];
+          if (exp) {
+            const questionField = document.querySelector("textarea[placeholder*='Faça uma pergunta']") as HTMLTextAreaElement;
+            if (questionField) {
+              questionField.value = exp.question;
+              questionField.focus();
+            }
+          }
+          setConceptModalId(null);
+        }}
       />
     </main>
   );

@@ -7,6 +7,7 @@ interface ConceptModalProps {
   conceptId: string | null;
   onClose: () => void;
   onSelectConcept: (id: string) => void;
+  onRunExperiment?: (conceptId: string) => void;
 }
 
 interface SectionListProps {
@@ -29,7 +30,7 @@ function SectionList({ title, values }: SectionListProps) {
   );
 }
 
-export function ConceptModal({ conceptId, onClose, onSelectConcept }: ConceptModalProps) {
+export function ConceptModal({ conceptId, onClose, onSelectConcept, onRunExperiment }: ConceptModalProps) {
   const concept = conceptId ? getConceptById(conceptId) : null;
 
   useEffect(() => {
@@ -78,6 +79,31 @@ export function ConceptModal({ conceptId, onClose, onSelectConcept }: ConceptMod
         {/* Body */}
         <div className="concept-modal__body">
           <div className="concept-modal__col concept-modal__col--left">
+            {concept.testingSteps && concept.testingSteps.length > 0 && (
+              <div className="concept-modal__section concept-modal__section--highlight">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                  <h4 style={{ margin: 0 }}>🎯 Como testar agora</h4>
+                  {onRunExperiment && (
+                    <button
+                      type="button"
+                      className="concept-btn-experiment"
+                      onClick={() => onRunExperiment(concept.id)}
+                      title="Preenche automaticamente os campos para você testar este conceito"
+                    >
+                      ▶ Executar
+                    </button>
+                  )}
+                </div>
+                <ol style={{ margin: "8px 0", paddingLeft: "20px" }}>
+                  {concept.testingSteps.map((step, i) => (
+                    <li key={i} style={{ marginBottom: "6px", lineHeight: "1.4" }}>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
             <div className="concept-modal__section">
               <h4>Por que importa</h4>
               <p>{concept.whyItMatters}</p>

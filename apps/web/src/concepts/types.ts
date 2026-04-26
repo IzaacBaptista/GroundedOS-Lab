@@ -35,6 +35,13 @@ export interface Concept {
   suggestedExperiments: string[];
   tradeoffsAndLimitations: string[];
   relatedFiles: string[];
+  
+  testingSteps?: string[];
+  suggestedExperiment?: {
+    question?: string;
+    topK?: number;
+    exampleDoc?: string;
+  };
 
   dependsOn?: string[];
   nextConcepts?: string[];

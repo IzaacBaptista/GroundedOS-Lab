@@ -37,6 +37,14 @@ export const CONCEPTS: Concept[] = [
       "Test with different sampling parameters.",
       "Measure latency and token efficiency.",
     ],
+    testingSteps: [
+      "1. Faça upload de um documento.",
+      "2. Clique em Index.",
+      "3. Faça uma pergunta no campo de entrada.",
+      "4. Observe a resposta na aba Answer.",
+      "5. Abra Citations para verificar as fontes da resposta.",
+      "6. Abra Chunks para ver todos os trechos recuperados.",
+    ],
     tradeoffsAndLimitations: [
       "Larger models = better quality but higher latency and cost.",
       "Local models = privacy but may be slower or lower quality.",
@@ -272,6 +280,14 @@ export const CONCEPTS: Concept[] = [
       "Vary Top K and see how many chunks are retrieved.",
       "Ask questions the document does not answer.",
     ],
+    testingSteps: [
+      "1. Faça upload de um documento.",
+      "2. Clique em Index.",
+      "3. Faça uma pergunta no campo de entrada.",
+      "4. Observe a resposta na aba Answer.",
+      "5. Abra Citations para verificar as fontes.",
+      "6. Abra Chunks para ver todos os trechos recuperados.",
+    ],
     tradeoffsAndLimitations: [
       "RAG is only as good as the retrieved chunks.",
       "Retrieval can fail silently (no chunks retrieved).",
@@ -332,6 +348,13 @@ export const CONCEPTS: Concept[] = [
       "Measure latency for each provider.",
       "Look for semantic vs syntactic search differences.",
     ],
+    testingSteps: [
+      "1. Escolha um embedding provider no dropdown (local, ollama, api).",
+      "2. Faça uma pergunta.",
+      "3. Observe os scores de relevância no painel Chunks.",
+      "4. Mude para outro provider e compare os rankings.",
+      "5. Observe a diferença de latência.",
+    ],
     tradeoffsAndLimitations: [
       "Better embeddings cost more (API) or are slower (local).",
       "Embeddings are opaque; you cannot easily understand why a chunk ranked high.",
@@ -383,6 +406,13 @@ export const CONCEPTS: Concept[] = [
       "Create indexes of different sizes.",
       "Measure latency growth with more documents.",
       "Delete and recreate an index.",
+    ],
+    testingSteps: [
+      "1. Faça upload de um documento e clique Index.",
+      "2. Abra a aba Embeddings para ver o índice criado.",
+      "3. Faça perguntas e observe a latência de recuperação.",
+      "4. Adicione mais documentos e observe o crescimento de latência.",
+      "5. Delete o índice e recrie-o.",
     ],
     tradeoffsAndLimitations: [
       "In-memory vectors are lost on app restart without persistence.",
@@ -440,6 +470,12 @@ export const CONCEPTS: Concept[] = [
       "Ask a question that targets the end of the document.",
       "Compare how chunk rank changes with different queries.",
       "Change Top K and observe how many chunks are returned.",
+    ],
+    testingSteps: [
+      "1. Faça upload de um PDF ou TXT.",
+      "2. Clique em Index.",
+      "3. Abra a aba Citações ou Chunks.",
+      "4. Observe chunkId, offsets e tamanho do chunk.",
     ],
     tradeoffsAndLimitations: [
       "Small chunks improve precision but may lose context.",
@@ -807,6 +843,13 @@ export const CONCEPTS: Concept[] = [
       "Look for citations that do not match the answer.",
       "Read the full source text from citations.",
     ],
+    testingSteps: [
+      "1. Faça uma pergunta que exija múltiplas fontes.",
+      "2. Abra a aba Citations na resposta.",
+      "3. Clique em cada citação para ver o documento original.",
+      "4. Verifique se a resposta foi baseada no documento.",
+      "5. Teste o Guardrails Playground para defesa contra alucinações.",
+    ],
     tradeoffsAndLimitations: [
       "Grounding can limit model expressiveness.",
       "Poor retrieval breaks grounding.",
@@ -906,6 +949,19 @@ export const CONCEPTS: Concept[] = [
 ];
 
 export const LEARNING_PATHS: LearningPath[] = [
+  {
+    id: "comece-por-aqui",
+    title: "Comece por Aqui",
+    description: "Uma trilha curta e prática para começar. Domine os conceitos fundamentais de RAG em poucos passos.",
+    conceptIds: [
+      "chunking",
+      "embeddings",
+      "vector-database",
+      "rag",
+      "grounding",
+    ],
+    difficulty: "beginner",
+  },
   {
     id: "rag-foundations",
     title: "Fundamentos de RAG",

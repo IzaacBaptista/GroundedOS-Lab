@@ -132,6 +132,51 @@
   font-size: 0.88rem;
 }
 
+.concept-modal__section--highlight {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 12px 14px !important;
+  margin-bottom: 12px;
+}
+
+.concept-modal__section--highlight h4 {
+  color: var(--accent-strong);
+  margin-bottom: 10px;
+}
+
+.concept-modal__section--highlight ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.concept-modal__section--highlight li {
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: 0.87rem;
+}
+
+.concept-btn-experiment {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 200ms ease;
+}
+
+.concept-btn-experiment:hover {
+  background: var(--accent-strong);
+}
+
+.concept-btn-experiment:active {
+  opacity: 0.9;
+}
+
 /* ── Responsive ───────────────────────────────── */
 @media (max-width: 720px) {
   .concept-modal__body {
