@@ -252,6 +252,161 @@ describe("api server", () => {
     }
   });
 
+  it("blocks /lab endpoints when user role is not allowed", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousAllowedLabRoles = process.env.ALLOWED_LAB_ROLES;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.ALLOWED_LAB_ROLES = "admin,power-user";
+
+    try {
+      const app = await createTestServer();
+      const regularUserToken = createTestToken({
+        sub: "user-regular",
+        username: "regular",
+        roles: ["user"],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/lab/experiments",
+        headers: {
+          authorization: `Bearer ${regularUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Lab Mode features require one of: admin, power-user.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.ALLOWED_LAB_ROLES = previousAllowedLabRoles;
+    }
+  });
+
+  it("allows /lab endpoints when role is configured in ALLOWED_LAB_ROLES", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousAllowedLabRoles = process.env.ALLOWED_LAB_ROLES;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.ALLOWED_LAB_ROLES = "admin,power-user";
+
+    try {
+      const app = await createTestServer();
+      const powerUserToken = createTestToken({
+        sub: "user-power",
+        username: "power",
+        roles: ["power-user"],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/lab/experiments",
+        headers: {
+          authorization: `Bearer ${powerUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        domains: expect.any(Array),
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.ALLOWED_LAB_ROLES = previousAllowedLabRoles;
+    }
+  });
+
+  it("blocks /admin endpoints for non-admin users", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const regularUserToken = createTestToken({
+        sub: "user-regular",
+        username: "regular",
+        roles: ["user"],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/cost/summary",
+        headers: {
+          authorization: `Bearer ${regularUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Admin role required.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("allows admin to access /admin endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const indexDir = await createTempIndexDir();
+      const app = await createTestServer(indexDir);
+      const adminToken = createTestToken({
+        sub: "user-admin",
+        username: "admin",
+        roles: ["admin", "user"],
+      });
+
+      const seeded = await app.inject({
+        method: "POST",
+        url: "/rag/index",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          type: "text",
+          content: "Admin index seed content.",
+          title: "Admin Seed",
+          documentId: "admin-seed-index",
+        },
+      });
+      expect(seeded.statusCode).toBe(200);
+
+      const costSummary = await app.inject({
+        method: "GET",
+        url: "/admin/cost/summary",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(costSummary.statusCode).toBe(200);
+      expect(costSummary.json()).toMatchObject({
+        dailyTotalUsd: expect.any(Number),
+        tradeoffs: expect.any(Object),
+      });
+
+      const clearIndexes = await app.inject({
+        method: "DELETE",
+        url: "/admin/indexes/all",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(clearIndexes.statusCode).toBe(200);
+      expect(clearIndexes.json()).toMatchObject({
+        deletedCount: expect.any(Number),
+        deletedDocumentIds: expect.any(Array),
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
   it("serves JSON POST /rag/ask", async () => {
     const app = await createTestServer();
     const response = await app.inject({

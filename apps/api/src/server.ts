@@ -91,6 +91,29 @@ export async function createApiServer(
       return;
     }
 
+    if (path.startsWith("/admin") && !user.roles.includes("admin")) {
+      reply.status(403).send({
+        error: {
+          message: "Admin role required.",
+        },
+      });
+      return;
+    }
+
+    if (path.startsWith("/lab")) {
+      const allowedLabRoles = parseAllowedLabRoles(process.env.ALLOWED_LAB_ROLES);
+      const hasLabRole = user.roles.some((role) => allowedLabRoles.includes(role));
+
+      if (!hasLabRole) {
+        reply.status(403).send({
+          error: {
+            message: `Lab Mode features require one of: ${allowedLabRoles.join(", ")}.`,
+          },
+        });
+        return;
+      }
+    }
+
     (request as unknown as { user?: unknown }).user = user;
     done();
   });
@@ -154,6 +177,15 @@ function extractCookieValue(cookieHeader: string | string[] | undefined, key: st
   }
 
   return null;
+}
+
+function parseAllowedLabRoles(value: string | undefined): string[] {
+  const parsed = (value ?? "user,admin,power-user")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  return parsed.length > 0 ? parsed : ["admin"];
 }
 
 if (process.argv[1]?.endsWith("server.ts")) {

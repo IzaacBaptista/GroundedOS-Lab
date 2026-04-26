@@ -5,16 +5,25 @@ import { RagModule } from "./rag/rag.module";
 import { AgentsModule } from "./agents/index";
 import { LabModule } from "./lab/lab.module";
 import { AuthModule } from "./auth/auth.module";
+import { AdminModule } from "./admin/admin.module";
 import type { ApiConfig } from "./config/api-config";
 
 @Module({
-  imports: [ConfigModule, HealthModule, AuthModule, RagModule, AgentsModule, LabModule],
+  imports: [ConfigModule, HealthModule, AuthModule, RagModule, AgentsModule, LabModule, AdminModule],
 })
 export class AppModule {
   static forRoot(config: ApiConfig = {}) {
     return {
       module: AppModule,
-      imports: [ConfigModule.forRoot(config), HealthModule, AuthModule, RagModule, AgentsModule, LabModule],
+      imports: [
+        ConfigModule.forRoot(config),
+        HealthModule,
+        AuthModule,
+        RagModule,
+        AgentsModule,
+        LabModule,
+        AdminModule,
+      ],
     };
   }
 }

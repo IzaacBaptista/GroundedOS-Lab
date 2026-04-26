@@ -553,6 +553,16 @@ export type RagModelBenchmarkRunResponse = {
   output: string;
 };
 
+export type RagAdminClearIndexesResponse = {
+  deletedCount: number;
+  deletedDocumentIds: string[];
+};
+
+export type RagAdminCostSummaryResponse = {
+  dailyTotalUsd: number;
+  tradeoffs: RagTradeoffMetricsResponse;
+};
+
 export type RagSessionMemoryResponse = {
   sessionId: string;
   count: number;
@@ -574,6 +584,31 @@ export type GroundedAnswer = {
 
 export function getRagTradeoffMetrics(): RagTradeoffMetricsResponse {
   return tradeoffMetricsStore.getSummary();
+}
+
+export async function clearAllPersistedRagIndexes(
+  indexDir?: string
+): Promise<RagAdminClearIndexesResponse> {
+  const indexes = await listRagIndexes(indexDir);
+  const deletedDocumentIds: string[] = [];
+
+  for (const item of indexes) {
+    await deleteRagIndex(item.document.documentId, indexDir);
+    semanticCache.invalidate(item.document.documentId);
+    deletedDocumentIds.push(item.document.documentId);
+  }
+
+  return {
+    deletedCount: deletedDocumentIds.length,
+    deletedDocumentIds,
+  };
+}
+
+export async function getRagAdminCostSummary(): Promise<RagAdminCostSummaryResponse> {
+  return {
+    dailyTotalUsd: await costLedger.getDailyTotalUsd(),
+    tradeoffs: getRagTradeoffMetrics(),
+  };
 }
 
 export async function getRagSessionMemory(
