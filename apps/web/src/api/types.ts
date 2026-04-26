@@ -75,6 +75,8 @@ export interface DevModeOutput {
     selectedModel: string;
     selectedProvider: string;
     reason: string;
+    stage?: "pre-retrieval" | "post-retrieval";
+    strategy?: "query-only" | "hybrid";
     confidence: number;
     tradeoff: {
       latency: string;
@@ -87,6 +89,30 @@ export interface DevModeOutput {
       reason: string;
     }>;
     features: Record<string, unknown>;
+    retrievalSignals?: {
+      resultCount: number;
+      topScore: number;
+      avgScore: number;
+      scoreSpread: number;
+      groundedResultRatio: number;
+      uniqueDocuments: number;
+    };
+    initialDecision?: {
+      selectedModel: string;
+      selectedProvider: string;
+      reason: string;
+      confidence: number;
+      tradeoff: {
+        latency: string;
+        cost: string;
+        quality: string;
+      };
+    };
+    refinement?: {
+      changed: boolean;
+      reason: string;
+      triggeredBy: string[];
+    };
   };
   orchestration?: {
     mode: "single-model" | "multi-model";
@@ -156,6 +182,39 @@ export interface DevModeOutput {
       hybridScore: number;
       lexicalOverlapScore: number;
       finalScore: number;
+    }>;
+  };
+  contextEngineering?: {
+    retrievalQuery: string;
+    rewrittenQuery?: string;
+    expansionTerms: string[];
+    memoryAugmented: boolean;
+    memoryRecallCount: number;
+    candidateCount: number;
+    returnedCount: number;
+    selectedChunkIds: string[];
+    selectedSections: string[];
+    tokenEstimate: {
+      rawQuery: number;
+      retrievalQuery: number;
+      retrievedContext: number;
+      answer: number;
+    };
+    truncation: {
+      applied: boolean;
+      keptRatio: number;
+    };
+  };
+  agentLoop?: {
+    enabled: boolean;
+    mode: "inline-rag-agent";
+    steps: Array<{
+      id: string;
+      type: "reasoning" | "tool" | "decision";
+      title: string;
+      detail: string;
+      model?: string;
+      durationMs?: number;
     }>;
   };
   [key: string]: unknown;

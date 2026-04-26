@@ -91,6 +91,7 @@ type ResultMode =
   | "embeddings"
   | "models"
   | "routing"
+  | "context"
   | "cache"
   | "evals"
   | "lab";
@@ -1174,6 +1175,8 @@ function ResultPanel({
         ? ["hybrid-search", "reranking", "embeddings"]
         : outputTab === "routing"
           ? ["tool-calling", "inference", "cost-analysis"]
+          : outputTab === "context"
+            ? ["context-engineering", "chunking", "long-term-memory"]
           : outputTab === "cache"
             ? ["rag", "hybrid-search", "observability"]
             : outputTab === "evals"
@@ -1257,6 +1260,15 @@ function ResultPanel({
           onClick={() => setOutputTab("routing")}
         >
           Routing
+        </button>
+        <button
+          className={`result-tab${outputTab === "context" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "context"}
+          onClick={() => setOutputTab("context")}
+        >
+          Context
         </button>
         <button
           className={`result-tab${outputTab === "cache" ? " result-tab--active" : ""}`}
@@ -1444,6 +1456,8 @@ function ResultPanel({
       )}
 
       {outputTab === "routing" && <RoutingView response={result} />}
+
+  {outputTab === "context" && <ContextView response={result} />}
 
       {outputTab === "cache" && <CacheView response={result} />}
 
@@ -2365,12 +2379,50 @@ function RoutingView({ response }: { response: RagAskResponse | undefined }) {
       </div>
       <div className="result-row__meta">
         <Pill variant="gray">provider: {routing.selectedProvider}</Pill>
+        <Pill variant="gray">stage: {routing.stage ?? "pre-retrieval"}</Pill>
+        <Pill variant="gray">strategy: {routing.strategy ?? "query-only"}</Pill>
         <Pill variant="blue">confidence: {(routing.confidence * 100).toFixed(0)}%</Pill>
         <Pill variant="amber">cost: {routing.tradeoff.cost}</Pill>
         <Pill variant="amber">latency: {routing.tradeoff.latency}</Pill>
         <Pill variant="green">quality: {routing.tradeoff.quality}</Pill>
       </div>
       <ExplainBox>{routing.reason}</ExplainBox>
+
+      {routing.initialDecision && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Hybrid routing refinement</h3>
+          </div>
+          <div className="result-row__meta">
+            <Pill variant="gray">pre: {routing.initialDecision.selectedModel}</Pill>
+            <Pill variant="teal">post: {routing.selectedModel}</Pill>
+            <Pill variant={routing.refinement?.changed ? "amber" : "green"}>
+              {routing.refinement?.changed ? "changed" : "confirmed"}
+            </Pill>
+          </div>
+          <p className="chunk-text">{routing.refinement?.reason ?? "No refinement note captured."}</p>
+          {routing.refinement?.triggeredBy && routing.refinement.triggeredBy.length > 0 && (
+            <p className="chunk-text">Signals: {routing.refinement.triggeredBy.join(", ")}.</p>
+          )}
+        </section>
+      )}
+
+      {routing.retrievalSignals && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Post-retrieval signals</h3>
+          </div>
+          <div className="tradeoffs-grid">
+            <MetricCard label="Top score" value={routing.retrievalSignals.topScore.toFixed(3)} />
+            <MetricCard label="Avg score" value={routing.retrievalSignals.avgScore.toFixed(3)} />
+            <MetricCard label="Score spread" value={routing.retrievalSignals.scoreSpread.toFixed(3)} />
+            <MetricCard
+              label="Grounded ratio"
+              value={`${Math.round(routing.retrievalSignals.groundedResultRatio * 100)}%`}
+            />
+          </div>
+        </section>
+      )}
 
       {routing.alternatives.length > 0 && (
         <div className="result-list">
@@ -2419,6 +2471,94 @@ function RoutingView({ response }: { response: RagAskResponse | undefined }) {
           </ul>
         </section>
       )}
+    </section>
+  );
+}
+
+function ContextView({ response }: { response: RagAskResponse | undefined }) {
+  const contextEngineering = response?.devMode.contextEngineering;
+  const agentLoop = response?.devMode.agentLoop;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect context assembly.</p>;
+  }
+
+  if (!contextEngineering) {
+    return <p className="chunk-text">No context engineering metadata available for this run.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Context Engineering</h3>
+      </div>
+      <ExplainBox label="retrieval query">{contextEngineering.retrievalQuery}</ExplainBox>
+
+      <div className="tradeoffs-grid">
+        <MetricCard label="Candidates" value={String(contextEngineering.candidateCount)} />
+        <MetricCard label="Returned" value={String(contextEngineering.returnedCount)} />
+        <MetricCard
+          label="Memory recall"
+          value={`${contextEngineering.memoryRecallCount} ${contextEngineering.memoryAugmented ? "used" : "unused"}`}
+        />
+        <MetricCard
+          label="Kept ratio"
+          value={`${Math.round(contextEngineering.truncation.keptRatio * 100)}%`}
+        />
+      </div>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Assembly details</h3>
+        </div>
+        <div className="result-row__meta">
+          <Pill variant="gray">raw q: {contextEngineering.tokenEstimate.rawQuery} tok</Pill>
+          <Pill variant="gray">retrieval q: {contextEngineering.tokenEstimate.retrievalQuery} tok</Pill>
+          <Pill variant="gray">ctx: {contextEngineering.tokenEstimate.retrievedContext} tok</Pill>
+          <Pill variant="gray">answer: {contextEngineering.tokenEstimate.answer} tok</Pill>
+        </div>
+        <p className="chunk-text">
+          {contextEngineering.rewrittenQuery
+            ? `Rewritten query: ${contextEngineering.rewrittenQuery}`
+            : "No query rewrite was applied."}
+        </p>
+        <p className="chunk-text">
+          Expansions: {contextEngineering.expansionTerms.join(", ") || "none"}
+        </p>
+        <p className="chunk-text">
+          Selected chunks: {contextEngineering.selectedChunkIds.join(", ") || "none"}
+        </p>
+      </section>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Agent loop trace</h3>
+          <Pill variant={agentLoop?.enabled ? "green" : "amber"}>
+            {agentLoop?.mode ?? "disabled"}
+          </Pill>
+        </div>
+        {agentLoop?.steps?.length ? (
+          <div className="result-list">
+            {agentLoop.steps.map((step) => (
+              <article key={step.id} className="result-row">
+                <div className="result-row__meta">
+                  <Pill variant="gray">{step.type}</Pill>
+                  {step.model ? <Pill variant="blue">{step.model}</Pill> : null}
+                  {typeof step.durationMs === "number" ? (
+                    <Pill variant="amber">{step.durationMs} ms</Pill>
+                  ) : null}
+                </div>
+                <p className="chunk-text" style={{ marginBottom: 4, fontWeight: 600 }}>
+                  {step.title}
+                </p>
+                <p className="chunk-text">{step.detail}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="chunk-text">No agent loop trace available.</p>
+        )}
+      </section>
     </section>
   );
 }

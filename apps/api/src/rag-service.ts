@@ -190,6 +190,8 @@ export type RagAskResponse = {
       selectedModel: string;
       selectedProvider: string;
       reason: string;
+      stage?: "pre-retrieval" | "post-retrieval";
+      strategy?: "query-only" | "hybrid";
       confidence: number;
       tradeoff: {
         latency: string;
@@ -202,6 +204,23 @@ export type RagAskResponse = {
         reason: string;
       }>;
       features: Record<string, unknown>;
+      retrievalSignals?: RetrievalRoutingSignalsSummary;
+      initialDecision?: {
+        selectedModel: string;
+        selectedProvider: string;
+        reason: string;
+        confidence: number;
+        tradeoff: {
+          latency: string;
+          cost: string;
+          quality: string;
+        };
+      };
+      refinement?: {
+        changed: boolean;
+        reason: string;
+        triggeredBy: string[];
+      };
     };
     orchestration?: {
       mode: "single-model" | "multi-model";
@@ -286,7 +305,49 @@ export type RagAskResponse = {
         avg: number;
       };
     }[];
+    contextEngineering?: {
+      retrievalQuery: string;
+      rewrittenQuery?: string;
+      expansionTerms: string[];
+      memoryAugmented: boolean;
+      memoryRecallCount: number;
+      candidateCount: number;
+      returnedCount: number;
+      selectedChunkIds: string[];
+      selectedSections: string[];
+      tokenEstimate: {
+        rawQuery: number;
+        retrievalQuery: number;
+        retrievedContext: number;
+        answer: number;
+      };
+      truncation: {
+        applied: boolean;
+        keptRatio: number;
+      };
+    };
+    agentLoop?: {
+      enabled: boolean;
+      mode: "inline-rag-agent";
+      steps: Array<{
+        id: string;
+        type: "reasoning" | "tool" | "decision";
+        title: string;
+        detail: string;
+        model?: string;
+        durationMs?: number;
+      }>;
+    };
   };
+};
+
+type RetrievalRoutingSignalsSummary = {
+  resultCount: number;
+  topScore: number;
+  avgScore: number;
+  scoreSpread: number;
+  groundedResultRatio: number;
+  uniqueDocuments: number;
 };
 
 export type RagIndexResponse = {
@@ -1270,7 +1331,9 @@ async function runLocalRag(
     cacheQualityScore?: number;
     cacheShadowChecked?: boolean;
     cacheSavingsMs?: number;
+    initialRoutingDecision?: ReturnType<typeof routeModel>;
     routingDecision?: ReturnType<typeof routeModel>;
+    routingSignals?: RetrievalRoutingSignalsSummary;
     orchestration?: ReturnType<typeof orchestrateAnswerPipeline>;
     reasoningSummary?: string[];
     decisionSteps?: string[];
@@ -1386,6 +1449,7 @@ async function runLocalRag(
         return {
           ...input,
           processedQuery,
+          initialRoutingDecision: routingDecision,
           routingDecision,
           decisionSteps: [
             `intent=${processedQuery.intent}`,
@@ -1523,6 +1587,10 @@ async function runLocalRag(
         }
 
         const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const routingSignals = buildRetrievalRoutingSignals(reranked);
+        const refinedRoutingDecision = routeModel(input.rawQuery, {
+          postRetrieval: routingSignals,
+        });
         const rerankInputTokens = estimateTokenUsage(
           `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
         );
@@ -1544,6 +1612,12 @@ async function runLocalRag(
         return {
           ...input,
           devMode: reranked,
+          routingSignals,
+          routingDecision: refinedRoutingDecision,
+          decisionSteps: [
+            ...(input.decisionSteps ?? []),
+            `postModel=${refinedRoutingDecision.selectedModel}`,
+          ],
           rerankInputTokens,
         };
       },
@@ -1694,9 +1768,10 @@ async function runLocalRag(
 
   const cacheMetrics = semanticCache.getMetrics();
   const resolvedIndexSummary = result.output.indexSummary ?? createIndexSummary(result.output.index);
+  const finalAnswer = result.output.answer ?? createGroundedAnswer(result.output.devMode);
 
   const response = {
-    answer: result.output.answer ?? createGroundedAnswer(result.output.devMode),
+    answer: finalAnswer,
     index: resolvedIndexSummary,
     devMode: {
       ...result.output.devMode,
@@ -1726,10 +1801,23 @@ async function runLocalRag(
             selectedModel: result.output.routingDecision.selectedModel,
             selectedProvider: result.output.routingDecision.selectedProvider,
             reason: result.output.routingDecision.reason,
+            stage: result.output.routingDecision.stage,
+            strategy: result.output.routingDecision.strategy,
             confidence: result.output.routingDecision.confidence,
             tradeoff: result.output.routingDecision.tradeoff,
             alternatives: result.output.routingDecision.alternatives,
             features: result.output.routingDecision.features as unknown as Record<string, unknown>,
+            retrievalSignals: result.output.routingSignals,
+            initialDecision: result.output.initialRoutingDecision
+              ? {
+                  selectedModel: result.output.initialRoutingDecision.selectedModel,
+                  selectedProvider: result.output.initialRoutingDecision.selectedProvider,
+                  reason: result.output.initialRoutingDecision.reason,
+                  confidence: result.output.initialRoutingDecision.confidence,
+                  tradeoff: result.output.initialRoutingDecision.tradeoff,
+                }
+              : undefined,
+            refinement: result.output.routingDecision.refinement,
           }
         : undefined,
       orchestration: result.output.orchestration
@@ -1784,6 +1872,8 @@ async function runLocalRag(
         rerankResults: result.output.devMode.resultCount,
         scores: result.output.devMode.results.map((item) => item.score),
       }),
+      contextEngineering: buildContextEngineering(result.output, finalAnswer),
+      agentLoop: buildAgentLoopTrace(result.context, result.output, finalAnswer),
     },
   };
 
@@ -1839,7 +1929,9 @@ async function runPersistedRag(
     cacheQualityScore?: number;
     cacheShadowChecked?: boolean;
     cacheSavingsMs?: number;
+    initialRoutingDecision?: ReturnType<typeof routeModel>;
     routingDecision?: ReturnType<typeof routeModel>;
+    routingSignals?: RetrievalRoutingSignalsSummary;
     orchestration?: ReturnType<typeof orchestrateAnswerPipeline>;
     reasoningSummary?: string[];
     decisionSteps?: string[];
@@ -1937,6 +2029,7 @@ async function runPersistedRag(
         return {
           ...input,
           processedQuery,
+          initialRoutingDecision: routingDecision,
           routingDecision,
           decisionSteps: [
             `intent=${processedQuery.intent}`,
@@ -2067,6 +2160,10 @@ async function runPersistedRag(
 
         const providerName = input.index.embeddingProvider.name;
         const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const routingSignals = buildRetrievalRoutingSignals(reranked);
+        const refinedRoutingDecision = routeModel(input.rawQuery, {
+          postRetrieval: routingSignals,
+        });
         const rerankInputTokens = estimateTokenUsage(
           `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
         );
@@ -2088,6 +2185,12 @@ async function runPersistedRag(
         return {
           ...input,
           devMode: reranked,
+          routingSignals,
+          routingDecision: refinedRoutingDecision,
+          decisionSteps: [
+            ...(input.decisionSteps ?? []),
+            `postModel=${refinedRoutingDecision.selectedModel}`,
+          ],
           rerankInputTokens,
         };
       },
@@ -2237,9 +2340,10 @@ async function runPersistedRag(
 
   const cacheMetrics = semanticCache.getMetrics();
   const indexSummary = result.output.indexSummary ?? createIndexSummary(index);
+  const finalAnswer = result.output.answer ?? createGroundedAnswer(result.output.devMode);
 
   const response = {
-    answer: result.output.answer ?? createGroundedAnswer(result.output.devMode),
+    answer: finalAnswer,
     index: indexSummary,
     devMode: {
       ...result.output.devMode,
@@ -2269,10 +2373,23 @@ async function runPersistedRag(
             selectedModel: result.output.routingDecision.selectedModel,
             selectedProvider: result.output.routingDecision.selectedProvider,
             reason: result.output.routingDecision.reason,
+            stage: result.output.routingDecision.stage,
+            strategy: result.output.routingDecision.strategy,
             confidence: result.output.routingDecision.confidence,
             tradeoff: result.output.routingDecision.tradeoff,
             alternatives: result.output.routingDecision.alternatives,
             features: result.output.routingDecision.features as unknown as Record<string, unknown>,
+            retrievalSignals: result.output.routingSignals,
+            initialDecision: result.output.initialRoutingDecision
+              ? {
+                  selectedModel: result.output.initialRoutingDecision.selectedModel,
+                  selectedProvider: result.output.initialRoutingDecision.selectedProvider,
+                  reason: result.output.initialRoutingDecision.reason,
+                  confidence: result.output.initialRoutingDecision.confidence,
+                  tradeoff: result.output.initialRoutingDecision.tradeoff,
+                }
+              : undefined,
+            refinement: result.output.routingDecision.refinement,
           }
         : undefined,
       orchestration: result.output.orchestration
@@ -2327,6 +2444,8 @@ async function runPersistedRag(
         rerankResults: result.output.devMode.resultCount,
         scores: result.output.devMode.results.map((item) => item.score),
       }),
+      contextEngineering: buildContextEngineering(result.output, finalAnswer),
+      agentLoop: buildAgentLoopTrace(result.context, result.output, finalAnswer),
     },
   };
 
@@ -2481,9 +2600,118 @@ function buildReasoningSummary(
 
   return [
     `Intent detected: ${processedQuery?.intent ?? "unknown"}.`,
-    `Routing selected model: ${routingDecision?.selectedModel ?? "unknown"} (${routingDecision?.reason ?? "no reason"}).`,
+    `Routing selected model: ${routingDecision?.selectedModel ?? "unknown"} (${routingDecision?.stage ?? "pre-retrieval"}; ${routingDecision?.reason ?? "no reason"}).`,
     `Orchestration mode: ${orchestration?.mode ?? "single-model"} with ${orchestration?.steps.length ?? 0} steps.`,
   ];
+}
+
+function buildRetrievalRoutingSignals(
+  devMode: RetrievalDevModeOutput
+): RetrievalRoutingSignalsSummary {
+  const scores = devMode.results.map((item) => item.score);
+  const topScore = scores[0] ?? 0;
+  const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+  const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+  const groundedResultRatio =
+    devMode.results.filter((item) => item.score >= 0.2).length / Math.max(1, devMode.results.length);
+
+  return {
+    resultCount: devMode.resultCount,
+    topScore: Number(topScore.toFixed(3)),
+    avgScore: Number(avgScore.toFixed(3)),
+    scoreSpread: Number(Math.max(0, topScore - minScore).toFixed(3)),
+    groundedResultRatio: Number(groundedResultRatio.toFixed(3)),
+    uniqueDocuments: new Set(devMode.results.map((item) => item.documentId)).size,
+  };
+}
+
+function buildContextEngineering(
+  output: {
+    rawQuery: string;
+    retrievalQuery: string;
+    processedQuery?: ProcessedQuery;
+    memoryMatches?: MemorySearchResult[];
+    rerankCandidateCount?: number;
+    devMode: RetrievalDevModeOutput;
+  },
+  answer: GroundedAnswer
+): NonNullable<RagAskResponse["devMode"]["contextEngineering"]> {
+  const retrievedContext = output.devMode.results.map((item) => item.text).join(" ");
+  const candidateCount = output.rerankCandidateCount ?? output.devMode.resultCount;
+
+  return {
+    retrievalQuery: output.retrievalQuery,
+    rewrittenQuery: output.processedQuery?.rewritten,
+    expansionTerms: output.processedQuery?.expanded ?? [],
+    memoryAugmented: (output.memoryMatches?.length ?? 0) > 0,
+    memoryRecallCount: output.memoryMatches?.length ?? 0,
+    candidateCount,
+    returnedCount: output.devMode.resultCount,
+    selectedChunkIds: output.devMode.results.map((item) => item.chunkId),
+    selectedSections: output.devMode.results.map((item) => item.sectionId),
+    tokenEstimate: {
+      rawQuery: estimateTokenUsage(output.rawQuery),
+      retrievalQuery: estimateTokenUsage(output.retrievalQuery),
+      retrievedContext: estimateTokenUsage(retrievedContext),
+      answer: estimateTokenUsage(answer.text),
+    },
+    truncation: {
+      applied: candidateCount > output.devMode.resultCount,
+      keptRatio: Number((output.devMode.resultCount / Math.max(1, candidateCount)).toFixed(3)),
+    },
+  };
+}
+
+function buildAgentLoopTrace(
+  context: WorkflowContext,
+  output: {
+    processedQuery?: ProcessedQuery;
+    routingDecision?: ReturnType<typeof routeModel>;
+    initialRoutingDecision?: ReturnType<typeof routeModel>;
+    devMode: RetrievalDevModeOutput;
+    rerankCandidateCount?: number;
+    orchestration?: ReturnType<typeof orchestrateAnswerPipeline>;
+  },
+  answer: GroundedAnswer
+): NonNullable<RagAskResponse["devMode"]["agentLoop"]> {
+  return {
+    enabled: true,
+    mode: "inline-rag-agent",
+    steps: [
+      {
+        id: "understand-query",
+        type: "reasoning",
+        title: "Interpret query",
+        detail: `Intent ${output.processedQuery?.intent ?? "unknown"} with ${output.processedQuery?.expanded.length ?? 0} expansion(s).`,
+        durationMs: context.steps["process-query"]?.durationMs ?? 0,
+      },
+      {
+        id: "retrieve-evidence",
+        type: "tool",
+        title: "Retrieve evidence",
+        detail: `Retrieved ${output.rerankCandidateCount ?? output.devMode.resultCount} candidates and kept ${output.devMode.resultCount}.`,
+        durationMs: context.steps["retrieve-chunks"]?.durationMs ?? 0,
+      },
+      {
+        id: "refine-route",
+        type: "decision",
+        title: "Refine model route",
+        detail:
+          output.initialRoutingDecision && output.routingDecision
+            ? `${output.initialRoutingDecision.selectedModel} → ${output.routingDecision.selectedModel} (${output.routingDecision.reason})`
+            : output.routingDecision?.reason ?? "No routing decision captured.",
+        model: output.routingDecision?.selectedModel,
+        durationMs: context.steps["rerank-chunks"]?.durationMs ?? 0,
+      },
+      {
+        id: "synthesize-answer",
+        type: "reasoning",
+        title: "Synthesize grounded answer",
+        detail: `Produced grounded=${answer.grounded} answer with ${answer.citations.length} citation(s).`,
+        model: output.orchestration?.steps.at(-1)?.model ?? output.routingDecision?.selectedModel,
+      },
+    ],
+  };
 }
 
 function buildCostBreakdown(costSummary?: RequestCostSummary): {

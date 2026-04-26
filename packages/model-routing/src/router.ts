@@ -24,10 +24,21 @@ export interface QueryRoutingFeatures {
   complexityScore: number;
 }
 
+export interface RetrievalRoutingSignals {
+  resultCount: number;
+  topScore: number;
+  avgScore: number;
+  scoreSpread: number;
+  groundedResultRatio: number;
+  uniqueDocuments: number;
+}
+
 export interface ModelRoutingDecision {
   selectedModel: string;
   selectedProvider: "local" | "cloud" | "ollama";
   reason: string;
+  stage: "pre-retrieval" | "post-retrieval";
+  strategy: "query-only" | "hybrid";
   confidence: number;
   tradeoff: {
     latency: "low" | "medium" | "high";
@@ -40,12 +51,19 @@ export interface ModelRoutingDecision {
     reason: string;
   }>;
   features: QueryRoutingFeatures;
+  retrievalSignals?: RetrievalRoutingSignals;
+  refinement?: {
+    changed: boolean;
+    reason: string;
+    triggeredBy: string[];
+  };
 }
 
 export interface RoutingContext {
   forcedModel?: string;
   forceCheap?: boolean;
   forceQuality?: boolean;
+  postRetrieval?: RetrievalRoutingSignals;
 }
 
 const DEFAULT_CANDIDATES: RoutingCandidate[] = [
@@ -133,6 +151,8 @@ export function routeModel(
   candidates: RoutingCandidate[] = DEFAULT_CANDIDATES
 ): ModelRoutingDecision {
   const features = analyzeQuery(query);
+  const stage = context.postRetrieval ? "post-retrieval" : "pre-retrieval";
+  const strategy = context.postRetrieval ? "hybrid" : "query-only";
 
   if (context.forcedModel) {
     const forced =
@@ -142,6 +162,8 @@ export function routeModel(
       selectedModel: forced.model,
       selectedProvider: forced.provider,
       reason: `Model forced by context: ${forced.model}`,
+      stage,
+      strategy,
       confidence: 1,
       tradeoff: {
         latency: forced.latencyTier,
@@ -150,24 +172,130 @@ export function routeModel(
       },
       alternatives: buildAlternatives(candidates, forced.model),
       features,
+      retrievalSignals: context.postRetrieval,
+      refinement: context.postRetrieval
+        ? {
+            changed: false,
+            reason: "Forced selection bypassed retrieval-based refinement.",
+            triggeredBy: ["forced-model"],
+          }
+        : undefined,
     };
   }
 
   const preferred = pickCandidate(features, context, candidates);
-  const confidence = computeRoutingConfidence(features, preferred);
+  const refinement = refineCandidate(preferred, features, context.postRetrieval, candidates);
+  const confidence = computeRoutingConfidence(features, refinement.selected, context.postRetrieval);
 
   return {
-    selectedModel: preferred.model,
-    selectedProvider: preferred.provider,
-    reason: buildReason(features, preferred),
+    selectedModel: refinement.selected.model,
+    selectedProvider: refinement.selected.provider,
+    reason: buildReason(features, refinement.selected, context.postRetrieval, refinement),
+    stage,
+    strategy,
     confidence,
     tradeoff: {
-      latency: preferred.latencyTier,
-      cost: preferred.costTier,
-      quality: preferred.qualityTier,
+      latency: refinement.selected.latencyTier,
+      cost: refinement.selected.costTier,
+      quality: refinement.selected.qualityTier,
     },
-    alternatives: buildAlternatives(candidates, preferred.model),
+    alternatives: buildAlternatives(candidates, refinement.selected.model),
     features,
+    retrievalSignals: context.postRetrieval,
+    refinement: context.postRetrieval
+      ? {
+          changed: refinement.changed,
+          reason: refinement.reason,
+          triggeredBy: refinement.triggers,
+        }
+      : undefined,
+  };
+}
+
+function refineCandidate(
+  preferred: RoutingCandidate,
+  features: QueryRoutingFeatures,
+  signals: RetrievalRoutingSignals | undefined,
+  candidates: RoutingCandidate[]
+): {
+  selected: RoutingCandidate;
+  changed: boolean;
+  reason: string;
+  triggers: string[];
+} {
+  if (!signals) {
+    return {
+      selected: preferred,
+      changed: false,
+      reason: "No retrieval evidence available yet.",
+      triggers: [],
+    };
+  }
+
+  const triggers: string[] = [];
+  const needsEscalation =
+    signals.topScore < 0.45 ||
+    signals.scoreSpread < 0.08 ||
+    signals.groundedResultRatio < 0.5 ||
+    (signals.uniqueDocuments <= 1 && signals.resultCount <= 2);
+  const supportsDowngrade =
+    signals.topScore >= 0.82 &&
+    signals.scoreSpread >= 0.18 &&
+    signals.groundedResultRatio >= 0.8 &&
+    features.intent === "simple";
+
+  if (signals.topScore < 0.45) {
+    triggers.push("weak-top-hit");
+  }
+  if (signals.scoreSpread < 0.08) {
+    triggers.push("tight-score-band");
+  }
+  if (signals.groundedResultRatio < 0.5) {
+    triggers.push("low-grounded-ratio");
+  }
+  if (signals.uniqueDocuments <= 1 && signals.resultCount <= 2) {
+    triggers.push("narrow-evidence");
+  }
+  if (supportsDowngrade) {
+    triggers.push("high-confidence-retrieval");
+  }
+
+  if (needsEscalation) {
+    const escalated =
+      candidates.find((candidate) => candidate.qualityTier === "reasoning") ??
+      candidates.find((candidate) => candidate.qualityTier === "strong") ??
+      preferred;
+
+    return {
+      selected: escalated,
+      changed: escalated.model !== preferred.model,
+      reason:
+        escalated.model === preferred.model
+          ? "Retrieval signaled uncertainty, but no stronger candidate was available."
+          : "Retrieval signaled ambiguity; upgraded to a stronger refinement model.",
+      triggers,
+    };
+  }
+
+  if (supportsDowngrade) {
+    const cheaper = candidates.find((candidate) => candidate.costTier === "low") ?? preferred;
+
+    return {
+      selected: cheaper,
+      changed: cheaper.model !== preferred.model,
+      reason:
+        cheaper.model === preferred.model
+          ? "Retrieval confidence was strong enough to keep the low-cost route."
+          : "Retrieval was highly confident; downgraded to a faster lower-cost model.",
+      triggers,
+    };
+  }
+
+  return {
+    selected: preferred,
+    changed: false,
+    reason: "Post-retrieval evidence confirmed the initial route.",
+    triggers,
   };
 }
 
@@ -207,7 +335,17 @@ function pickCandidate(
   return candidates.find((candidate) => candidate.provider === "ollama") ?? candidates[0]!;
 }
 
-function buildReason(features: QueryRoutingFeatures, candidate: RoutingCandidate): string {
+function buildReason(
+  features: QueryRoutingFeatures,
+  candidate: RoutingCandidate,
+  signals?: RetrievalRoutingSignals,
+  refinement?: { changed: boolean; reason: string; triggers: string[] }
+): string {
+  if (signals && refinement) {
+    const triggerText = refinement.triggers.length > 0 ? ` Signals: ${refinement.triggers.join(", ")}.` : "";
+    return `${refinement.reason}${triggerText}`;
+  }
+
   if (candidate.qualityTier === "reasoning") {
     return "Reasoning/comparison intent detected; routed to higher-quality reasoning model.";
   }
@@ -230,7 +368,11 @@ function buildAlternatives(candidates: RoutingCandidate[], selectedModel: string
     }));
 }
 
-function computeRoutingConfidence(features: QueryRoutingFeatures, selected: RoutingCandidate): number {
+function computeRoutingConfidence(
+  features: QueryRoutingFeatures,
+  selected: RoutingCandidate,
+  signals?: RetrievalRoutingSignals
+): number {
   const base = 0.6;
   const intentBoost =
     features.intent === "simple"
@@ -239,8 +381,14 @@ function computeRoutingConfidence(features: QueryRoutingFeatures, selected: Rout
         ? 0.28
         : 0.18;
   const complexityPenalty = selected.qualityTier === "baseline" && features.complexityScore > 0.5 ? 0.2 : 0;
+  const retrievalBoost =
+    signals === undefined
+      ? 0
+      : Math.max(-0.12, Math.min(0.12, signals.topScore * 0.1 + signals.scoreSpread * 0.08));
 
-  return Number(Math.max(0.4, Math.min(0.98, base + intentBoost - complexityPenalty)).toFixed(2));
+  return Number(
+    Math.max(0.4, Math.min(0.98, base + intentBoost - complexityPenalty + retrievalBoost)).toFixed(2)
+  );
 }
 
 function hasAnyKeyword(text: string, keywords: string[]): boolean {
