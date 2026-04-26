@@ -176,12 +176,19 @@ h3 {
   color: var(--danger);
 }
 
+.app-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 18px;
+  align-items: start;
+  padding-top: 18px;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-  padding-top: 18px;
 }
 
 .panel {
@@ -1317,6 +1324,10 @@ textarea:focus {
 
   .topbar__meta {
     justify-content: flex-start;
+  }
+
+  .app-body {
+    grid-template-columns: 1fr;
   }
 
   .workspace {

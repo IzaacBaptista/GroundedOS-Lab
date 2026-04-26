@@ -41,7 +41,8 @@ import { useApiHealth } from "./hooks/useApiHealth";
 import { useIndexList } from "./hooks/useIndexList";
 import { AnswerPanel, type AnswerTab as PedagogicalAnswerTab } from "./components/AnswerPanel";
 import { ConceptBadgeGroup } from "./components/ConceptBadge";
-import { ConceptsDrawer } from "./components/ConceptsDrawer";
+import { ConceptModal } from "./components/ConceptModal";
+import { ConceptsSidebar } from "./components/ConceptsSidebar";
 import { ChunksList } from "./components/ResultParts";
 import { ExplainBox } from "./components/shared/ExplainBox";
 import { Pill } from "./components/shared/Pill";
@@ -672,6 +673,7 @@ export default function App() {
     };
   }, [activeIndex, appState, stateDetail]);
 
+  const [conceptModalId, setConceptModalId] = useState<string | null>(null);
   const busy = appState === "indexing" || appState === "asking";
 
   return (
@@ -693,7 +695,9 @@ export default function App() {
         </div>
       </header>
 
-      <section className="workspace" aria-label="Local RAG workspace">
+      <div className="app-body">
+        <ConceptsSidebar onConceptClick={setConceptModalId} />
+        <section className="workspace" aria-label="Local RAG workspace">
         <form className="panel input-panel" onSubmit={handleSubmit}>
           <div className="panel__header">
             <h2>Source</h2>
@@ -971,8 +975,15 @@ export default function App() {
           onRefreshLabExperiments={() => void loadLabExperiments()}
           labMessage={labMessage}
           labMessageIsError={labMessageIsError}
+          onConceptClick={setConceptModalId}
         />
       </section>
+      </div>
+      <ConceptModal
+        conceptId={conceptModalId}
+        onClose={() => setConceptModalId(null)}
+        onSelectConcept={setConceptModalId}
+      />
     </main>
   );
 }
@@ -1015,6 +1026,7 @@ interface ResultPanelProps {
   onRefreshLabExperiments: () => void;
   labMessage: string;
   labMessageIsError: boolean;
+  onConceptClick: (id: string) => void;
 }
 
 function ResultPanel({
@@ -1055,10 +1067,9 @@ function ResultPanel({
   onRefreshLabExperiments,
   labMessage,
   labMessageIsError,
+  onConceptClick,
 }: ResultPanelProps) {
   const [answerPanelTab, setAnswerPanelTab] = useState<PedagogicalAnswerTab>("chunks");
-  const [conceptsDrawerOpen, setConceptsDrawerOpen] = useState(false);
-  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
   const resultMeta = result
@@ -1098,11 +1109,6 @@ function ResultPanel({
         : outputTab === "lab"
           ? ["guardrails", "grounding"]
           : [];
-
-  const openConceptDrawer = (conceptId?: string) => {
-    setSelectedConceptId(conceptId ?? tabConcepts[0] ?? "rag");
-    setConceptsDrawerOpen(true);
-  };
 
   return (
     <section className="panel output-panel" aria-label="RAG output">
@@ -1180,15 +1186,12 @@ function ResultPanel({
         >
           Guardrails
         </button>
-        <button className="result-tab" type="button" onClick={() => openConceptDrawer()}>
-          Laboratório de Conceitos
-        </button>
       </div>
 
       {tabConcepts.length > 0 && (
         <div className="concepts-tab-hints" aria-label="Referências de conceitos desta visualização">
           <span className="chunk-text">Conceitos nesta visualização:</span>
-          <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={(id) => openConceptDrawer(id)} />
+          <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={onConceptClick} />
         </div>
       )}
 
@@ -1345,12 +1348,6 @@ function ResultPanel({
         <LabExperimentsView />
       )}
 
-      <ConceptsDrawer
-        isOpen={conceptsDrawerOpen}
-        onClose={() => setConceptsDrawerOpen(false)}
-        selectedConceptId={selectedConceptId}
-        onSelectConcept={setSelectedConceptId}
-      />
     </section>
   );
 }

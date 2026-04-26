@@ -1,0 +1,123 @@
+.concepts-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  min-width: 240px;
+  min-height: calc(100vh - 100px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 14px 28px rgba(43, 38, 30, 0.08);
+  overflow: hidden;
+  position: sticky;
+  top: 18px;
+  align-self: start;
+}
+
+.concepts-sidebar__header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.concepts-sidebar__nav {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Category row ─────────────────────────────── */
+.sidebar-category__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sidebar-category__btn:hover {
+  background: var(--panel-strong);
+}
+
+.sidebar-category__btn--open {
+  background: var(--panel-strong);
+  color: var(--accent-strong);
+}
+
+.sidebar-category__icon {
+  font-size: 1rem;
+  min-width: 20px;
+  text-align: center;
+}
+
+.sidebar-category__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-category__chevron {
+  font-size: 1rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+/* ── Concept sub-items ────────────────────────── */
+.sidebar-category__items {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  background: var(--panel-strong);
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar-concept-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px 7px 32px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 0.81rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.sidebar-concept-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .sidebar-concept-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.sidebar-concept-btn__dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  border-radius: 50%;
+}
