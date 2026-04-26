@@ -20,6 +20,7 @@ import type {
 } from "../rag-service";
 import {
   extractMultipart,
+  parseBoolean,
   parseMetadata,
   parsePositiveInteger,
   withTempUpload,
@@ -91,6 +92,15 @@ export class RagController {
         documentId: fields.documentId,
         metadata: parseMetadata(fields.metadata),
         embeddingProvider: fields.embeddingProvider as RagAskFileRequest["embeddingProvider"],
+        useMultiModelOrchestration: parseBoolean(
+          fields.useMultiModelOrchestration,
+          "useMultiModelOrchestration"
+        ),
+        reasoningEnabled: parseBoolean(fields.reasoningEnabled, "reasoningEnabled"),
+        enableShadowRetrieval: parseBoolean(
+          fields.enableShadowRetrieval,
+          "enableShadowRetrieval"
+        ),
       })
     );
   }

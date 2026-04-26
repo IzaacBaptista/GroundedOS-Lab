@@ -68,8 +68,15 @@ export {
 // Semantic Cache (Phase 2 — Concept 4)
 export {
   SemanticCache,
+  buildCacheKey,
+  hashContextSignature,
+  selectAdaptiveCacheThreshold,
   type CacheEntry,
   type SemanticCacheConfig,
   type CacheLookupResult,
   type CacheMetrics,
+  type CacheLookupContext,
+  type CacheStoreContext,
+  type CacheShadowEvalInput,
+  type AdaptiveThresholdInput,
 } from "./semantic-cache";

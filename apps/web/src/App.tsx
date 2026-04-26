@@ -85,7 +85,15 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "ollama",
 ];
 
-type ResultMode = "answer" | "compare" | "embeddings" | "models" | "lab";
+type ResultMode =
+  | "answer"
+  | "compare"
+  | "embeddings"
+  | "models"
+  | "routing"
+  | "cache"
+  | "evals"
+  | "lab";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -118,6 +126,9 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(3);
   const [sessionId, setSessionId] = useState("");
+  const [useMultiModelOrchestration, setUseMultiModelOrchestration] = useState(true);
+  const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const [enableShadowRetrieval, setEnableShadowRetrieval] = useState(true);
 
   // Output state
   const [outputTab, setOutputTab] = useState<ResultMode>("answer");
@@ -391,6 +402,9 @@ export default function App() {
               query: trimmedQuery,
               topK,
               sessionId: sessionId.trim() || undefined,
+              useMultiModelOrchestration,
+              reasoningEnabled,
+              enableShadowRetrieval,
             })
           : sourceMode === "file"
             ? await runAskFile(trimmedQuery, topK, embeddingProvider)
@@ -435,6 +449,9 @@ export default function App() {
       embeddingProvider: provider,
       sessionId: sessionId.trim() || undefined,
       title: fileTitle.trim() || undefined,
+      useMultiModelOrchestration,
+      reasoningEnabled,
+      enableShadowRetrieval,
     });
   };
 
@@ -456,6 +473,9 @@ export default function App() {
       embeddingProvider: provider,
       sessionId: sessionId.trim() || undefined,
       title: textTitle.trim() || undefined,
+      useMultiModelOrchestration,
+      reasoningEnabled,
+      enableShadowRetrieval,
     });
   };
 
@@ -482,6 +502,9 @@ export default function App() {
     setQuery("");
     setTopK(3);
     setSessionId("");
+    setUseMultiModelOrchestration(true);
+    setReasoningEnabled(false);
+    setEnableShadowRetrieval(true);
     setResult(undefined);
     setCompare((state) => ({
       ...state,
@@ -905,6 +928,30 @@ export default function App() {
                 onChange={(event) => setTopK(Number(event.target.value))}
               />
             </label>
+            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={useMultiModelOrchestration}
+                onChange={(event) => setUseMultiModelOrchestration(event.target.checked)}
+              />
+              <span>Multi-model orchestration</span>
+            </label>
+            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={reasoningEnabled}
+                onChange={(event) => setReasoningEnabled(event.target.checked)}
+              />
+              <span>Reasoning mode (summary only)</span>
+            </label>
+            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={enableShadowRetrieval}
+                onChange={(event) => setEnableShadowRetrieval(event.target.checked)}
+              />
+              <span>Shadow retrieval for cache quality</span>
+            </label>
           </details>
 
           <div className="run-row">
@@ -1125,6 +1172,12 @@ function ResultPanel({
             : ["cost-analysis", "latency", "observability"]
       : outputTab === "compare"
         ? ["hybrid-search", "reranking", "embeddings"]
+        : outputTab === "routing"
+          ? ["tool-calling", "inference", "cost-analysis"]
+          : outputTab === "cache"
+            ? ["rag", "hybrid-search", "observability"]
+            : outputTab === "evals"
+              ? ["grounding", "observability", "cost-analysis"]
         : outputTab === "lab"
           ? ["guardrails", "grounding"]
           : [];
@@ -1195,6 +1248,33 @@ function ResultPanel({
           onClick={() => setOutputTab("compare")}
         >
           Compare mode
+        </button>
+        <button
+          className={`result-tab${outputTab === "routing" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "routing"}
+          onClick={() => setOutputTab("routing")}
+        >
+          Routing
+        </button>
+        <button
+          className={`result-tab${outputTab === "cache" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "cache"}
+          onClick={() => setOutputTab("cache")}
+        >
+          Cache
+        </button>
+        <button
+          className={`result-tab${outputTab === "evals" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "evals"}
+          onClick={() => setOutputTab("evals")}
+        >
+          Evals
         </button>
         <button
           className={`result-tab${outputTab === "lab" ? " result-tab--active" : ""}`}
@@ -1362,6 +1442,12 @@ function ResultPanel({
           onChangeProviders={onChangeBenchmarkProviders}
         />
       )}
+
+      {outputTab === "routing" && <RoutingView response={result} />}
+
+      {outputTab === "cache" && <CacheView response={result} />}
+
+      {outputTab === "evals" && <EvalsView response={result} />}
 
       {outputTab === "lab" && (
         <LabExperimentsView />
@@ -2255,6 +2341,172 @@ function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRu
         </div>
       </section>
     </>
+  );
+}
+
+function RoutingView({ response }: { response: RagAskResponse | undefined }) {
+  const routing = response?.devMode.routing;
+  const orchestration = response?.devMode.orchestration;
+  const reasoning = response?.devMode.reasoning;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect routing decisions.</p>;
+  }
+
+  if (!routing) {
+    return <p className="chunk-text">No routing metadata available for this run.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Routing Decision</h3>
+        <Pill variant="teal">{routing.selectedModel}</Pill>
+      </div>
+      <div className="result-row__meta">
+        <Pill variant="gray">provider: {routing.selectedProvider}</Pill>
+        <Pill variant="blue">confidence: {(routing.confidence * 100).toFixed(0)}%</Pill>
+        <Pill variant="amber">cost: {routing.tradeoff.cost}</Pill>
+        <Pill variant="amber">latency: {routing.tradeoff.latency}</Pill>
+        <Pill variant="green">quality: {routing.tradeoff.quality}</Pill>
+      </div>
+      <ExplainBox>{routing.reason}</ExplainBox>
+
+      {routing.alternatives.length > 0 && (
+        <div className="result-list">
+          {routing.alternatives.map((candidate) => (
+            <article key={`${candidate.provider}-${candidate.model}`} className="result-row">
+              <div className="result-row__meta">
+                <Pill variant="gray">{candidate.model}</Pill>
+                <Pill variant="blue">{candidate.provider}</Pill>
+              </div>
+              <p className="chunk-text">{candidate.reason}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Multi-model orchestration</h3>
+        </div>
+        <p className="chunk-text">
+          {orchestration?.enabled
+            ? `Mode: ${orchestration.mode} | steps: ${orchestration.steps.length}`
+            : "Orchestration disabled."}
+        </p>
+        {orchestration?.steps?.map((step) => (
+          <article key={step.id} className="result-row">
+            <div className="result-row__meta">
+              <Pill variant="gray">{step.role}</Pill>
+              <Pill variant="blue">{step.model}</Pill>
+              <Pill variant="amber">{step.durationMs} ms</Pill>
+            </div>
+            <p className="chunk-text">{step.outputPreview}</p>
+          </article>
+        ))}
+      </section>
+
+      {reasoning?.enabled && reasoning.summary.length > 0 && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Reasoning summary</h3>
+          </div>
+          <ul className="chunk-text" style={{ margin: 0, paddingInlineStart: "1.1rem" }}>
+            {reasoning.summary.map((line, index) => (
+              <li key={`${line}-${index}`}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </section>
+  );
+}
+
+function CacheView({ response }: { response: RagAskResponse | undefined }) {
+  const cache = response?.devMode.cache;
+  const cacheAware = response?.devMode.cacheAwareRetrieval;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect cache behavior.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Cache Trace</h3>
+        <Pill variant={cache?.hit ? "green" : "amber"}>{cache?.hit ? "HIT" : "MISS"}</Pill>
+      </div>
+      <div className="tradeoffs-grid">
+        <MetricCard label="Similarity" value={(cache?.similarity ?? 0).toFixed(3)} />
+        <MetricCard label="Threshold used" value={(cache?.thresholdUsed ?? 0).toFixed(2)} />
+        <MetricCard label="Hit rate" value={`${Math.round((cache?.hitRate ?? 0) * 100)}%`} />
+        <MetricCard label="Saved ms" value={`${Math.round(cache?.savingsMs ?? 0)} ms`} />
+      </div>
+
+      <ExplainBox label="why this happened">
+        {cache?.reason ?? "No cache reason captured."} | {cache?.adaptiveThresholdReason ?? "default"}
+      </ExplainBox>
+
+      <div className="result-row__meta">
+        <Pill variant="gray">key: {cache?.cacheKey ?? "n/a"}</Pill>
+        <Pill variant="gray">ctx: {cache?.contextHash ?? "n/a"}</Pill>
+        <Pill variant="blue">
+          quality: {cache?.quality?.label ?? "n/a"} ({(cache?.quality?.score ?? 0).toFixed(2)})
+        </Pill>
+      </div>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Cache-aware retrieval</h3>
+        </div>
+        <p className="chunk-text">
+          {cacheAware?.influenced
+            ? `Cache influenced ranking (${cacheAware.hybridScoreMode}). Boosted chunks: ${cacheAware.boostedChunkIds.join(", ") || "none"}.`
+            : "Cache did not influence ranking in this run."}
+        </p>
+      </section>
+    </section>
+  );
+}
+
+function EvalsView({ response }: { response: RagAskResponse | undefined }) {
+  const evals = response?.devMode.evals;
+  const costBreakdown = response?.devMode.costBreakdown;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect eval metrics.</p>;
+  }
+
+  if (!evals) {
+    return <p className="chunk-text">No eval metrics available for this run.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Evaluation Scores</h3>
+      </div>
+      <div className="tradeoffs-grid">
+        <MetricCard label="Groundedness" value={evals.groundedness.toFixed(3)} />
+        <MetricCard label="Answer overlap" value={evals.answerOverlap.toFixed(3)} />
+        <MetricCard label="Retrieval accuracy" value={evals.retrievalAccuracy.toFixed(3)} />
+        <MetricCard label="Pipeline score" value={evals.pipelineScore.toFixed(3)} />
+        <MetricCard label="Model score" value={evals.modelScore.toFixed(3)} />
+      </div>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Cost Breakdown</h3>
+        </div>
+        <div className="tradeoffs-grid">
+          <MetricCard label="Embeddings" value={`$${(costBreakdown?.embeddingsUsd ?? 0).toFixed(6)}`} />
+          <MetricCard label="Retrieval" value={`$${(costBreakdown?.retrievalUsd ?? 0).toFixed(6)}`} />
+          <MetricCard label="Generation" value={`$${(costBreakdown?.generationUsd ?? 0).toFixed(6)}`} />
+          <MetricCard label="Total" value={`$${(costBreakdown?.totalUsd ?? 0).toFixed(6)}`} />
+        </div>
+      </section>
+    </section>
   );
 }
 

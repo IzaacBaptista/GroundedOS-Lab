@@ -55,6 +55,80 @@ export interface DevModeResult {
 
 export interface DevModeOutput {
   results: DevModeResult[];
+  cache?: {
+    hit: boolean;
+    similarity?: number;
+    thresholdUsed?: number;
+    adaptiveThresholdReason?: string;
+    cacheKey?: string;
+    contextHash?: string;
+    reason?: string;
+    savingsMs?: number;
+    hitRate?: number;
+    quality?: {
+      score?: number;
+      label?: "high" | "medium" | "low";
+      shadowChecked?: boolean;
+    };
+  };
+  routing?: {
+    selectedModel: string;
+    selectedProvider: string;
+    reason: string;
+    confidence: number;
+    tradeoff: {
+      latency: string;
+      cost: string;
+      quality: string;
+    };
+    alternatives: Array<{
+      model: string;
+      provider: string;
+      reason: string;
+    }>;
+    features: Record<string, unknown>;
+  };
+  orchestration?: {
+    mode: "single-model" | "multi-model";
+    enabled: boolean;
+    steps: Array<{
+      id: string;
+      model: string;
+      role: string;
+      inputPreview: string;
+      outputPreview: string;
+      durationMs: number;
+      grounded?: boolean;
+      qualityDelta?: number;
+    }>;
+    comparison?: {
+      singleModelAnswer: string;
+      multiModelAnswer: string;
+    };
+  };
+  reasoning?: {
+    enabled: boolean;
+    summary: string[];
+    decisionSteps: string[];
+  };
+  evals?: {
+    groundedness: number;
+    answerOverlap: number;
+    retrievalAccuracy: number;
+    pipelineScore: number;
+    modelScore: number;
+  };
+  cacheAwareRetrieval?: {
+    influenced: boolean;
+    boostedChunkIds: string[];
+    hybridScoreMode: string;
+  };
+  costBreakdown?: {
+    embeddingsUsd: number;
+    retrievalUsd: number;
+    generationUsd: number;
+    totalUsd: number;
+  };
   hybrid?: {
     mode: "hybrid";
     denseWeight: number;
