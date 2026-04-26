@@ -12,6 +12,7 @@ export type StoredApiKey = {
   username: string;
   roles: string[];
   createdAt: string;
+  expiresAt?: string;
   revokedAt?: string;
 };
 
@@ -234,6 +235,7 @@ function parseStoredApiKey(value: string | null): StoredApiKey | null {
       username: parsed.username,
       roles: parsed.roles.filter((role): role is string => typeof role === "string"),
       createdAt: parsed.createdAt,
+      expiresAt: typeof parsed.expiresAt === "string" ? parsed.expiresAt : undefined,
       revokedAt: typeof parsed.revokedAt === "string" ? parsed.revokedAt : undefined,
     };
   } catch {

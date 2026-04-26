@@ -25,6 +25,7 @@ export type ApiKeySummary = {
   username: string;
   roles: string[];
   createdAt: string;
+  expiresAt?: string;
   revokedAt?: string;
 };
 
@@ -56,6 +57,7 @@ export class AuthService {
   private readonly revocationStore: TokenRevocationStore = createTokenRevocationStore();
   private readonly apiKeyStore: ApiKeyStore = createApiKeyStore();
   private readonly apiKeyPrefix = (process.env.API_KEY_PREFIX ?? "gdos").trim() || "gdos";
+  private readonly apiKeyTtlMs = parseDurationToMs(process.env.API_KEY_TTL ?? "90d", 90 * 24 * 60 * 60 * 1000);
 
   login(
     username: string,
@@ -187,6 +189,10 @@ export class AuthService {
       return null;
     }
 
+    if (isExpired(current.expiresAt)) {
+      return null;
+    }
+
     return {
       userId: current.userId,
       username: current.username,
@@ -203,6 +209,7 @@ export class AuthService {
     const key = `${this.apiKeyPrefix}_${id.slice(0, 8)}.${secret}`;
     const keyPrefix = key.slice(0, Math.min(18, key.length));
     const createdAt = new Date().toISOString();
+    const expiresAt = this.apiKeyTtlMs > 0 ? new Date(Date.now() + this.apiKeyTtlMs).toISOString() : undefined;
     const record: StoredApiKey = {
       id,
       keyHash: hashApiKey(key),
@@ -212,6 +219,7 @@ export class AuthService {
       username: input.user.username,
       roles: input.user.roles,
       createdAt,
+      expiresAt,
     };
 
     await this.apiKeyStore.create(record);
@@ -234,6 +242,34 @@ export class AuthService {
     }
 
     return this.apiKeyStore.revokeById(normalized);
+  }
+
+  async rotateApiKey(id: string): Promise<CreatedApiKey | null> {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      return null;
+    }
+
+    const keys = await this.apiKeyStore.list();
+    const current = keys.find((key) => key.id === normalizedId && !key.revokedAt);
+
+    if (!current || isExpired(current.expiresAt)) {
+      return null;
+    }
+
+    const revoked = await this.apiKeyStore.revokeById(normalizedId);
+    if (!revoked) {
+      return null;
+    }
+
+    return this.createApiKey({
+      label: current.label,
+      user: {
+        userId: current.userId,
+        username: current.username,
+        roles: current.roles,
+      },
+    });
   }
 
   async revokeToken(token: string): Promise<boolean> {
@@ -347,6 +383,7 @@ function toApiKeySummary(record: StoredApiKey): ApiKeySummary {
     username: record.username,
     roles: record.roles,
     createdAt: record.createdAt,
+    expiresAt: record.expiresAt,
     revokedAt: record.revokedAt,
   };
 }
@@ -358,4 +395,13 @@ function normalizeOptionalLabel(value: string | undefined): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isExpired(expiresAt: string | undefined): boolean {
+  if (!expiresAt) {
+    return false;
+  }
+
+  const epoch = Date.parse(expiresAt);
+  return Number.isFinite(epoch) && epoch <= Date.now();
 }

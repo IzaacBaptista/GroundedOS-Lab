@@ -418,6 +418,124 @@ describe("api server", () => {
     }
   });
 
+  it("supports API key rotation and invalidates the previous key", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const created = createResponse.json() as {
+        apiKey: string;
+        key: { id: string };
+      };
+
+      const rotateResponse = await app.inject({
+        method: "POST",
+        url: `/admin/api-keys/${created.key.id}/rotate`,
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const rotated = rotateResponse.json() as {
+        rotated: true;
+        replacedId: string;
+        apiKey: string;
+        key: { id: string };
+      };
+
+      expect(rotateResponse.statusCode).toBe(201);
+      expect(rotated.replacedId).toBe(created.key.id);
+      expect(rotated.apiKey).toBeTruthy();
+      expect(rotated.apiKey).not.toBe(created.apiKey);
+
+      const withOldKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": created.apiKey,
+        },
+      });
+      expect(withOldKey.statusCode).toBe(401);
+
+      const withNewKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": rotated.apiKey,
+        },
+      });
+      expect(withNewKey.statusCode).toBe(200);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("rejects expired API keys", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousApiKeyTtl = process.env.API_KEY_TTL;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.API_KEY_TTL = "1ms";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const created = createResponse.json() as { apiKey: string };
+
+      await sleep(10);
+
+      const withExpiredKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": created.apiKey,
+        },
+      });
+
+      expect(withExpiredKey.statusCode).toBe(401);
+      expect(withExpiredKey.json()).toEqual({
+        error: {
+          message: "Invalid API key.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.API_KEY_TTL = previousApiKeyTtl;
+    }
+  });
+
   it("scopes persisted indexes by owner when auth is enabled", async () => {
     const previousEnforcement = process.env.AUTH_ENFORCEMENT;
     process.env.AUTH_ENFORCEMENT = "true";
@@ -1147,4 +1265,10 @@ function createTestToken(input: {
 
 function toBase64Url(input: Buffer): string {
   return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

@@ -34,4 +34,8 @@ export class AdminService {
   revokeApiKey(id: string): Promise<boolean> {
     return this.authService.revokeApiKey(id);
   }
+
+  rotateApiKey(id: string): Promise<CreatedApiKey | null> {
+    return this.authService.rotateApiKey(id);
+  }
 }

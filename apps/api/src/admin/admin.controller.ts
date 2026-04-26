@@ -99,6 +99,7 @@ export class AdminController {
       username: string;
       roles: string[];
       createdAt: string;
+      expiresAt?: string;
       revokedAt?: string;
     };
   }> {
@@ -141,6 +142,7 @@ export class AdminController {
       username: string;
       roles: string[];
       createdAt: string;
+      expiresAt?: string;
       revokedAt?: string;
     }>;
   }> {
@@ -184,6 +186,51 @@ export class AdminController {
     return {
       revoked,
       id,
+    };
+  }
+
+  @Post("api-keys/:id/rotate")
+  async rotateApiKey(
+    @Req() request: FastifyRequest,
+    @Param("id") id: string
+  ): Promise<{
+    rotated: true;
+    replacedId: string;
+    apiKey: string;
+    key: {
+      id: string;
+      keyPrefix: string;
+      label?: string;
+      userId: string;
+      username: string;
+      roles: string[];
+      createdAt: string;
+      expiresAt?: string;
+      revokedAt?: string;
+    };
+  }> {
+    const rotated = await this.admin.rotateApiKey(id);
+    if (!rotated) {
+      throw new ApiRequestError("API key not found or already inactive.", 404);
+    }
+
+    const requestUser = getRequestUser(request);
+    await this.audit.record({
+      userId: requestUser?.userId,
+      username: requestUser?.username,
+      action: "admin.api_key.rotated",
+      resource: `/admin/api-keys/${id}/rotate`,
+      metadata: {
+        replacedId: id,
+        newId: rotated.summary.id,
+      },
+    });
+
+    return {
+      rotated: true,
+      replacedId: id,
+      apiKey: rotated.key,
+      key: rotated.summary,
     };
   }
 }
