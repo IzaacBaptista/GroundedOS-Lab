@@ -1,5 +1,7 @@
-import { Controller, Get, Inject, Param, Query } from "@nestjs/common";
+import { Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
+import type { FastifyRequest } from "fastify";
 import type { RagSessionMemoryResponse } from "../../rag-service";
+import { getRequestUserId } from "../../common/auth-context";
 import { RagMemoryService } from "./rag-memory.service";
 
 @Controller("rag/memory")
@@ -8,6 +10,7 @@ export class RagMemoryController {
 
   @Get(":sessionId")
   async listSession(
+    @Req() request: FastifyRequest,
     @Param("sessionId") sessionId: string,
     @Query("limit") limit?: string
   ): Promise<RagSessionMemoryResponse> {
@@ -16,6 +19,7 @@ export class RagMemoryController {
 
     return this.ragMemory.listSession(
       sessionId,
+      getRequestUserId(request),
       Number.isInteger(parsedLimit) && parsedLimit! > 0 ? parsedLimit : undefined
     );
   }

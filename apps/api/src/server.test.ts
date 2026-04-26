@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "fs/promises";
+import { createHmac } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -112,6 +113,139 @@ describe("api server", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
         count: expect.any(Number),
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("scopes persisted indexes by owner when auth is enabled", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const adminToken = createTestToken({
+        sub: "user-admin",
+        username: "admin",
+        roles: ["admin", "user"],
+      });
+      const otherToken = createTestToken({
+        sub: "user-other",
+        username: "other",
+        roles: ["user"],
+      });
+
+      const indexResponse = await app.inject({
+        method: "POST",
+        url: "/rag/index",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          type: "text",
+          content: "Scoped index content.",
+          title: "Scoped Index",
+          documentId: "scoped-index-1",
+        },
+      });
+      expect(indexResponse.statusCode).toBe(200);
+
+      const ownerList = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const ownerListBody = ownerList.json() as { count: number };
+      expect(ownerList.statusCode).toBe(200);
+      expect(ownerListBody.count).toBeGreaterThanOrEqual(1);
+
+      const otherList = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${otherToken}`,
+        },
+      });
+      expect(otherList.statusCode).toBe(200);
+      expect(otherList.json()).toEqual({ count: 0, indexes: [] });
+
+      const otherAsk = await app.inject({
+        method: "POST",
+        url: "/rag/ask",
+        headers: {
+          authorization: `Bearer ${otherToken}`,
+        },
+        payload: {
+          documentId: "scoped-index-1",
+          query: "What is this?",
+        },
+      });
+
+      expect(otherAsk.statusCode).toBe(404);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("scopes session memory by owner when auth is enabled", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const ownerToken = createTestToken({
+        sub: "user-owner",
+        username: "owner",
+        roles: ["user"],
+      });
+      const otherToken = createTestToken({
+        sub: "user-other",
+        username: "other",
+        roles: ["user"],
+      });
+      const sessionId = `scoped-session-${Date.now()}`;
+
+      const askResponse = await app.inject({
+        method: "POST",
+        url: "/rag/ask",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+        },
+        payload: {
+          type: "text",
+          content: "Alpha notes.\n\nBeta notes about retrieval metrics.",
+          query: "What mentions retrieval?",
+          topK: 1,
+          sessionId,
+        },
+      });
+      expect(askResponse.statusCode).toBe(200);
+
+      const ownerMemory = await app.inject({
+        method: "GET",
+        url: `/rag/memory/${encodeURIComponent(sessionId)}`,
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+        },
+      });
+      const ownerBody = ownerMemory.json() as { count: number };
+      expect(ownerMemory.statusCode).toBe(200);
+      expect(ownerBody.count).toBeGreaterThanOrEqual(1);
+
+      const otherMemory = await app.inject({
+        method: "GET",
+        url: `/rag/memory/${encodeURIComponent(sessionId)}`,
+        headers: {
+          authorization: `Bearer ${otherToken}`,
+        },
+      });
+      expect(otherMemory.statusCode).toBe(200);
+      expect(otherMemory.json()).toMatchObject({
+        sessionId,
+        count: 0,
       });
     } finally {
       process.env.AUTH_ENFORCEMENT = previousEnforcement;
@@ -507,4 +641,36 @@ async function createTempIndexDir(): Promise<string> {
   tempDirs.push(tempDir);
 
   return tempDir;
+}
+
+function createTestToken(input: {
+  sub: string;
+  username: string;
+  roles: string[];
+  expiresInSeconds?: number;
+}): string {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const payload = {
+    sub: input.sub,
+    username: input.username,
+    roles: input.roles,
+    iat: nowSeconds,
+    exp: nowSeconds + (input.expiresInSeconds ?? 3600),
+  };
+  const header = {
+    alg: "HS256",
+    typ: "JWT",
+  };
+
+  const encodedHeader = toBase64Url(Buffer.from(JSON.stringify(header), "utf8"));
+  const encodedPayload = toBase64Url(Buffer.from(JSON.stringify(payload), "utf8"));
+  const data = `${encodedHeader}.${encodedPayload}`;
+  const secret = process.env.JWT_SECRET ?? "dev-secret-change-in-production-immediately";
+  const signature = toBase64Url(createHmac("sha256", secret).update(data).digest());
+
+  return `${data}.${signature}`;
+}
+
+function toBase64Url(input: Buffer): string {
+  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }

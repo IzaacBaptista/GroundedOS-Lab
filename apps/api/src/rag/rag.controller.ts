@@ -25,6 +25,7 @@ import {
   parsePositiveInteger,
   withTempUpload,
 } from "../common/multipart";
+import { getRequestUserId } from "../common/auth-context";
 import { RagService } from "./rag.service";
 
 type FastifyMultipartRequest = FastifyRequest & {
@@ -42,8 +43,10 @@ export class RagController {
     @Headers("content-type") contentType: string | undefined,
     @Body() body: unknown
   ): Promise<RagAskResponse> {
+    const ownerId = getRequestUserId(request);
+
     if (request.isMultipart()) {
-      return await this.handleMultipartAsk(request);
+      return await this.handleMultipartAsk(request, ownerId);
     }
 
     if (!contentType?.includes("application/json")) {
@@ -53,7 +56,10 @@ export class RagController {
       );
     }
 
-    return await this.rag.ask(body as RagAskRequest);
+    return await this.rag.ask({
+      ...(body as RagAskRequest),
+      ownerId,
+    });
   }
 
   @Post("index")
@@ -63,8 +69,10 @@ export class RagController {
     @Headers("content-type") contentType: string | undefined,
     @Body() body: unknown
   ): Promise<RagIndexResponse> {
+    const ownerId = getRequestUserId(request);
+
     if (request.isMultipart()) {
-      return await this.handleMultipartIndex(request);
+      return await this.handleMultipartIndex(request, ownerId);
     }
 
     if (!contentType?.includes("application/json")) {
@@ -74,10 +82,16 @@ export class RagController {
       );
     }
 
-    return await this.rag.index(body as RagIndexRequest);
+    return await this.rag.index({
+      ...(body as RagIndexRequest),
+      ownerId,
+    });
   }
 
-  private async handleMultipartAsk(request: FastifyRequest): Promise<RagAskResponse> {
+  private async handleMultipartAsk(
+    request: FastifyRequest,
+    ownerId?: string
+  ): Promise<RagAskResponse> {
     const { fields, upload } = await extractMultipart(request);
 
     return await withTempUpload(upload, (tempFilePath) =>
@@ -101,11 +115,15 @@ export class RagController {
           fields.enableShadowRetrieval,
           "enableShadowRetrieval"
         ),
+        ownerId,
       })
     );
   }
 
-  private async handleMultipartIndex(request: FastifyRequest): Promise<RagIndexResponse> {
+  private async handleMultipartIndex(
+    request: FastifyRequest,
+    ownerId?: string
+  ): Promise<RagIndexResponse> {
     const { fields, upload } = await extractMultipart(request);
 
     return await withTempUpload(upload, (tempFilePath) =>
@@ -117,6 +135,7 @@ export class RagController {
         documentId: fields.documentId,
         metadata: parseMetadata(fields.metadata),
         embeddingProvider: fields.embeddingProvider as RagIndexFileRequest["embeddingProvider"],
+        ownerId,
       })
     );
   }

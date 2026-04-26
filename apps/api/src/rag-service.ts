@@ -114,6 +114,7 @@ export type RagAskRequest = {
   useMultiModelOrchestration?: boolean;
   reasoningEnabled?: boolean;
   enableShadowRetrieval?: boolean;
+  ownerId?: string;
 };
 
 export type RagAskFileRequest = {
@@ -131,6 +132,7 @@ export type RagAskFileRequest = {
   useMultiModelOrchestration?: boolean;
   reasoningEnabled?: boolean;
   enableShadowRetrieval?: boolean;
+  ownerId?: string;
 };
 
 export type RagIndexRequest = {
@@ -141,6 +143,7 @@ export type RagIndexRequest = {
   metadata?: Record<string, unknown>;
   indexDir?: string;
   embeddingProvider?: ApiEmbeddingProviderId;
+  ownerId?: string;
 };
 
 export type RagIndexFileRequest = {
@@ -152,6 +155,7 @@ export type RagIndexFileRequest = {
   metadata?: Record<string, unknown>;
   indexDir?: string;
   embeddingProvider?: ApiEmbeddingProviderId;
+  ownerId?: string;
 };
 
 export type RagDocumentSummary = {
@@ -574,10 +578,12 @@ export function getRagTradeoffMetrics(): RagTradeoffMetricsResponse {
 
 export async function getRagSessionMemory(
   sessionId: string,
-  limit = 20
+  limit = 20,
+  ownerId?: string
 ): Promise<RagSessionMemoryResponse> {
   const normalized = normalizeSessionId(sessionId);
-  const entries = await sessionMemoryStore.list(normalized, limit);
+  const scopedSessionId = createOwnedSessionId(ownerId, normalized);
+  const entries = await sessionMemoryStore.list(scopedSessionId, limit);
 
   return {
     sessionId: normalized,
@@ -652,6 +658,7 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
     normalizedRequest.topK,
     normalizedRequest.embeddingProvider,
     normalizedRequest.sessionId,
+    request.ownerId,
     {
       useMultiModelOrchestration: normalizedRequest.useMultiModelOrchestration,
       reasoningEnabled: normalizedRequest.reasoningEnabled,
@@ -704,6 +711,7 @@ export async function askRagFromFile(
     normalizedRequest.topK,
     normalizedRequest.embeddingProvider,
     normalizedRequest.sessionId,
+    request.ownerId,
     {
       useMultiModelOrchestration: normalizedRequest.useMultiModelOrchestration,
       reasoningEnabled: normalizedRequest.reasoningEnabled,
@@ -759,6 +767,7 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
   const indexSummary = createIndexSummary(index);
   const saved = await saveRagIndex(
     {
+      resourceOwner: request.ownerId,
       document: documentSummary,
       index: indexSummary,
       embeddedChunks: index.embeddedChunks,
@@ -815,6 +824,7 @@ export async function indexRagFromFile(
   const indexSummary = createIndexSummary(index);
   const saved = await saveRagIndex(
     {
+      resourceOwner: request.ownerId,
       document: documentSummary,
       index: indexSummary,
       embeddedChunks: index.embeddedChunks,
@@ -842,13 +852,18 @@ export async function askPersistedRag(
     | "topK"
     | "indexDir"
     | "sessionId"
+    | "ownerId"
     | "useMultiModelOrchestration"
     | "reasoningEnabled"
     | "enableShadowRetrieval"
   >
 ): Promise<RagAskResponse> {
   const normalizedRequest = normalizePersistedAskRequest(request);
-  const saved = await loadRagIndex(normalizedRequest.documentId, normalizedRequest.indexDir);
+  const saved = await loadRagIndex(
+    normalizedRequest.documentId,
+    normalizedRequest.indexDir,
+    normalizedRequest.ownerId
+  );
   const provider = createApiEmbeddingProviderFromIndex(
     saved.record.index,
     normalizedRequest.documentId
@@ -866,6 +881,7 @@ export async function askPersistedRag(
     normalizedRequest.query,
     normalizedRequest.topK,
     normalizedRequest.sessionId,
+    normalizedRequest.ownerId,
     {
       useMultiModelOrchestration: normalizedRequest.useMultiModelOrchestration,
       reasoningEnabled: normalizedRequest.reasoningEnabled,
@@ -888,8 +904,11 @@ export async function askPersistedRag(
   return response;
 }
 
-export async function listPersistedRagIndexes(indexDir?: string): Promise<RagIndexListResponse> {
-  const indexes = await listRagIndexes(indexDir);
+export async function listPersistedRagIndexes(
+  indexDir?: string,
+  ownerId?: string
+): Promise<RagIndexListResponse> {
+  const indexes = await listRagIndexes(indexDir, ownerId);
 
   return {
     count: indexes.length,
@@ -899,13 +918,14 @@ export async function listPersistedRagIndexes(indexDir?: string): Promise<RagInd
 
 export async function getPersistedRagEmbeddingMap(
   documentId: string,
-  indexDir?: string
+  indexDir?: string,
+  ownerId?: string
 ): Promise<RagEmbeddingMapResponse> {
   if (typeof documentId !== "string" || documentId.trim().length === 0) {
     throw new ApiRequestError("documentId must be a non-empty string.");
   }
 
-  const saved = await loadRagIndex(documentId.trim(), indexDir);
+  const saved = await loadRagIndex(documentId.trim(), indexDir, ownerId);
   const chunks = saved.record.embeddedChunks;
   const { xDimension, yDimension } = selectProjectionDimensions(
     chunks.map((chunk) => chunk.embedding)
@@ -950,13 +970,14 @@ export async function getPersistedRagEmbeddingMap(
 
 export async function deletePersistedRagIndex(
   documentId: string,
-  indexDir?: string
+  indexDir?: string,
+  ownerId?: string
 ): Promise<RagIndexDeleteResponse> {
   if (typeof documentId !== "string" || documentId.trim().length === 0) {
     throw new ApiRequestError("documentId must be a non-empty string.");
   }
 
-  const index = await deleteRagIndex(documentId.trim(), indexDir);
+  const index = await deleteRagIndex(documentId.trim(), indexDir, ownerId);
   semanticCache.invalidate(documentId.trim());
 
   return {
@@ -1120,7 +1141,7 @@ function normalizeRequest(request: RagAskRequest): Required<
 function normalizeIndexRequest(request: RagIndexRequest): Required<
   Pick<RagIndexRequest, "content" | "embeddingProvider">
 > &
-  Pick<RagIndexRequest, "title" | "documentId" | "metadata" | "indexDir"> {
+  Pick<RagIndexRequest, "title" | "documentId" | "metadata" | "indexDir" | "ownerId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -1148,6 +1169,7 @@ function normalizeIndexRequest(request: RagIndexRequest): Required<
     documentId: request.documentId,
     metadata: request.metadata,
     indexDir: request.indexDir,
+    ownerId: request.ownerId,
   };
 }
 
@@ -1232,7 +1254,10 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
 function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
   Pick<RagIndexFileRequest, "filePath" | "type" | "embeddingProvider">
 > &
-  Pick<RagIndexFileRequest, "title" | "documentId" | "metadata" | "originalFilename" | "indexDir"> {
+  Pick<
+    RagIndexFileRequest,
+    "title" | "documentId" | "metadata" | "originalFilename" | "indexDir" | "ownerId"
+  > {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Multipart request data must be provided.");
   }
@@ -1260,6 +1285,7 @@ function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
     metadata: request.metadata,
     originalFilename: request.originalFilename,
     indexDir: request.indexDir,
+    ownerId: request.ownerId,
   };
 }
 
@@ -1271,6 +1297,7 @@ function normalizePersistedAskRequest(
     | "topK"
     | "indexDir"
     | "sessionId"
+    | "ownerId"
     | "useMultiModelOrchestration"
     | "reasoningEnabled"
     | "enableShadowRetrieval"
@@ -1286,7 +1313,7 @@ function normalizePersistedAskRequest(
     | "enableShadowRetrieval"
   >
 > &
-  Pick<RagAskRequest, "indexDir" | "sessionId"> {
+  Pick<RagAskRequest, "indexDir" | "sessionId" | "ownerId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -1322,6 +1349,7 @@ function normalizePersistedAskRequest(
     enableShadowRetrieval: request.enableShadowRetrieval ?? true,
     indexDir: request.indexDir,
     sessionId: request.sessionId,
+    ownerId: request.ownerId,
   };
 }
 async function runLocalRag(
@@ -1330,6 +1358,7 @@ async function runLocalRag(
   topK: number,
   embeddingProviderId: ApiEmbeddingProviderId,
   sessionId?: string,
+  ownerId?: string,
   options?: {
     useMultiModelOrchestration?: boolean;
     reasoningEnabled?: boolean;
@@ -1391,6 +1420,7 @@ async function runLocalRag(
       hybridScoreMode: string;
     };
     sessionId?: string;
+    ownerId?: string;
     memoryMatches?: MemorySearchResult[];
     memoryStored?: boolean;
     rerankCandidateCount?: number;
@@ -1420,7 +1450,7 @@ async function runLocalRag(
         }
 
         const matches = await sessionMemoryStore.search(
-          input.sessionId,
+          createOwnedSessionId(input.ownerId, input.sessionId),
           input.rawQuery,
           DEFAULT_MEMORY_RECALL_LIMIT
         );
@@ -1793,7 +1823,7 @@ async function runLocalRag(
 
         if (input.sessionId) {
           await sessionMemoryStore.append({
-            sessionId: input.sessionId,
+            sessionId: createOwnedSessionId(input.ownerId, input.sessionId),
             query: input.rawQuery,
             answer: answer.text,
             metadata: {
@@ -1834,6 +1864,7 @@ async function runLocalRag(
     topK,
     provider,
     sessionId: normalizeSessionIdOrUndefined(sessionId),
+    ownerId,
     costTracker: new CostTracker(document.documentId),
   });
 
@@ -1975,6 +2006,7 @@ async function runPersistedRag(
   query: string,
   topK: number,
   sessionId?: string,
+  ownerId?: string,
   options?: {
     useMultiModelOrchestration?: boolean;
     reasoningEnabled?: boolean;
@@ -2033,6 +2065,7 @@ async function runPersistedRag(
       hybridScoreMode: string;
     };
     sessionId?: string;
+    ownerId?: string;
     memoryMatches?: MemorySearchResult[];
     memoryStored?: boolean;
     rerankCandidateCount?: number;
@@ -2063,7 +2096,7 @@ async function runPersistedRag(
         }
 
         const matches = await sessionMemoryStore.search(
-          input.sessionId,
+          createOwnedSessionId(input.ownerId, input.sessionId),
           input.rawQuery,
           DEFAULT_MEMORY_RECALL_LIMIT
         );
@@ -2410,7 +2443,7 @@ async function runPersistedRag(
 
         if (input.sessionId) {
           await sessionMemoryStore.append({
-            sessionId: input.sessionId,
+            sessionId: createOwnedSessionId(input.ownerId, input.sessionId),
             query: input.rawQuery,
             answer: answer.text,
             metadata: {
@@ -2450,6 +2483,7 @@ async function runPersistedRag(
     retrievalQuery: query,
     topK,
     sessionId: normalizeSessionIdOrUndefined(sessionId),
+    ownerId,
     costTracker: new CostTracker(persistedDocumentId),
   });
 
@@ -2994,6 +3028,19 @@ function normalizeSessionId(sessionId: string): string {
   }
 
   return trimmed;
+}
+
+function createOwnedSessionId(ownerId: string | undefined, sessionId: string): string {
+  if (!ownerId) {
+    return sessionId;
+  }
+
+  const normalizedOwner = ownerId.trim();
+  if (normalizedOwner.length === 0) {
+    return sessionId;
+  }
+
+  return `${normalizedOwner}__${sessionId}`;
 }
 
 function validateOptionalMetadata(metadata: Record<string, unknown> | undefined): void {
