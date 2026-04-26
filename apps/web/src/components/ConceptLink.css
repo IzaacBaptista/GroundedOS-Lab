@@ -1,0 +1,16 @@
+.concept-link {
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.concept-link:hover {
+  color: var(--accent-strong);
+  text-decoration: none;
+}

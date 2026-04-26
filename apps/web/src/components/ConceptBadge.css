@@ -1,0 +1,94 @@
+.concept-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid;
+  background: var(--panel);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.concept-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.concept-badge--small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.concept-badge .badge-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.concept-badge.badge-implemented {
+  color: var(--accent);
+  border-color: var(--accent);
+  background-color: var(--accent-soft);
+}
+
+.concept-badge.badge-implemented:hover {
+  border-color: var(--accent-strong);
+}
+
+.concept-badge.badge-implemented .badge-dot {
+  background-color: var(--accent);
+}
+
+.concept-badge.badge-partial {
+  color: var(--amber);
+  border-color: var(--amber);
+  background-color: var(--amber-soft);
+}
+
+.concept-badge.badge-partial:hover {
+  border-color: var(--amber);
+}
+
+.concept-badge.badge-partial .badge-dot {
+  background-color: var(--amber);
+}
+
+.concept-badge.badge-planned {
+  color: var(--muted);
+  border-color: var(--line-strong);
+  background-color: var(--panel-strong);
+}
+
+.concept-badge.badge-planned:hover {
+  border-color: var(--line-strong);
+}
+
+.concept-badge.badge-planned .badge-dot {
+  background-color: var(--muted);
+}
+
+.concept-badge.badge-stub {
+  color: var(--muted);
+  border-color: var(--line);
+  background-color: var(--panel-strong);
+}
+
+.concept-badge.badge-stub:hover {
+  border-color: var(--line-strong);
+}
+
+.concept-badge.badge-stub .badge-dot {
+  background-color: var(--muted);
+}
+
+.concept-badge-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}

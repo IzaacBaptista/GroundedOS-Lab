@@ -40,6 +40,8 @@ import type {
 import { useApiHealth } from "./hooks/useApiHealth";
 import { useIndexList } from "./hooks/useIndexList";
 import { AnswerPanel, type AnswerTab as PedagogicalAnswerTab } from "./components/AnswerPanel";
+import { ConceptBadgeGroup } from "./components/ConceptBadge";
+import { ConceptsDrawer } from "./components/ConceptsDrawer";
 import { ChunksList } from "./components/ResultParts";
 import { ExplainBox } from "./components/shared/ExplainBox";
 import { Pill } from "./components/shared/Pill";
@@ -1055,6 +1057,8 @@ function ResultPanel({
   labMessageIsError,
 }: ResultPanelProps) {
   const [answerPanelTab, setAnswerPanelTab] = useState<PedagogicalAnswerTab>("chunks");
+  const [conceptsDrawerOpen, setConceptsDrawerOpen] = useState(false);
+  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
   const resultMeta = result
@@ -1079,6 +1083,26 @@ function ResultPanel({
           ? "Guardrails playground"
         : "No result";
   const showPanelHeader = outputTab === "embeddings" || outputTab === "models";
+
+  const tabConcepts: string[] =
+    outputTab === "answer"
+      ? answerPanelTab === "chunks"
+        ? ["semantic-caching", "latency", "rag"]
+        : answerPanelTab === "citations"
+          ? ["grounding", "data-lineage", "chunking"]
+          : answerPanelTab === "workflow"
+            ? ["rag", "embeddings", "context-engineering"]
+            : ["cost-analysis", "latency", "observability"]
+      : outputTab === "compare"
+        ? ["hybrid-search", "reranking", "embeddings"]
+        : outputTab === "lab"
+          ? ["guardrails", "grounding"]
+          : [];
+
+  const openConceptDrawer = (conceptId?: string) => {
+    setSelectedConceptId(conceptId ?? tabConcepts[0] ?? "rag");
+    setConceptsDrawerOpen(true);
+  };
 
   return (
     <section className="panel output-panel" aria-label="RAG output">
@@ -1156,7 +1180,17 @@ function ResultPanel({
         >
           Guardrails
         </button>
+        <button className="result-tab" type="button" onClick={() => openConceptDrawer()}>
+          Concepts Lab
+        </button>
       </div>
+
+      {tabConcepts.length > 0 && (
+        <div className="concepts-tab-hints" aria-label="Concept references for this view">
+          <span className="chunk-text">Concepts in this view:</span>
+          <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={(id) => openConceptDrawer(id)} />
+        </div>
+      )}
 
       {outputTab === "answer" && (
         <AnswerPanel
@@ -1310,6 +1344,13 @@ function ResultPanel({
       {outputTab === "lab" && (
         <LabExperimentsView />
       )}
+
+      <ConceptsDrawer
+        isOpen={conceptsDrawerOpen}
+        onClose={() => setConceptsDrawerOpen(false)}
+        selectedConceptId={selectedConceptId}
+        onSelectConcept={setSelectedConceptId}
+      />
     </section>
   );
 }
