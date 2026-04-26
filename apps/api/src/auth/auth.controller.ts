@@ -8,6 +8,10 @@ export type LoginRequest = {
   password: string;
 };
 
+export type RefreshRequest = {
+  refreshToken: string;
+};
+
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -17,7 +21,12 @@ export class AuthController {
   login(
     @Body() body: LoginRequest,
     @Res({ passthrough: true }) reply: FastifyReply
-  ): { accessToken: string; expiresIn: number; user: { userId: string; username: string; roles: string[] } } {
+  ): {
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    user: { userId: string; username: string; roles: string[] };
+  } {
     if (!body || typeof body.username !== "string" || typeof body.password !== "string") {
       throw new ApiRequestError("username and password are required.", 400);
     }
@@ -38,6 +47,25 @@ export class AuthController {
     );
 
     return session;
+  }
+
+  @Post("refresh")
+  @HttpCode(200)
+  refresh(@Body() body: RefreshRequest): {
+    accessToken: string;
+    expiresIn: number;
+    user: { userId: string; username: string; roles: string[] };
+  } {
+    if (!body || typeof body.refreshToken !== "string" || body.refreshToken.trim().length === 0) {
+      throw new ApiRequestError("refreshToken is required.", 400);
+    }
+
+    const refreshed = this.authService.refreshAccessToken(body.refreshToken.trim());
+    if (!refreshed) {
+      throw new ApiRequestError("invalid refresh token.", 401);
+    }
+
+    return refreshed;
   }
 
   @Post("logout")

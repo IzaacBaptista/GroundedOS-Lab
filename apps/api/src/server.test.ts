@@ -1,5 +1,5 @@
 import { mkdtemp, rm } from "fs/promises";
-import { createHmac } from "crypto";
+import { createHmac, randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -50,12 +50,14 @@ describe("api server", () => {
       });
       const body = response.json() as {
         accessToken: string;
+        refreshToken: string;
         expiresIn: number;
         user: { userId: string; username: string; roles: string[] };
       };
 
       expect(response.statusCode).toBe(200);
       expect(body.accessToken).toBeTruthy();
+      expect(body.refreshToken).toBeTruthy();
       expect(body.expiresIn).toBeGreaterThan(0);
       expect(body.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
       expect(body.user.roles).toContain("admin");
@@ -111,6 +113,94 @@ describe("api server", () => {
       });
       expect(afterLogout.statusCode).toBe(401);
       expect(afterLogout.json()).toEqual({
+        error: {
+          message: "Invalid or expired token.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("serves POST /auth/refresh and issues a new access token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as {
+        accessToken: string;
+        refreshToken: string;
+      };
+
+      const refreshResponse = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: loginBody.refreshToken,
+        },
+      });
+      const refreshBody = refreshResponse.json() as {
+        accessToken: string;
+        expiresIn: number;
+        user: { username: string };
+      };
+
+      expect(refreshResponse.statusCode).toBe(200);
+      expect(refreshBody.accessToken).toBeTruthy();
+      expect(refreshBody.accessToken).not.toBe(loginBody.accessToken);
+      expect(refreshBody.expiresIn).toBeGreaterThan(0);
+      expect(refreshBody.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
+
+      const usingRefreshedAccess = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${refreshBody.accessToken}`,
+        },
+      });
+      expect(usingRefreshedAccess.statusCode).toBe(200);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("rejects using refresh token as bearer access token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as {
+        refreshToken: string;
+      };
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.refreshToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toEqual({
         error: {
           message: "Invalid or expired token.",
         },
@@ -858,6 +948,7 @@ function createTestToken(input: {
   sub: string;
   username: string;
   roles: string[];
+  tokenType?: "access" | "refresh";
   expiresInSeconds?: number;
 }): string {
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -865,6 +956,8 @@ function createTestToken(input: {
     sub: input.sub,
     username: input.username,
     roles: input.roles,
+    tokenType: input.tokenType ?? "access",
+    jti: randomUUID(),
     iat: nowSeconds,
     exp: nowSeconds + (input.expiresInSeconds ?? 3600),
   };

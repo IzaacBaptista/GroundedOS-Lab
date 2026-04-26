@@ -61,7 +61,8 @@ export async function createApiServer(
     const isPublicEndpoint =
       path === "/health" ||
       path === "/status" ||
-      path === "/auth/login";
+      path === "/auth/login" ||
+      path === "/auth/refresh";
 
     if (isPublicEndpoint || request.method === "OPTIONS") {
       done();
