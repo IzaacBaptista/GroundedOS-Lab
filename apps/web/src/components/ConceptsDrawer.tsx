@@ -18,11 +18,11 @@ interface ConceptsDrawerProps {
 }
 
 const STATUS_FILTERS: Array<{ label: string; value: "all" | ConceptStatus }> = [
-  { label: "All", value: "all" },
-  { label: "Implemented", value: "implemented" },
-  { label: "Partial", value: "partial" },
-  { label: "Planned", value: "planned" },
-  { label: "Stub", value: "stub" },
+  { label: "Todos", value: "all" },
+  { label: "Implementado", value: "implemented" },
+  { label: "Parcial", value: "partial" },
+  { label: "Planejado", value: "planned" },
+  { label: "Rascunho", value: "stub" },
 ];
 
 export function ConceptsDrawer({
@@ -52,33 +52,33 @@ export function ConceptsDrawer({
   }
 
   return (
-    <aside className="concepts-drawer" aria-label="Concepts lab">
+    <aside className="concepts-drawer" aria-label="Laboratório de conceitos">
       <div className="concepts-drawer__backdrop" onClick={onClose} aria-hidden="true" />
 
       <div className="concepts-drawer__panel">
         <header className="concepts-drawer__header">
           <div>
-            <h2>Concepts Lab</h2>
-            <p>From term definitions to hands-on checks in this app.</p>
+            <h2>Laboratório de Conceitos</h2>
+            <p>Da definição do termo à verificação prática dentro do app.</p>
           </div>
           <button type="button" className="secondary-button" onClick={onClose}>
-            Close
+            Fechar
           </button>
         </header>
 
         <div className="concepts-drawer__content">
-          <section className="concepts-drawer__left" aria-label="Concept list and filters">
+          <section className="concepts-drawer__left" aria-label="Lista de conceitos e filtros">
             <label className="field field--compact">
-              <span>Search concepts</span>
+              <span>Buscar conceitos</span>
               <input
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Try: RAG, embeddings, guardrails"
+                placeholder="Ex.: RAG, embeddings, guardrails"
               />
             </label>
 
-            <div className="concept-filter-row" role="radiogroup" aria-label="Status filter">
+            <div className="concept-filter-row" role="radiogroup" aria-label="Filtro de status">
               {STATUS_FILTERS.map((item) => (
                 <button
                   key={item.value}
@@ -91,13 +91,13 @@ export function ConceptsDrawer({
               ))}
             </div>
 
-            <div className="concept-category-list" role="listbox" aria-label="Categories">
+            <div className="concept-category-list" role="listbox" aria-label="Categorias">
               <button
                 type="button"
                 className={`concept-category-item${activeCategory === "all" ? " concept-category-item--active" : ""}`}
                 onClick={() => setActiveCategory("all")}
               >
-                All categories
+                Todas as categorias
               </button>
               {categories.map((category) => (
                 <button
@@ -111,8 +111,8 @@ export function ConceptsDrawer({
               ))}
             </div>
 
-            <div className="concept-search-results" aria-label="Matching concepts">
-              <p className="chunk-text">{filtered.length} concept(s) found.</p>
+            <div className="concept-search-results" aria-label="Conceitos encontrados">
+              <p className="chunk-text">{filtered.length} conceito(s) encontrado(s).</p>
               {filtered.map((concept) => (
                 <button
                   key={concept.id}
@@ -130,7 +130,7 @@ export function ConceptsDrawer({
             </div>
           </section>
 
-          <section className="concepts-drawer__right" aria-label="Concept details">
+          <section className="concepts-drawer__right" aria-label="Detalhes do conceito">
             <ConceptDetailPanel conceptId={selectedConceptId} onSelectConcept={onSelectConcept} />
             <LearningPathPanel onSelectConcept={onSelectConcept} />
           </section>

@@ -13,11 +13,11 @@
 .concepts-drawer__panel {
   position: absolute;
   top: 0;
-  right: 0;
+  left: 0;
   width: min(1100px, 94vw);
   height: 100vh;
   background: var(--panel);
-  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;

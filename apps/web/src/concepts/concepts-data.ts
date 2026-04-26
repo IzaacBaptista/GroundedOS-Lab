@@ -908,8 +908,8 @@ export const CONCEPTS: Concept[] = [
 export const LEARNING_PATHS: LearningPath[] = [
   {
     id: "rag-foundations",
-    title: "RAG Foundations",
-    description: "Build end-to-end understanding from ingestion to grounded answers.",
+    title: "Fundamentos de RAG",
+    description: "Construa entendimento de ponta a ponta: da ingestão até respostas ancoradas.",
     conceptIds: [
       "text",
       "pdf",
@@ -924,8 +924,8 @@ export const LEARNING_PATHS: LearningPath[] = [
   },
   {
     id: "retrieval-quality",
-    title: "Retrieval Quality",
-    description: "Improve ranking quality for hard and jargon-heavy queries.",
+    title: "Qualidade de Recuperação",
+    description: "Melhore a qualidade de ranking para consultas difíceis e com muito jargão.",
     conceptIds: [
       "embeddings",
       "hybrid-search",
@@ -937,8 +937,8 @@ export const LEARNING_PATHS: LearningPath[] = [
   },
   {
     id: "performance",
-    title: "Observability & Performance",
-    description: "Measure and reduce latency, costs, and bottlenecks.",
+    title: "Observabilidade e Performance",
+    description: "Meça e reduza latência, custos e gargalos.",
     conceptIds: [
       "observability",
       "cost-analysis",
@@ -950,15 +950,15 @@ export const LEARNING_PATHS: LearningPath[] = [
   },
   {
     id: "safety",
-    title: "Safety & Reliability",
-    description: "Practice guardrails and failure-mode handling.",
+    title: "Segurança e Confiabilidade",
+    description: "Pratique guardrails e tratamento de modos de falha.",
     conceptIds: ["guardrails", "grounding"],
     difficulty: "intermediate",
   },
   {
     id: "optimization",
-    title: "Model Optimization",
-    description: "Study model adaptation and serving optimization techniques.",
+    title: "Otimização de Modelos",
+    description: "Estude técnicas de adaptação de modelos e otimização de serving.",
     conceptIds: ["quantization", "lora", "distillation", "fine-tuning", "inference"],
     difficulty: "advanced",
   },

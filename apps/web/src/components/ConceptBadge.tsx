@@ -21,7 +21,7 @@ export function ConceptBadge({ conceptId, onClick, small = false }: ConceptBadge
       onClick={onClick}
       title={concept.shortDefinition}
       type="button"
-      aria-label={`Learn about ${concept.title}`}
+      aria-label={`Aprender sobre ${concept.title}`}
     >
       <span className="badge-dot" />
       <span className="badge-text">{concept.title}</span>

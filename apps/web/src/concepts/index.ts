@@ -47,10 +47,10 @@ export function getLearningPath(pathId: string) {
 
 export function toDisplayStatus(status: string): string {
   const map: Record<string, string> = {
-    implemented: "✅ Implemented",
-    partial: "🟡 Partial",
-    planned: "🔲 Planned",
-    stub: "⚪ Stub",
+    implemented: "✅ Implementado",
+    partial: "🟡 Parcial",
+    planned: "🔲 Planejado",
+    stub: "⚪ Rascunho",
   };
   return map[status] || status;
 }

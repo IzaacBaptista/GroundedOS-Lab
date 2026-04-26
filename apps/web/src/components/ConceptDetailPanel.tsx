@@ -33,9 +33,9 @@ export function ConceptDetailPanel({ conceptId, onSelectConcept }: ConceptDetail
 
   if (!concept) {
     return (
-      <section className="concept-detail-panel" aria-label="Concept details">
-        <h3>Concept Detail</h3>
-        <p className="concept-detail-empty">Select a concept to explore where it appears, how to test it, and what trade-offs it introduces.</p>
+      <section className="concept-detail-panel" aria-label="Detalhes do conceito">
+        <h3>Detalhes do Conceito</h3>
+        <p className="concept-detail-empty">Selecione um conceito para ver onde ele aparece, como testar e quais trade-offs ele introduz.</p>
       </section>
     );
   }
@@ -53,27 +53,27 @@ export function ConceptDetailPanel({ conceptId, onSelectConcept }: ConceptDetail
       </div>
 
       <section className="concept-detail-section">
-        <h4>Why it matters</h4>
+        <h4>Por que importa</h4>
         <p>{concept.whyItMatters}</p>
       </section>
 
       <section className="concept-detail-section">
-        <h4>How it works</h4>
+        <h4>Como funciona</h4>
         <p>{concept.explanation}</p>
       </section>
 
-      <DetailList title="How to study" values={concept.howToStudy} />
-      <DetailList title="How to practice in GroundedOS" values={concept.howToPracticeInProject} />
-      <DetailList title="Applied in project" values={concept.appliedInGroundedOS} />
-      <DetailList title="Visible in current data" values={concept.visibleInCurrentData} />
-      <DetailList title="Where to see in UI" values={concept.whereToSeeInUI} />
-      <DetailList title="Suggested experiments" values={concept.suggestedExperiments} />
-      <DetailList title="Trade-offs and limitations" values={concept.tradeoffsAndLimitations} />
-      <DetailList title="Related files" values={concept.relatedFiles} />
+      <DetailList title="Como estudar" values={concept.howToStudy} />
+      <DetailList title="Como praticar no GroundedOS" values={concept.howToPracticeInProject} />
+      <DetailList title="Aplicado no projeto" values={concept.appliedInGroundedOS} />
+      <DetailList title="Visível nos dados atuais" values={concept.visibleInCurrentData} />
+      <DetailList title="Onde ver na UI" values={concept.whereToSeeInUI} />
+      <DetailList title="Experimentos sugeridos" values={concept.suggestedExperiments} />
+      <DetailList title="Trade-offs e limitações" values={concept.tradeoffsAndLimitations} />
+      <DetailList title="Arquivos relacionados" values={concept.relatedFiles} />
 
       {related.length > 0 && (
         <section className="concept-detail-section">
-          <h4>Related concepts</h4>
+          <h4>Conceitos relacionados</h4>
           <ConceptBadgeGroup conceptIds={related.map((item) => item.id)} onClick={onSelectConcept} small />
         </section>
       )}

@@ -1181,13 +1181,13 @@ function ResultPanel({
           Guardrails
         </button>
         <button className="result-tab" type="button" onClick={() => openConceptDrawer()}>
-          Concepts Lab
+          Laboratório de Conceitos
         </button>
       </div>
 
       {tabConcepts.length > 0 && (
-        <div className="concepts-tab-hints" aria-label="Concept references for this view">
-          <span className="chunk-text">Concepts in this view:</span>
+        <div className="concepts-tab-hints" aria-label="Referências de conceitos desta visualização">
+          <span className="chunk-text">Conceitos nesta visualização:</span>
           <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={(id) => openConceptDrawer(id)} />
         </div>
       )}
