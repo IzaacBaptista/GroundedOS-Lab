@@ -6,7 +6,7 @@
  * only the JSON surface the web client reads.
  */
 
-export type EmbeddingProviderId = "api-lexical" | "local-hash" | "ollama";
+export type EmbeddingProviderId = "api-lexical" | "local-hash" | "ollama" | "openai";
 
 export interface EmbeddingModelInfo {
   provider: string;

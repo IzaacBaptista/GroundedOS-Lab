@@ -83,6 +83,7 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "api-lexical",
   "local-hash",
   "ollama",
+  "openai",
 ];
 
 type ResultMode =
@@ -1377,7 +1378,7 @@ function ResultPanel({
 
           <p
             className="compare-tip"
-            title="api-lexical e local-hash são estratégias lexicais; ollama é semântico e tende a divergir mais em ranking."
+            title="api-lexical e local-hash são estratégias lexicais; ollama e openai são semânticos e tendem a divergir mais em ranking."
           >
             {explainCompareTip(compare.providerA, compare.providerB)}
           </p>
