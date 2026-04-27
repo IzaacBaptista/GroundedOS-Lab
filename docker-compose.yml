@@ -97,7 +97,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3001}
+      API_BASE_URL: ${API_BASE_URL:-http://api:3001}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://api:3001}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
