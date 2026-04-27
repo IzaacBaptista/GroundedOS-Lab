@@ -18,6 +18,7 @@ export type AuditEventInput = Omit<AuditEvent, "id" | "timestamp">;
 export type AuditLogQuery = {
   limit?: number;
   offset?: number;
+  sortDirection?: "asc" | "desc";
   userId?: string;
   action?: string;
 };
@@ -59,9 +60,9 @@ class InMemoryAuditStore implements AuditStore {
   async list(query: AuditLogQuery = {}): Promise<AuditEvent[]> {
     const limit = normalizeLimit(query.limit);
     const offset = normalizeOffset(query.offset);
-    return this.events
-      .filter((event) => matchesQuery(event, query))
-      .slice(offset, offset + limit);
+    const filtered = this.events.filter((event) => matchesQuery(event, query));
+    const ordered = query.sortDirection === "asc" ? [...filtered].reverse() : filtered;
+    return ordered.slice(offset, offset + limit);
   }
 }
 
@@ -112,12 +113,12 @@ class OptionalRedisAuditStore implements AuditStore {
       const parsed = records
         .map((record) => parseAuditEvent(record))
         .filter((event): event is AuditEvent => Boolean(event))
-        .filter((event) => matchesQuery(event, query))
-        .slice(offset, offset + limit);
-      return parsed;
+        .filter((event) => matchesQuery(event, query));
+      const ordered = query.sortDirection === "asc" ? [...parsed].reverse() : parsed;
+      return ordered.slice(offset, offset + limit);
     } catch {
       this.disabled = true;
-      return this.fallback.list({ ...query, limit, offset });
+      return this.fallback.list({ ...query, limit, offset, sortDirection: query.sortDirection });
     }
   }
 

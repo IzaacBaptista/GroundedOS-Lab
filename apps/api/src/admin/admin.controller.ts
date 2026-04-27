@@ -59,15 +59,18 @@ export class AdminController {
     @Req() request: FastifyRequest,
     @Query("limit") limitValue?: string,
     @Query("cursor") cursorValue?: string,
+    @Query("sort") sortValue?: string,
     @Query("action") action?: string,
     @Query("userId") userId?: string
   ): Promise<{ count: number; nextCursor?: string; events: AuditEvent[] }> {
     const limit = parseLimit(limitValue);
     const offset = parseCursor(cursorValue);
+    const sortDirection = parseSortDirection(sortValue);
     const probeLimit = Math.min(500, limit + 1);
     const events = await this.audit.list({
       limit: probeLimit,
       offset,
+      sortDirection,
       action: normalizeOptionalString(action),
       userId: normalizeOptionalString(userId),
     });
@@ -83,6 +86,7 @@ export class AdminController {
       metadata: {
         limit,
         offset,
+        sortDirection,
       },
     });
 
@@ -141,7 +145,8 @@ export class AdminController {
   async listApiKeys(
     @Req() request: FastifyRequest,
     @Query("limit") limitValue?: string,
-    @Query("cursor") cursorValue?: string
+    @Query("cursor") cursorValue?: string,
+    @Query("sort") sortValue?: string
   ): Promise<{
     count: number;
     nextCursor?: string;
@@ -159,8 +164,13 @@ export class AdminController {
   }> {
     const limit = parseLimit(limitValue);
     const offset = parseCursor(cursorValue);
+    const sortDirection = parseSortDirection(sortValue);
     const allKeys = await this.admin.listApiKeys();
-    const page = allKeys.slice(offset, offset + limit + 1);
+    const sortedKeys =
+      sortDirection === "asc"
+        ? [...allKeys].sort(compareByCreatedAtAsc)
+        : [...allKeys].sort(compareByCreatedAtDesc);
+    const page = sortedKeys.slice(offset, offset + limit + 1);
     const hasMore = page.length > limit;
     const keys = hasMore ? page.slice(0, limit) : page;
     const requestUser = getRequestUser(request);
@@ -174,6 +184,7 @@ export class AdminController {
         count: keys.length,
         limit,
         offset,
+        sortDirection,
       },
     });
 
@@ -292,4 +303,40 @@ function parseCursor(value?: string): number {
 
 function encodeCursor(offset: number): string {
   return Buffer.from(String(Math.max(0, Math.floor(offset))), "utf8").toString("base64url");
+}
+
+function parseSortDirection(value?: string): "asc" | "desc" {
+  if (!value) {
+    return "desc";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "asc" || normalized === "createdat:asc") {
+    return "asc";
+  }
+
+  if (normalized === "desc" || normalized === "createdat:desc") {
+    return "desc";
+  }
+
+  return "desc";
+}
+
+function compareByCreatedAtAsc(
+  left: { createdAt: string; id: string },
+  right: { createdAt: string; id: string }
+): number {
+  const byCreatedAt = left.createdAt.localeCompare(right.createdAt);
+  if (byCreatedAt !== 0) {
+    return byCreatedAt;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function compareByCreatedAtDesc(
+  left: { createdAt: string; id: string },
+  right: { createdAt: string; id: string }
+): number {
+  return compareByCreatedAtAsc(right, left);
 }

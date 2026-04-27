@@ -419,6 +419,38 @@ describe("api server", () => {
       expect(listSecondPageBody.count).toBe(1);
       expect(listSecondPageBody.keys[0]?.id).not.toBe(listFirstPageBody.keys[0]?.id);
 
+      const listAsc = await app.inject({
+        method: "GET",
+        url: "/admin/api-keys?limit=2&sort=createdAt:asc",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listAscBody = listAsc.json() as {
+        count: number;
+        keys: Array<{ id: string }>;
+      };
+      expect(listAsc.statusCode).toBe(200);
+      expect(listAscBody.count).toBe(2);
+      expect(listAscBody.keys[0]?.id).toBe(createApiKeyBody.key.id);
+
+      const listDesc = await app.inject({
+        method: "GET",
+        url: "/admin/api-keys?limit=2&sort=createdAt:desc",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listDescBody = listDesc.json() as {
+        count: number;
+        keys: Array<{ id: string }>;
+      };
+      expect(listDesc.statusCode).toBe(200);
+      expect(listDescBody.count).toBe(2);
+      expect(listDescBody.keys.map((key) => key.id).sort()).toEqual(
+        listAscBody.keys.map((key) => key.id).sort()
+      );
+
       const withApiKey = await app.inject({
         method: "GET",
         url: "/rag/indexes",
@@ -850,6 +882,15 @@ describe("api server", () => {
         tradeoffs: expect.any(Object),
       });
 
+      const costSummarySecond = await app.inject({
+        method: "GET",
+        url: "/admin/cost/summary",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(costSummarySecond.statusCode).toBe(200);
+
       const clearIndexes = await app.inject({
         method: "DELETE",
         url: "/admin/indexes/all",
@@ -926,6 +967,38 @@ describe("api server", () => {
       expect(clearAuditFiltered.statusCode).toBe(200);
       expect(clearAuditBody.count).toBeGreaterThanOrEqual(1);
       expect(clearAuditBody.events[0]?.action).toBe("admin.indexes.clear_all");
+
+      const auditCreatedDesc = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=2&action=admin.cost.summary.read&sort=createdAt:desc",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditCreatedDescBody = auditCreatedDesc.json() as {
+        count: number;
+        events: Array<{ id: string; action: string }>;
+      };
+      expect(auditCreatedDesc.statusCode).toBe(200);
+      expect(auditCreatedDescBody.count).toBeGreaterThanOrEqual(2);
+
+      const auditCreatedAsc = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=2&action=admin.cost.summary.read&sort=createdAt:asc",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditCreatedAscBody = auditCreatedAsc.json() as {
+        count: number;
+        events: Array<{ id: string; action: string }>;
+      };
+      expect(auditCreatedAsc.statusCode).toBe(200);
+      expect(auditCreatedAscBody.count).toBeGreaterThanOrEqual(2);
+
+      const descIdsSorted = auditCreatedDescBody.events.map((event) => event.id).sort();
+      const ascIdsSorted = auditCreatedAscBody.events.map((event) => event.id).sort();
+      expect(ascIdsSorted).toEqual(descIdsSorted);
     } finally {
       process.env.AUTH_ENFORCEMENT = previousEnforcement;
     }
