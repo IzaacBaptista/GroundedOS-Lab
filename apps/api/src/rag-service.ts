@@ -33,6 +33,7 @@ import {
   buildRetrievalIndex,
   InMemoryVectorStore,
   LocalHashEmbeddingsProvider,
+  OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   SemanticCache,
   retrieveForDevMode,
@@ -69,6 +70,9 @@ const EMBEDDING_DIMENSIONS = 64;
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OLLAMA_EMBEDDING_MODEL = "embeddinggemma";
 const DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS = 768;
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+const DEFAULT_OPENAI_EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_MEMORY_RECALL_LIMIT = 3;
 const DEFAULT_RETRIEVAL_MODE = "hybrid" as const;
 const DEFAULT_RERANK_CANDIDATE_MULTIPLIER = 3;
@@ -89,7 +93,7 @@ export { ApiRequestError } from "./errors";
 type SupportedApiModality = Extract<DocumentModality, "text" | "pdf">;
 type ApiEmbeddingProviderId = Extract<
   EmbeddingProviderId,
-  "api-lexical" | "local-hash" | "ollama"
+  "api-lexical" | "local-hash" | "ollama" | "openai"
 >;
 
 const DEFAULT_API_EMBEDDING_PROVIDER: ApiEmbeddingProviderId = "api-lexical";
@@ -2947,6 +2951,8 @@ function createApiEmbeddingProvider(
       return semanticToEmbeddingProvider(new LocalHashEmbeddingsProvider());
     case "ollama":
       return semanticToEmbeddingProvider(createOllamaEmbeddingsProvider(modelInfo));
+    case "openai":
+      return semanticToEmbeddingProvider(createOpenAiEmbeddingsProvider(modelInfo));
   }
 }
 
@@ -2974,18 +2980,30 @@ function normalizeEmbeddingProvider(
     return DEFAULT_API_EMBEDDING_PROVIDER;
   }
 
-  if (providerId === "api-lexical" || providerId === "local-hash" || providerId === "ollama") {
+  if (
+    providerId === "api-lexical" ||
+    providerId === "local-hash" ||
+    providerId === "ollama" ||
+    providerId === "openai"
+  ) {
     return providerId;
   }
 
-  throw new ApiRequestError('embeddingProvider must be "api-lexical", "local-hash" or "ollama".');
+  throw new ApiRequestError(
+    'embeddingProvider must be "api-lexical", "local-hash", "ollama" or "openai".'
+  );
 }
 
 function parseStoredEmbeddingProvider(
   providerId: string,
   documentId: string
 ): ApiEmbeddingProviderId {
-  if (providerId === "api-lexical" || providerId === "local-hash" || providerId === "ollama") {
+  if (
+    providerId === "api-lexical" ||
+    providerId === "local-hash" ||
+    providerId === "ollama" ||
+    providerId === "openai"
+  ) {
     return providerId;
   }
 
@@ -3015,6 +3033,31 @@ function createOllamaEmbeddingsProvider(modelInfo?: EmbeddingModelInfo): OllamaE
         process.env.GROUNDEDOS_OLLAMA_REQUEST_TIMEOUT_MS,
         "GROUNDEDOS_OLLAMA_REQUEST_TIMEOUT_MS"
       ) ?? undefined,
+  });
+}
+
+function createOpenAiEmbeddingsProvider(modelInfo?: EmbeddingModelInfo): OpenAIEmbeddingsProvider {
+  return new OpenAIEmbeddingsProvider({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: process.env.GROUNDEDOS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL,
+    model:
+      modelInfo?.model ??
+      process.env.GROUNDEDOS_OPENAI_EMBED_MODEL ??
+      DEFAULT_OPENAI_EMBEDDING_MODEL,
+    dimensions:
+      modelInfo?.dimensions ??
+      parseOptionalPositiveInteger(
+        process.env.GROUNDEDOS_OPENAI_EMBED_DIMENSIONS,
+        "GROUNDEDOS_OPENAI_EMBED_DIMENSIONS"
+      ) ??
+      DEFAULT_OPENAI_EMBEDDING_DIMENSIONS,
+    requestTimeoutMs:
+      parseOptionalPositiveInteger(
+        process.env.GROUNDEDOS_OPENAI_REQUEST_TIMEOUT_MS,
+        "GROUNDEDOS_OPENAI_REQUEST_TIMEOUT_MS"
+      ) ?? undefined,
+    organization: process.env.OPENAI_ORG_ID,
+    project: process.env.OPENAI_PROJECT_ID,
   });
 }
 

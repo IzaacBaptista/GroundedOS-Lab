@@ -5,7 +5,7 @@
  * Retrieval-Augmented Generation primitives for GroundedOS Lab.
  */
 export { chunkDocument, } from "./chunking";
-export { DeterministicEmbeddingProvider, LocalHashEmbeddingsProvider, OllamaEmbeddingsProvider, createEmbeddingProviderRegistry, embeddingProviderToSemantic, embedChunks, semanticToEmbeddingProvider, } from "./embeddings";
+export { DeterministicEmbeddingProvider, LocalHashEmbeddingsProvider, OpenAIEmbeddingsProvider, OllamaEmbeddingsProvider, createEmbeddingProviderRegistry, embeddingProviderToSemantic, embedChunks, semanticToEmbeddingProvider, } from "./embeddings";
 export { InMemoryVectorStore, } from "./vector-store";
 export { buildRetrievalIndex, createRetrievalDevOutput, retrieveForDevMode, retrieveFromIndex, } from "./retrieval";
 // Query Understanding (Phase 2 — Concept 1)

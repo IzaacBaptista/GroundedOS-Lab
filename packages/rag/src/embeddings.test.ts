@@ -4,6 +4,7 @@ import type { RetrievalChunk } from "./chunking";
 import {
   DeterministicEmbeddingProvider,
   LocalHashEmbeddingsProvider,
+  OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   createEmbeddingProviderRegistry,
   embedChunks,
@@ -202,6 +203,108 @@ describe("OllamaEmbeddingsProvider", () => {
 
     await expect(provider.embedOne({ text: "hello" })).rejects.toThrow(
       "[rag/embeddings] ollama embedding at index 0 has 2 dimensions; expected 3."
+    );
+  });
+});
+
+describe("OpenAIEmbeddingsProvider", () => {
+  it("posts batch inputs to OpenAI and returns vectors with model metadata", async () => {
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const provider = new OpenAIEmbeddingsProvider({
+      apiKey: "test-key",
+      baseUrl: "https://api.openai.com/v1/",
+      model: "text-embedding-3-small",
+      dimensions: 3,
+      fetchFn: async (url, init) => {
+        requests.push({
+          url: String(url),
+          body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+        });
+
+        return createJsonResponse({
+          object: "list",
+          data: [
+            {
+              object: "embedding",
+              index: 0,
+              embedding: [1, 0, 0],
+            },
+            {
+              object: "embedding",
+              index: 1,
+              embedding: [0, 1, 0],
+            },
+          ],
+          model: "text-embedding-3-small",
+          usage: {
+            prompt_tokens: 12,
+            total_tokens: 12,
+          },
+        });
+      },
+    });
+
+    const results = await provider.embedMany([
+      { text: "first retrieval text" },
+      { text: "second retrieval text" },
+    ]);
+
+    expect(requests).toEqual([
+      {
+        url: "https://api.openai.com/v1/embeddings",
+        body: {
+          model: "text-embedding-3-small",
+          input: ["first retrieval text", "second retrieval text"],
+          dimensions: 3,
+          encoding_format: "float",
+        },
+      },
+    ]);
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      vector: [1, 0, 0],
+      model: {
+        provider: "openai",
+        model: "text-embedding-3-small",
+        dimensions: 3,
+        normalized: true,
+      },
+      usage: {
+        inputTokens: 12,
+      },
+    });
+  });
+
+  it("rejects OpenAI HTTP errors with a clear message", async () => {
+    const provider = new OpenAIEmbeddingsProvider({
+      apiKey: "test-key",
+      dimensions: 3,
+      fetchFn: async () => createTextResponse(401, "invalid api key"),
+    });
+
+    await expect(provider.embedOne({ text: "hello" })).rejects.toThrow(
+      "[rag/embeddings] openai embed request failed with status 401: invalid api key"
+    );
+  });
+
+  it("rejects OpenAI embeddings with unexpected dimensions", async () => {
+    const provider = new OpenAIEmbeddingsProvider({
+      apiKey: "test-key",
+      dimensions: 3,
+      fetchFn: async () =>
+        createJsonResponse({
+          data: [
+            {
+              object: "embedding",
+              index: 0,
+              embedding: [1, 0],
+            },
+          ],
+        }),
+    });
+
+    await expect(provider.embedOne({ text: "hello" })).rejects.toThrow(
+      "[rag/embeddings] openai embedding at index 0 has 2 dimensions; expected 3."
     );
   });
 });

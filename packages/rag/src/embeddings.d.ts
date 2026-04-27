@@ -1,6 +1,6 @@
 import type { RetrievalChunk } from "./chunking";
 export type EmbeddingVector = number[];
-export type EmbeddingProviderId = "local-hash" | "api-lexical" | "ollama" | "semantic-placeholder";
+export type EmbeddingProviderId = "local-hash" | "api-lexical" | "ollama" | "openai" | "semantic-placeholder";
 export interface EmbeddingModelInfo {
     provider: EmbeddingProviderId;
     model: string;
@@ -61,6 +61,17 @@ export interface OllamaEmbeddingsProviderOptions {
     requestTimeoutMs?: number;
     fetchFn?: typeof fetch;
 }
+export interface OpenAIEmbeddingsProviderOptions {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+    dimensions?: number;
+    maxInputChars?: number;
+    requestTimeoutMs?: number;
+    organization?: string;
+    project?: string;
+    fetchFn?: typeof fetch;
+}
 export interface EmbeddingProviderRegistry {
     get(providerId: EmbeddingProviderId): SemanticEmbeddingsProvider;
     list(): EmbeddingModelInfo[];
@@ -87,6 +98,23 @@ export declare class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvi
     private readonly requestTimeoutMs;
     private readonly fetchFn;
     constructor(options?: OllamaEmbeddingsProviderOptions);
+    getModelInfo(): EmbeddingModelInfo;
+    embedOne(input: EmbedTextInput): Promise<EmbedTextResult>;
+    embedMany(inputs: EmbedTextInput[]): Promise<EmbedTextResult[]>;
+    private requestEmbeddings;
+}
+export declare class OpenAIEmbeddingsProvider implements SemanticEmbeddingsProvider {
+    readonly id: "openai";
+    private readonly apiKey;
+    private readonly baseUrl;
+    private readonly model;
+    private readonly dimensions;
+    private readonly maxInputChars;
+    private readonly requestTimeoutMs;
+    private readonly organization;
+    private readonly project;
+    private readonly fetchFn;
+    constructor(options?: OpenAIEmbeddingsProviderOptions);
     getModelInfo(): EmbeddingModelInfo;
     embedOne(input: EmbedTextInput): Promise<EmbedTextResult>;
     embedMany(inputs: EmbedTextInput[]): Promise<EmbedTextResult[]>;
