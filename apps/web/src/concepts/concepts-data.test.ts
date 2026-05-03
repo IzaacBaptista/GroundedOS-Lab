@@ -87,10 +87,7 @@ describe("Concepts Data Layer", () => {
         const hasConceptInCategory = CONCEPTS.some(
           (c) => c.category === category
         );
-        expect(hasConceptInCategory).toBe(
-          true,
-          `No concepts found for category: ${category}`
-        );
+        expect(hasConceptInCategory).toBe(true);
       });
     });
   });
@@ -125,7 +122,7 @@ describe("Concepts Data Layer", () => {
 
       LEARNING_PATHS.forEach((path) => {
         const invalidForPath = path.conceptIds.filter(id => !validConceptIds.has(id));
-        expect(invalidForPath).toEqual([], `Path '${path.id}' references invalid concepts: ${invalidForPath.join(', ')}`);
+        expect(invalidForPath).toEqual([]);
       });
     });
   });
