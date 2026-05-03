@@ -792,12 +792,12 @@ implementation focus is Phase 6 Infrastructure & Deploy.
    `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`,
    API-key management, admin endpoints, owner scoping for indexes and memory,
    and rate limiting / audit hooks.
-- Auth enforcement remains opt-in in local development through
-   `AUTH_ENFORCEMENT=false` by default while the web login flow is still being
-   finalized.
+- Auth enforcement now follows environment defaults:
+   opt-in in local development, and enabled by default in non-dev/non-test
+   environments when `AUTH_ENFORCEMENT` is unset.
 - Next technical priorities:
-   DB-backed auth/session persistence, queue-backed worker jobs, production
-   observability and deployment hardening.
+   OAuth/provider-based identity, production observability and deployment
+   hardening.
 - Keep roadmap checkboxes and package READMEs synchronized with implementation
    status.
 

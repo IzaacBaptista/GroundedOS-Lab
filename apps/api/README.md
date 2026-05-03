@@ -290,9 +290,10 @@ pairs and timestamps.
 - `"openai"` embeddings are wired for indexing and ask flows; Hugging Face
   provider integration is still not implemented.
 - Auth, owner scoping, rate limiting, admin routes and audit logging are
-  implemented, but middleware enforcement is disabled by default in local dev
-  until `AUTH_ENFORCEMENT=true` is set.
-- User storage remains environment-backed for local development; database-backed
-  users and sessions are still pending.
+  implemented. Middleware enforcement is opt-in in local dev and defaults to
+  enabled in non-dev/non-test environments when `AUTH_ENFORCEMENT` is unset.
+- User/session storage supports memory (default) and optional PostgreSQL
+  backends (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`) with
+  memory fallback on DB unavailability.
 - Production observability stack and production vector database are still
   pending.

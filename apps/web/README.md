@@ -57,18 +57,19 @@ Open the web app and sign in from the top bar. Local development defaults are:
 - password: `admin-password`
 
 The browser authenticates API requests with the HttpOnly
-`groundedos-session` cookie issued by `/auth/login`. The web app stores only
-the refresh token and lightweight user metadata in `localStorage` so it can
-restore the session after reload. Logout calls `/auth/logout`, revokes the
-active token when available, clears the cookie, and removes the local session
-metadata.
+`groundedos-session` cookie issued by `/auth/login`. The web app also keeps
+the current access token, refresh token, expiry metadata and user summary in
+`localStorage` so it can restore and rotate sessions after reload. Logout calls
+`/auth/logout`, revokes the active token when available, clears the cookie, and
+removes the local session metadata.
 
 ## Current limits
 
 - Local-development UI is primary; production deployment hardening is tracked in
   Phase 6.
-- The backend can enforce JWT/session auth, but the default local web flow still
-  remains usable in anonymous local mode when `AUTH_ENFORCEMENT=false`.
+- The backend enforces JWT/session auth when enabled. In local dev it remains
+  opt-in; in non-dev/non-test environments it defaults to enabled when
+  `AUTH_ENFORCEMENT` is unset.
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Session memory is managed by the API under `.groundedos/memory/` when
