@@ -99,12 +99,21 @@ npm --workspace @groundedos/api run jobs:worker
 These endpoints are protected when auth enforcement is active. Provide a
 bearer token or API key in requests.
 
-Enqueue a Phase 5 track run:
+Enqueue a Phase 5 track run (bearer token):
 
 ```bash
 curl -X POST http://localhost:3001/jobs/phase5 \
   -H 'content-type: application/json' \
   -H 'authorization: Bearer <access-token>' \
+  -d '{"track":"quantization"}'
+```
+
+Enqueue a Phase 5 track run (API key):
+
+```bash
+curl -X POST http://localhost:3001/jobs/phase5 \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: <api-key>' \
   -d '{"track":"quantization"}'
 ```
 
@@ -117,11 +126,27 @@ curl -X POST http://localhost:3001/jobs/model-benchmark \
   -d '{"providers":["local-extractive","ollama","openai"]}'
 ```
 
+Capture `jobId` from an enqueue response (requires `jq`):
+
+```bash
+JOB_ID=$(curl -s -X POST http://localhost:3001/jobs/phase5 \
+  -H 'content-type: application/json' \
+  -H 'x-api-key: <api-key>' \
+  -d '{"track":"quantization"}' | jq -r '.jobId')
+```
+
 Poll a job status (replace `<job-id>` from enqueue response):
 
 ```bash
 curl http://localhost:3001/jobs/<job-id> \
   -H 'authorization: Bearer <access-token>'
+```
+
+Or with API key and captured `JOB_ID`:
+
+```bash
+curl "http://localhost:3001/jobs/${JOB_ID}" \
+  -H 'x-api-key: <api-key>'
 ```
 
 If Redis is not configured, jobs endpoints return `503` and worker startup

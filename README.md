@@ -110,9 +110,25 @@ curl -X POST http://localhost:3001/jobs/phase5 \
    -H 'authorization: Bearer <access-token>' \
    -d '{"track":"quantization"}'
 
+# 2b) Same enqueue using API key
+curl -X POST http://localhost:3001/jobs/phase5 \
+   -H 'content-type: application/json' \
+   -H 'x-api-key: <api-key>' \
+   -d '{"track":"quantization"}'
+
+# 2c) Optional: capture jobId with jq
+JOB_ID=$(curl -s -X POST http://localhost:3001/jobs/phase5 \
+   -H 'content-type: application/json' \
+   -H 'x-api-key: <api-key>' \
+   -d '{"track":"quantization"}' | jq -r '.jobId')
+
 # 3) Poll status (replace <job-id>)
 curl http://localhost:3001/jobs/<job-id> \
    -H 'authorization: Bearer <access-token>'
+
+# 3b) Poll with API key + captured JOB_ID
+curl "http://localhost:3001/jobs/${JOB_ID}" \
+   -H 'x-api-key: <api-key>'
 ```
 
 ### What is NOT yet implemented
