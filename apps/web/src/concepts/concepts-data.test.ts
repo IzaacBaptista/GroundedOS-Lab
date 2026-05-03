@@ -219,10 +219,7 @@ describe("Concepts Data Layer", () => {
 
       implemented.forEach((concept) => {
         expect(concept.whereToSeeInUI.length).toBeGreaterThan(0);
-        expect(concept.whereToSeeInUI.some((location) => !location.includes("future"))).toBe(
-          true,
-          `Implemented concept '${concept.id}' has no visible UI locations`
-        );
+        expect(concept.whereToSeeInUI.some((location) => !location.includes("future"))).toBe(true);
       });
     });
 
