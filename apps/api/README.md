@@ -101,77 +101,16 @@ npm --workspace @groundedos/api run jobs:worker
 These endpoints are protected when auth enforcement is active. Provide a
 bearer token or API key in requests.
 
-Enqueue a Phase 5 track run (bearer token):
+Recommended flow:
 
-```bash
-curl -X POST http://localhost:3001/jobs/phase5 \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer <access-token>' \
-  -d '{"track":"quantization"}'
-```
+- enqueue via `POST /jobs/phase5` or `POST /jobs/model-benchmark`
+- poll via `GET /jobs/:jobId`
 
-Enqueue a Phase 5 track run (API key):
+If Redis is not configured, `/jobs/*` returns `503` and worker startup fails
+with a queue configuration error.
 
-```bash
-curl -X POST http://localhost:3001/jobs/phase5 \
-  -H 'content-type: application/json' \
-  -H 'x-api-key: <api-key>' \
-  -d '{"track":"quantization"}'
-```
-
-Enqueue a model benchmark run:
-
-```bash
-curl -X POST http://localhost:3001/jobs/model-benchmark \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer <access-token>' \
-  -d '{"providers":["local-extractive","ollama","openai"]}'
-```
-
-Capture `jobId` from an enqueue response (requires `jq`):
-
-```bash
-JOB_ID=$(curl -s -X POST http://localhost:3001/jobs/phase5 \
-  -H 'content-type: application/json' \
-  -H 'x-api-key: <api-key>' \
-  -d '{"track":"quantization"}' | jq -r '.jobId')
-```
-
-Poll a job status (replace `<job-id>` from enqueue response):
-
-```bash
-curl http://localhost:3001/jobs/<job-id> \
-  -H 'authorization: Bearer <access-token>'
-```
-
-Or with API key and captured `JOB_ID`:
-
-```bash
-curl "http://localhost:3001/jobs/${JOB_ID}" \
-  -H 'x-api-key: <api-key>'
-```
-
-If Redis is not configured, jobs endpoints return `503` and worker startup
-fails with a configuration error.
-
-Troubleshooting (`/jobs/*`):
-
-- `401 Authentication required`:
-  enable auth headers when enforcement is active (`Authorization: Bearer ...`
-  or `x-api-key`).
-- `401 Invalid or expired token`:
-  refresh login session (`POST /auth/refresh`) or re-login to get a new access
-  token.
-- `403 Admin role required`:
-  endpoint was called under `/admin/*` with a non-admin identity.
-- `404 Job <id> not found`:
-  confirm the `jobId` came from the same Redis-backed environment and queue.
-- `503 Async job queue is not configured`:
-  set `REDIS_URL` (or `REDIS_HOST`/`REDIS_PORT`) and restart API + worker.
-- Worker starts but jobs do not complete:
-  verify worker is running (`npm run api:jobs:worker`), Redis is reachable,
-  and commands such as `npm run experiment:quantization` run successfully in
-  the same environment.
+For full request examples (bearer/API key), `jobId` capture and troubleshooting,
+use [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
 
 #### `POST /rag/ask`
 

@@ -106,40 +106,12 @@ Canonical operational guide: [docs/operational-runbook.md](./docs/operational-ru
 # 1) Start API and worker in separate terminals
 npm run api:dev
 npm run api:jobs:worker
-
-# 2) Enqueue a Phase 5 experiment
-curl -X POST http://localhost:3001/jobs/phase5 \
-   -H 'content-type: application/json' \
-   -H 'authorization: Bearer <access-token>' \
-   -d '{"track":"quantization"}'
-
-# 2b) Same enqueue using API key
-curl -X POST http://localhost:3001/jobs/phase5 \
-   -H 'content-type: application/json' \
-   -H 'x-api-key: <api-key>' \
-   -d '{"track":"quantization"}'
-
-# 2c) Optional: capture jobId with jq
-JOB_ID=$(curl -s -X POST http://localhost:3001/jobs/phase5 \
-   -H 'content-type: application/json' \
-   -H 'x-api-key: <api-key>' \
-   -d '{"track":"quantization"}' | jq -r '.jobId')
-
-# 3) Poll status (replace <job-id>)
-curl http://localhost:3001/jobs/<job-id> \
-   -H 'authorization: Bearer <access-token>'
-
-# 3b) Poll with API key + captured JOB_ID
-curl "http://localhost:3001/jobs/${JOB_ID}" \
-   -H 'x-api-key: <api-key>'
 ```
 
-Quick troubleshooting (`/jobs/*`):
-
-- `401`: include `Authorization: Bearer <access-token>` or `x-api-key`.
-- `404 job not found`: check if API/worker are connected to the same Redis.
-- `503 queue not configured`: set `REDIS_URL` (or `REDIS_HOST`/`REDIS_PORT`) and restart.
-- Jobs stay waiting: ensure worker is running with `npm run api:jobs:worker`.
+Then use `POST /jobs/phase5` (or `POST /jobs/model-benchmark`) and poll with
+`GET /jobs/:jobId`. Full request examples (bearer token + API key), `jobId`
+capture, and troubleshooting are documented in
+[docs/operational-runbook.md](./docs/operational-runbook.md).
 
 ### What is NOT yet implemented
 
