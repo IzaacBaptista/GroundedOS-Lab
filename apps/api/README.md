@@ -152,6 +152,25 @@ curl "http://localhost:3001/jobs/${JOB_ID}" \
 If Redis is not configured, jobs endpoints return `503` and worker startup
 fails with a configuration error.
 
+Troubleshooting (`/jobs/*`):
+
+- `401 Authentication required`:
+  enable auth headers when enforcement is active (`Authorization: Bearer ...`
+  or `x-api-key`).
+- `401 Invalid or expired token`:
+  refresh login session (`POST /auth/refresh`) or re-login to get a new access
+  token.
+- `403 Admin role required`:
+  endpoint was called under `/admin/*` with a non-admin identity.
+- `404 Job <id> not found`:
+  confirm the `jobId` came from the same Redis-backed environment and queue.
+- `503 Async job queue is not configured`:
+  set `REDIS_URL` (or `REDIS_HOST`/`REDIS_PORT`) and restart API + worker.
+- Worker starts but jobs do not complete:
+  verify worker is running (`npm run api:jobs:worker`), Redis is reachable,
+  and commands such as `npm run experiment:quantization` run successfully in
+  the same environment.
+
 #### `POST /rag/ask`
 
 Runs the local RAG pipeline against inline text content or an uploaded

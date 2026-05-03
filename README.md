@@ -131,6 +131,13 @@ curl "http://localhost:3001/jobs/${JOB_ID}" \
    -H 'x-api-key: <api-key>'
 ```
 
+Quick troubleshooting (`/jobs/*`):
+
+- `401`: include `Authorization: Bearer <access-token>` or `x-api-key`.
+- `404 job not found`: check if API/worker are connected to the same Redis.
+- `503 queue not configured`: set `REDIS_URL` (or `REDIS_HOST`/`REDIS_PORT`) and restart.
+- Jobs stay waiting: ensure worker is running with `npm run api:jobs:worker`.
+
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
