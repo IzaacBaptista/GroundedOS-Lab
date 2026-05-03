@@ -810,7 +810,7 @@ function validateOpenAiEmbeddingResponse(
       );
     }
 
-    byIndex.set(index, embedding as EmbeddingVector);
+    byIndex.set(index as number, embedding as EmbeddingVector);
   }
 
   const ordered: EmbeddingVector[] = [];

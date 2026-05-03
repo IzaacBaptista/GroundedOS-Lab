@@ -1915,65 +1915,65 @@ async function runLocalRag(
   }
 
   const cacheMetrics = semanticCache.getMetrics();
-  const resolvedIndexSummary = result.output.indexSummary ?? createIndexSummary(result.output.index);
-  const finalAnswer = result.output.answer ?? createGroundedAnswer(result.output.devMode);
+  const resolvedIndexSummary = result.output!.indexSummary ?? createIndexSummary(result.output!.index!);
+  const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
 
   const response = {
     answer: finalAnswer,
     index: resolvedIndexSummary,
     devMode: {
-      ...result.output.devMode,
-      processedQuery: result.output.processedQuery,
+      ...result.output!.devMode!,
+      processedQuery: result.output!.processedQuery,
       workflowContext: result.context,
       cache: {
-        hit: Boolean(result.output.cacheHit),
-        similarity: result.output.cacheSimilarity,
-        thresholdUsed: result.output.cacheThresholdUsed,
-        adaptiveThresholdReason: result.output.cacheAdaptiveReason,
-        cacheKey: result.output.cacheKey,
-        contextHash: result.output.cacheContextHash,
-        reason: result.output.cacheLookupReason,
+        hit: Boolean(result.output!.cacheHit),
+        similarity: result.output!.cacheSimilarity,
+        thresholdUsed: result.output!.cacheThresholdUsed,
+        adaptiveThresholdReason: result.output!.cacheAdaptiveReason,
+        cacheKey: result.output!.cacheKey,
+        contextHash: result.output!.cacheContextHash,
+        reason: result.output!.cacheLookupReason,
         quality: {
-          score: result.output.cacheQualityScore,
-          label: result.output.cacheQualityLabel,
-          shadowChecked: result.output.cacheShadowChecked,
+          score: result.output!.cacheQualityScore,
+          label: result.output!.cacheQualityLabel,
+          shadowChecked: result.output!.cacheShadowChecked,
         },
-        savingsMs: result.output.cacheSavingsMs,
+        savingsMs: result.output!.cacheSavingsMs,
         hits: cacheMetrics.hits,
         misses: cacheMetrics.misses,
         evictions: cacheMetrics.evictions,
         hitRate: cacheMetrics.cacheHitRate,
       },
-      routing: result.output.routingDecision
+      routing: result.output!.routingDecision
         ? {
-            selectedModel: result.output.routingDecision.selectedModel,
-            selectedProvider: result.output.routingDecision.selectedProvider,
-            reason: result.output.routingDecision.reason,
-            stage: result.output.routingDecision.stage,
-            strategy: result.output.routingDecision.strategy,
-            confidence: result.output.routingDecision.confidence,
-            tradeoff: result.output.routingDecision.tradeoff,
-            alternatives: result.output.routingDecision.alternatives,
-            features: result.output.routingDecision.features as unknown as Record<string, unknown>,
-            retrievalSignals: result.output.routingSignals,
-            initialDecision: result.output.initialRoutingDecision
+            selectedModel: result.output!.routingDecision.selectedModel,
+            selectedProvider: result.output!.routingDecision.selectedProvider,
+            reason: result.output!.routingDecision.reason,
+            stage: result.output!.routingDecision.stage,
+            strategy: result.output!.routingDecision.strategy,
+            confidence: result.output!.routingDecision.confidence,
+            tradeoff: result.output!.routingDecision.tradeoff,
+            alternatives: result.output!.routingDecision.alternatives,
+            features: result.output!.routingDecision.features as unknown as Record<string, unknown>,
+            retrievalSignals: result.output!.routingSignals,
+            initialDecision: result.output!.initialRoutingDecision
               ? {
-                  selectedModel: result.output.initialRoutingDecision.selectedModel,
-                  selectedProvider: result.output.initialRoutingDecision.selectedProvider,
-                  reason: result.output.initialRoutingDecision.reason,
-                  confidence: result.output.initialRoutingDecision.confidence,
-                  tradeoff: result.output.initialRoutingDecision.tradeoff,
+                  selectedModel: result.output!.initialRoutingDecision.selectedModel,
+                  selectedProvider: result.output!.initialRoutingDecision.selectedProvider,
+                  reason: result.output!.initialRoutingDecision.reason,
+                  confidence: result.output!.initialRoutingDecision.confidence,
+                  tradeoff: result.output!.initialRoutingDecision.tradeoff,
                 }
               : undefined,
-            refinement: result.output.routingDecision.refinement,
+            refinement: result.output!.routingDecision.refinement,
           }
         : undefined,
-      orchestration: result.output.orchestration
+      orchestration: result.output!.orchestration
         ? {
-            mode: result.output.orchestration.mode,
+            mode: result.output!.orchestration.mode,
             enabled: true,
-            steps: result.output.orchestration.steps,
-            comparison: result.output.orchestration.comparison,
+            steps: result.output!.orchestration.steps,
+            comparison: result.output!.orchestration.comparison,
           }
         : {
             mode: "single-model" as const,
@@ -1982,18 +1982,18 @@ async function runLocalRag(
           },
       reasoning: {
         enabled: options?.reasoningEnabled ?? false,
-        summary: result.output.reasoningSummary ?? [],
-        decisionSteps: result.output.decisionSteps ?? [],
+        summary: result.output!.reasoningSummary ?? [],
+        decisionSteps: result.output!.decisionSteps ?? [],
       },
-      evals: result.output.evals,
-      cacheAwareRetrieval: result.output.cacheAwareRetrieval,
-      costBreakdown: buildCostBreakdown(result.output.costSummary),
-      cost: result.output.costSummary,
+      evals: result.output!.evals,
+      cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
+      costBreakdown: buildCostBreakdown(result.output!.costSummary),
+      cost: result.output!.costSummary,
       memory: {
-        sessionId: result.output.sessionId,
-        recalled: result.output.memoryMatches?.length ?? 0,
-        stored: Boolean(result.output.memoryStored),
-        matches: (result.output.memoryMatches ?? []).map((match) => ({
+        sessionId: result.output!.sessionId,
+        recalled: result.output!.memoryMatches?.length ?? 0,
+        stored: Boolean(result.output!.memoryStored),
+        matches: (result.output!.memoryMatches ?? []).map((match) => ({
           score: match.score,
           query: match.entry.query,
           answer: match.entry.answer,
@@ -2002,26 +2002,26 @@ async function runLocalRag(
       },
       reranking: {
         applied: true,
-        candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        returnedCount: result.output.devMode.resultCount,
-        candidates: getRerankingCandidates(result.output.devMode),
+        candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        returnedCount: result.output!.devMode!.resultCount,
+        candidates: getRerankingCandidates(result.output!.devMode!),
       },
       stageMetrics: buildStageMetrics(result.context, {
-        rawQuery: result.output.rawQuery,
-        retrievalQuery: result.output.retrievalQuery,
-        retrievalResultCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResultCount: result.output.devMode.resultCount,
+        rawQuery: result.output!.rawQuery,
+        retrievalQuery: result.output!.retrievalQuery,
+        retrievalResultCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResultCount: result.output!.devMode!.resultCount,
         rerankInputTokens:
-          result.output.rerankInputTokens ?? estimateTokenUsage(result.output.retrievalQuery),
-        expansionCount: result.output.processedQuery?.expanded.length ?? 0,
+          result.output!.rerankInputTokens ?? estimateTokenUsage(result.output!.retrievalQuery),
+        expansionCount: result.output!.processedQuery?.expanded.length ?? 0,
       }),
       retrievalSpans: buildRetrievalSpans(result.context, {
-        retrievalResults: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResults: result.output.devMode.resultCount,
-        scores: result.output.devMode.results.map((item) => item.score),
+        retrievalResults: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResults: result.output!.devMode!.resultCount,
+        scores: result.output!.devMode!.results.map((item) => item.score),
       }),
-      contextEngineering: buildContextEngineering(result.output, finalAnswer),
-      agentLoop: buildAgentLoopTrace(result.context, result.output, finalAnswer),
+      contextEngineering: buildContextEngineering(result.output!, finalAnswer),
+      agentLoop: buildAgentLoopTrace(result.context, result.output!, finalAnswer),
     },
   };
 
@@ -2534,65 +2534,65 @@ async function runPersistedRag(
   }
 
   const cacheMetrics = semanticCache.getMetrics();
-  const indexSummary = result.output.indexSummary ?? createIndexSummary(index);
-  const finalAnswer = result.output.answer ?? createGroundedAnswer(result.output.devMode);
+  const indexSummary = result.output!.indexSummary ?? createIndexSummary(index);
+  const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
 
   const response = {
     answer: finalAnswer,
     index: indexSummary,
     devMode: {
-      ...result.output.devMode,
-      processedQuery: result.output.processedQuery,
+      ...result.output!.devMode!,
+      processedQuery: result.output!.processedQuery,
       workflowContext: result.context,
       cache: {
-        hit: Boolean(result.output.cacheHit),
-        similarity: result.output.cacheSimilarity,
-        thresholdUsed: result.output.cacheThresholdUsed,
-        adaptiveThresholdReason: result.output.cacheAdaptiveReason,
-        cacheKey: result.output.cacheKey,
-        contextHash: result.output.cacheContextHash,
-        reason: result.output.cacheLookupReason,
+        hit: Boolean(result.output!.cacheHit),
+        similarity: result.output!.cacheSimilarity,
+        thresholdUsed: result.output!.cacheThresholdUsed,
+        adaptiveThresholdReason: result.output!.cacheAdaptiveReason,
+        cacheKey: result.output!.cacheKey,
+        contextHash: result.output!.cacheContextHash,
+        reason: result.output!.cacheLookupReason,
         quality: {
-          score: result.output.cacheQualityScore,
-          label: result.output.cacheQualityLabel,
-          shadowChecked: result.output.cacheShadowChecked,
+          score: result.output!.cacheQualityScore,
+          label: result.output!.cacheQualityLabel,
+          shadowChecked: result.output!.cacheShadowChecked,
         },
-        savingsMs: result.output.cacheSavingsMs,
+        savingsMs: result.output!.cacheSavingsMs,
         hits: cacheMetrics.hits,
         misses: cacheMetrics.misses,
         evictions: cacheMetrics.evictions,
         hitRate: cacheMetrics.cacheHitRate,
       },
-      routing: result.output.routingDecision
+      routing: result.output!.routingDecision
         ? {
-            selectedModel: result.output.routingDecision.selectedModel,
-            selectedProvider: result.output.routingDecision.selectedProvider,
-            reason: result.output.routingDecision.reason,
-            stage: result.output.routingDecision.stage,
-            strategy: result.output.routingDecision.strategy,
-            confidence: result.output.routingDecision.confidence,
-            tradeoff: result.output.routingDecision.tradeoff,
-            alternatives: result.output.routingDecision.alternatives,
-            features: result.output.routingDecision.features as unknown as Record<string, unknown>,
-            retrievalSignals: result.output.routingSignals,
-            initialDecision: result.output.initialRoutingDecision
+            selectedModel: result.output!.routingDecision.selectedModel,
+            selectedProvider: result.output!.routingDecision.selectedProvider,
+            reason: result.output!.routingDecision.reason,
+            stage: result.output!.routingDecision.stage,
+            strategy: result.output!.routingDecision.strategy,
+            confidence: result.output!.routingDecision.confidence,
+            tradeoff: result.output!.routingDecision.tradeoff,
+            alternatives: result.output!.routingDecision.alternatives,
+            features: result.output!.routingDecision.features as unknown as Record<string, unknown>,
+            retrievalSignals: result.output!.routingSignals,
+            initialDecision: result.output!.initialRoutingDecision
               ? {
-                  selectedModel: result.output.initialRoutingDecision.selectedModel,
-                  selectedProvider: result.output.initialRoutingDecision.selectedProvider,
-                  reason: result.output.initialRoutingDecision.reason,
-                  confidence: result.output.initialRoutingDecision.confidence,
-                  tradeoff: result.output.initialRoutingDecision.tradeoff,
+                  selectedModel: result.output!.initialRoutingDecision.selectedModel,
+                  selectedProvider: result.output!.initialRoutingDecision.selectedProvider,
+                  reason: result.output!.initialRoutingDecision.reason,
+                  confidence: result.output!.initialRoutingDecision.confidence,
+                  tradeoff: result.output!.initialRoutingDecision.tradeoff,
                 }
               : undefined,
-            refinement: result.output.routingDecision.refinement,
+            refinement: result.output!.routingDecision.refinement,
           }
         : undefined,
-      orchestration: result.output.orchestration
+      orchestration: result.output!.orchestration
         ? {
-            mode: result.output.orchestration.mode,
+            mode: result.output!.orchestration.mode,
             enabled: true,
-            steps: result.output.orchestration.steps,
-            comparison: result.output.orchestration.comparison,
+            steps: result.output!.orchestration.steps,
+            comparison: result.output!.orchestration.comparison,
           }
         : {
             mode: "single-model" as const,
@@ -2601,18 +2601,18 @@ async function runPersistedRag(
           },
       reasoning: {
         enabled: options?.reasoningEnabled ?? false,
-        summary: result.output.reasoningSummary ?? [],
-        decisionSteps: result.output.decisionSteps ?? [],
+        summary: result.output!.reasoningSummary ?? [],
+        decisionSteps: result.output!.decisionSteps ?? [],
       },
-      evals: result.output.evals,
-      cacheAwareRetrieval: result.output.cacheAwareRetrieval,
-      costBreakdown: buildCostBreakdown(result.output.costSummary),
-      cost: result.output.costSummary,
+      evals: result.output!.evals,
+      cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
+      costBreakdown: buildCostBreakdown(result.output!.costSummary),
+      cost: result.output!.costSummary,
       memory: {
-        sessionId: result.output.sessionId,
-        recalled: result.output.memoryMatches?.length ?? 0,
-        stored: Boolean(result.output.memoryStored),
-        matches: (result.output.memoryMatches ?? []).map((match) => ({
+        sessionId: result.output!.sessionId,
+        recalled: result.output!.memoryMatches?.length ?? 0,
+        stored: Boolean(result.output!.memoryStored),
+        matches: (result.output!.memoryMatches ?? []).map((match) => ({
           score: match.score,
           query: match.entry.query,
           answer: match.entry.answer,
@@ -2621,26 +2621,26 @@ async function runPersistedRag(
       },
       reranking: {
         applied: true,
-        candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        returnedCount: result.output.devMode.resultCount,
-        candidates: getRerankingCandidates(result.output.devMode),
+        candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        returnedCount: result.output!.devMode!.resultCount,
+        candidates: getRerankingCandidates(result.output!.devMode!),
       },
       stageMetrics: buildStageMetrics(result.context, {
-        rawQuery: result.output.rawQuery,
-        retrievalQuery: result.output.retrievalQuery,
-        retrievalResultCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResultCount: result.output.devMode.resultCount,
+        rawQuery: result.output!.rawQuery,
+        retrievalQuery: result.output!.retrievalQuery,
+        retrievalResultCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResultCount: result.output!.devMode!.resultCount,
         rerankInputTokens:
-          result.output.rerankInputTokens ?? estimateTokenUsage(result.output.retrievalQuery),
-        expansionCount: result.output.processedQuery?.expanded.length ?? 0,
+          result.output!.rerankInputTokens ?? estimateTokenUsage(result.output!.retrievalQuery),
+        expansionCount: result.output!.processedQuery?.expanded.length ?? 0,
       }),
       retrievalSpans: buildRetrievalSpans(result.context, {
-        retrievalResults: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResults: result.output.devMode.resultCount,
-        scores: result.output.devMode.results.map((item) => item.score),
+        retrievalResults: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResults: result.output!.devMode!.resultCount,
+        scores: result.output!.devMode!.results.map((item) => item.score),
       }),
-      contextEngineering: buildContextEngineering(result.output, finalAnswer),
-      agentLoop: buildAgentLoopTrace(result.context, result.output, finalAnswer),
+      contextEngineering: buildContextEngineering(result.output!, finalAnswer),
+      agentLoop: buildAgentLoopTrace(result.context, result.output!, finalAnswer),
     },
   };
 
