@@ -80,6 +80,8 @@ enforcement is enabled and the authenticated user has the `admin` role.
 Async execution endpoints are available through a BullMQ queue when Redis is
 configured (`REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`).
 
+Canonical operational guide: [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
+
 - `POST /jobs/phase5` enqueues a Phase 5 experiment run.
 - `POST /jobs/model-benchmark` enqueues a model benchmark run.
 - `GET /jobs/:jobId` returns queue job status/result metadata.

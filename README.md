@@ -23,6 +23,7 @@
 | **Learn AI concepts behind the code** | [📖 Concepts](./docs/concepts/README.md) |
 | **Follow a guided learning path** | [📘 Study Tracks](./docs/study-tracks/README.md) |
 | **Understand key design decisions** | [📐 ADRs](./docs/adr/README.md) |
+| **Operate auth/jobs locally** | [🛠 Operational Runbook](./docs/operational-runbook.md) |
 | **Contribute** | [🤝 Contributing](#-contributing) |
 
 ---
@@ -98,6 +99,8 @@
    (`npm run api:jobs:worker`) when Redis is configured.
 
 Quick async jobs flow:
+
+Canonical operational guide: [docs/operational-runbook.md](./docs/operational-runbook.md).
 
 ```bash
 # 1) Start API and worker in separate terminals
