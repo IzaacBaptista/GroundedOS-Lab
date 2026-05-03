@@ -17,6 +17,8 @@ import {
   getModelBenchmarkPrecheck,
   login,
   logout as logoutFromApi,
+  setAuthAccessToken,
+  clearAuthAccessToken,
   refreshSession,
   runModelBenchmark,
   runGuardrailCheck,
@@ -94,7 +96,9 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
 const AUTH_STORAGE_KEY = "groundedos-auth-session";
 
 interface StoredAuthSession {
+  accessToken: string;
   refreshToken: string;
+  expiresAt: number;
   user: AuthUser;
 }
 
@@ -106,18 +110,24 @@ function readStoredAuthSession(): StoredAuthSession | undefined {
     }
 
     const parsed = JSON.parse(raw) as Partial<StoredAuthSession>;
-    if (
-      typeof parsed.refreshToken !== "string" ||
-      !parsed.user ||
-      typeof parsed.user.username !== "string" ||
-      typeof parsed.user.userId !== "string" ||
-      !Array.isArray(parsed.user.roles)
-    ) {
+    if (!parsed.user || typeof parsed.user.username !== "string" || typeof parsed.user.userId !== "string" || !Array.isArray(parsed.user.roles)) {
       return undefined;
     }
 
+    if (typeof parsed.refreshToken !== "string") {
+      return undefined;
+    }
+
+    const accessToken = typeof parsed.accessToken === "string" ? parsed.accessToken : "";
+    const expiresAt =
+      typeof parsed.expiresAt === "number" && Number.isFinite(parsed.expiresAt)
+        ? parsed.expiresAt
+        : 0;
+
     return {
+      accessToken,
       refreshToken: parsed.refreshToken,
+      expiresAt,
       user: parsed.user,
     };
   } catch {
@@ -231,6 +241,10 @@ export default function App() {
   const [refreshToken, setRefreshToken] = useState<string | undefined>(() => {
     return readStoredAuthSession()?.refreshToken;
   });
+  const [accessTokenExpiresAt, setAccessTokenExpiresAt] = useState<number | undefined>(() => {
+    const stored = readStoredAuthSession();
+    return stored && stored.expiresAt > 0 ? stored.expiresAt : undefined;
+  });
   const [authMessage, setAuthMessage] = useState(
     "Local anonymous mode. Sign in when API auth enforcement is enabled."
   );
@@ -284,22 +298,29 @@ export default function App() {
     setLabMessageIsError(isError);
   }, []);
 
-  const storeAuthSession = useCallback((nextRefreshToken: string, user: AuthUser) => {
+  const storeAuthSession = useCallback((session: { accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser }) => {
+    const nextExpiresAt = Date.now() + Math.max(1, session.expiresIn) * 1000;
     window.localStorage.setItem(
       AUTH_STORAGE_KEY,
       JSON.stringify({
-        refreshToken: nextRefreshToken,
-        user,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAt: nextExpiresAt,
+        user: session.user,
       } satisfies StoredAuthSession)
     );
-    setRefreshToken(nextRefreshToken);
-    setAuthUser(user);
+    setAuthAccessToken(session.accessToken);
+    setRefreshToken(session.refreshToken);
+    setAuthUser(session.user);
+    setAccessTokenExpiresAt(nextExpiresAt);
   }, []);
 
   const clearAuthSession = useCallback(() => {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    clearAuthAccessToken();
     setRefreshToken(undefined);
     setAuthUser(undefined);
+    setAccessTokenExpiresAt(undefined);
   }, []);
 
   const handleApiAuthError = useCallback(
@@ -351,6 +372,10 @@ export default function App() {
       return;
     }
 
+    if (stored.accessToken) {
+      setAuthAccessToken(stored.accessToken);
+    }
+
     let cancelled = false;
     setAuthMessage("Restoring saved session...");
     setAuthMessageIsError(false);
@@ -361,7 +386,7 @@ export default function App() {
           return;
         }
 
-        storeAuthSession(session.refreshToken, session.user);
+        storeAuthSession(session);
         setAuthMessage(`Signed in as ${session.user.username}.`);
         setAuthMessageIsError(false);
         void refreshIndexes();
@@ -385,6 +410,40 @@ export default function App() {
     };
   }, [clearAuthSession, refreshIndexes, storeAuthSession]);
 
+  useEffect(() => {
+    if (!refreshToken || !authUser) {
+      return;
+    }
+
+    const now = Date.now();
+    const defaultDelayMs = 10 * 60 * 1000;
+    const targetRefreshAt =
+      typeof accessTokenExpiresAt === "number" ? accessTokenExpiresAt - 60 * 1000 : now + defaultDelayMs;
+    const delayMs = Math.max(5_000, targetRefreshAt - now);
+
+    const timer = window.setTimeout(() => {
+      refreshSession(refreshToken)
+        .then((session) => {
+          storeAuthSession(session);
+          setAuthMessage(`Session renewed for ${session.user.username}.`);
+          setAuthMessageIsError(false);
+        })
+        .catch((error) => {
+          clearAuthSession();
+          setAuthMessage(
+            error instanceof Error
+              ? `Session expired: ${error.message}`
+              : "Session expired."
+          );
+          setAuthMessageIsError(true);
+        });
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [accessTokenExpiresAt, authUser, clearAuthSession, refreshToken, storeAuthSession]);
+
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setAuthBusy(true);
@@ -396,7 +455,7 @@ export default function App() {
         username: loginUsername.trim(),
         password: loginPassword,
       });
-      storeAuthSession(session.refreshToken, session.user);
+      storeAuthSession(session);
       setLoginPassword("");
       setAuthMessage(`Signed in as ${session.user.username}.`);
       setAuthMessageIsError(false);

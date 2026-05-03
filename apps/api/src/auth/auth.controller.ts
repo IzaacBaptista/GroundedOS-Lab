@@ -36,7 +36,7 @@ export class AuthController {
       throw new ApiRequestError("username and password are required.", 400);
     }
 
-    const session = this.authService.login(body.username, body.password);
+    const session = await this.authService.login(body.username, body.password);
     if (!session) {
       await this.audit.record({
         action: "auth.login.failed",

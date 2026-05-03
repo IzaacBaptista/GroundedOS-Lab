@@ -23,6 +23,52 @@ const API_PREFIX = "/api";
 const FETCH_DEFAULTS = {
   credentials: "same-origin" as RequestCredentials,
 };
+let accessToken: string | undefined;
+
+export function setAuthAccessToken(token: string | undefined): void {
+  const normalized = typeof token === "string" ? token.trim() : "";
+  accessToken = normalized.length > 0 ? normalized : undefined;
+}
+
+export function clearAuthAccessToken(): void {
+  accessToken = undefined;
+}
+
+async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const headers = normalizeHeaders(init?.headers);
+  if (accessToken && !hasHeader(headers, "authorization")) {
+    headers.authorization = `Bearer ${accessToken}`;
+  }
+
+  return fetch(input, {
+    ...FETCH_DEFAULTS,
+    ...init,
+    headers,
+  });
+}
+
+function normalizeHeaders(
+  headers: HeadersInit | undefined
+): Record<string, string> {
+  if (!headers) {
+    return {};
+  }
+
+  if (headers instanceof Headers) {
+    return Object.fromEntries(headers.entries());
+  }
+
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+
+  return { ...headers };
+}
+
+function hasHeader(headers: Record<string, string>, name: string): boolean {
+  const target = name.toLowerCase();
+  return Object.keys(headers).some((key) => key.toLowerCase() === target);
+}
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const body = (await response.json().catch(() => undefined)) as
@@ -43,7 +89,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function checkHealth(): Promise<void> {
-  const response = await fetch(`${API_PREFIX}/health`, FETCH_DEFAULTS);
+  const response = await apiFetch(`${API_PREFIX}/health`);
 
   if (!response.ok) {
     throw new ApiHttpError(
@@ -54,8 +100,7 @@ export async function checkHealth(): Promise<void> {
 }
 
 export async function login(params: LoginRequest): Promise<AuthSession> {
-  const response = await fetch(`${API_PREFIX}/auth/login`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(params),
@@ -64,8 +109,7 @@ export async function login(params: LoginRequest): Promise<AuthSession> {
 }
 
 export async function refreshSession(refreshToken: string): Promise<AuthSession> {
-  const response = await fetch(`${API_PREFIX}/auth/refresh`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/auth/refresh`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ refreshToken }),
@@ -74,24 +118,23 @@ export async function refreshSession(refreshToken: string): Promise<AuthSession>
 }
 
 export async function logout(): Promise<LogoutResponse> {
-  const response = await fetch(`${API_PREFIX}/auth/logout`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/auth/logout`, {
     method: "POST",
   });
   return parseResponse<LogoutResponse>(response);
 }
 
 export async function listIndexes(): Promise<RagIndexListResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/indexes`, FETCH_DEFAULTS);
+  const response = await apiFetch(`${API_PREFIX}/rag/indexes`);
   return parseResponse<RagIndexListResponse>(response);
 }
 
 export async function deleteIndex(
   documentId: string
 ): Promise<RagIndexDeleteResponse> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}`,
-    { ...FETCH_DEFAULTS, method: "DELETE" }
+    { method: "DELETE" }
   );
   return parseResponse<RagIndexDeleteResponse>(response);
 }
@@ -99,20 +142,17 @@ export async function deleteIndex(
 export async function getEmbeddingMap(
   documentId: string
 ): Promise<EmbeddingMapResponse> {
-  const response = await fetch(
-    `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}/embedding-map`,
-    FETCH_DEFAULTS
-  );
+  const response = await apiFetch(`${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}/embedding-map`);
   return parseResponse<EmbeddingMapResponse>(response);
 }
 
 export async function getTradeoffMetrics(): Promise<TradeoffMetricsResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/metrics/tradeoffs`, FETCH_DEFAULTS);
+  const response = await apiFetch(`${API_PREFIX}/rag/metrics/tradeoffs`);
   return parseResponse<TradeoffMetricsResponse>(response);
 }
 
 export async function getModelBenchmark(): Promise<ModelBenchmarkResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark`, FETCH_DEFAULTS);
+  const response = await apiFetch(`${API_PREFIX}/rag/metrics/model-benchmark`);
   return parseResponse<ModelBenchmarkResponse>(response);
 }
 
@@ -120,9 +160,8 @@ export async function getModelBenchmarkPrecheck(
   providers: string[] = ["local-extractive", "ollama", "groq"],
 ): Promise<ModelBenchmarkPrecheckResponse> {
   const qs = providers.join(",");
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_PREFIX}/rag/metrics/model-benchmark/precheck?providers=${encodeURIComponent(qs)}`,
-    FETCH_DEFAULTS
   );
 
   if (response.status === 404) {
@@ -160,8 +199,7 @@ export async function getModelBenchmarkPrecheck(
 export async function runModelBenchmark(
   providers: string[] = ["local-extractive", "ollama", "groq"],
 ): Promise<ModelBenchmarkRunResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark/run`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/rag/metrics/model-benchmark/run`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ providers }),
@@ -171,7 +209,7 @@ export async function runModelBenchmark(
 }
 
 export async function getLabExperiments(): Promise<LabExperimentsResponse> {
-  const response = await fetch(`${API_PREFIX}/lab/experiments`, FETCH_DEFAULTS);
+  const response = await apiFetch(`${API_PREFIX}/lab/experiments`);
   return parseResponse<LabExperimentsResponse>(response);
 }
 
@@ -181,8 +219,7 @@ export async function runGuardrailCheck(params: {
   source?: "user-input" | "document" | "assistant-output";
   context?: string;
 }): Promise<GuardrailCheckResponse> {
-  const response = await fetch(`${API_PREFIX}/lab/guardrails/check`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/lab/guardrails/check`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(params),
@@ -206,8 +243,7 @@ export interface AskTextParams {
 export async function askWithText(
   params: AskTextParams
 ): Promise<RagAskResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/ask`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/rag/ask`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -265,8 +301,7 @@ export async function askWithFile(
   form.append("reasoningEnabled", String(params.reasoningEnabled ?? false));
   form.append("enableShadowRetrieval", String(params.enableShadowRetrieval ?? true));
 
-  const response = await fetch(`${API_PREFIX}/rag/ask`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/rag/ask`, {
     method: "POST",
     body: form,
   });
@@ -286,8 +321,7 @@ export interface AskPersistedParams {
 export async function askWithPersisted(
   params: AskPersistedParams
 ): Promise<RagAskResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/ask`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/rag/ask`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(params),
@@ -304,8 +338,7 @@ export interface IndexTextParams {
 export async function indexText(
   params: IndexTextParams
 ): Promise<RagIndexResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/index`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/rag/index`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -338,8 +371,7 @@ export async function indexFile(
     form.append("title", params.title);
   }
 
-  const response = await fetch(`${API_PREFIX}/rag/index`, {
-    ...FETCH_DEFAULTS,
+  const response = await apiFetch(`${API_PREFIX}/rag/index`, {
     method: "POST",
     body: form,
   });

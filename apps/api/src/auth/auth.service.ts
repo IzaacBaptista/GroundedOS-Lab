@@ -10,6 +10,9 @@ import {
   createTokenRevocationStore,
   type TokenRevocationStore,
 } from "./revocation-store";
+import { createAuthUserStore, type AuthUserStore } from "./user-store";
+import { createAuthSessionStore, type AuthSessionStore } from "./session-store";
+import { verifyPassword } from "./password";
 
 export type AuthUser = {
   userId: string;
@@ -52,27 +55,31 @@ export class AuthService {
     process.env.JWT_REFRESH_EXPIRY ?? "30d",
     30 * 24 * 60 * 60 * 1000
   );
-  private readonly adminUsername = process.env.ADMIN_USERNAME ?? "admin";
-  private readonly adminPassword = process.env.ADMIN_PASSWORD ?? "admin-password";
   private readonly revocationStore: TokenRevocationStore = createTokenRevocationStore();
   private readonly apiKeyStore: ApiKeyStore = createApiKeyStore();
+  private readonly userStore: AuthUserStore = createAuthUserStore();
+  private readonly sessionStore: AuthSessionStore = createAuthSessionStore();
   private readonly apiKeyPrefix = (process.env.API_KEY_PREFIX ?? "gdos").trim() || "gdos";
   private readonly apiKeyTtlMs = parseDurationToMs(process.env.API_KEY_TTL ?? "90d", 90 * 24 * 60 * 60 * 1000);
 
-  login(
+  async login(
     username: string,
     password: string
-  ): { accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser } | null {
-    if (username !== this.adminUsername || password !== this.adminPassword) {
+  ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser } | null> {
+    const normalizedUsername = username.trim();
+    const user = await this.userStore.findByUsername(normalizedUsername);
+    if (!user || user.disabledAt || !verifyPassword(password, user.passwordHash)) {
       return null;
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     const expiresIn = Math.floor(this.tokenExpiryMs / 1000);
+    const refreshExpiresIn = Math.floor(this.refreshTokenExpiryMs / 1000);
+    const roles = user.roles.length > 0 ? user.roles : ["user"];
     const accessClaims: TokenClaims = {
-      sub: "user-admin",
-      username,
-      roles: ["admin", "user"],
+      sub: user.id,
+      username: user.username,
+      roles,
       tokenType: "access",
       jti: randomUUID(),
       iat: nowSeconds,
@@ -82,8 +89,16 @@ export class AuthService {
       ...accessClaims,
       tokenType: "refresh",
       jti: randomUUID(),
-      exp: nowSeconds + Math.floor(this.refreshTokenExpiryMs / 1000),
+      exp: nowSeconds + refreshExpiresIn,
     };
+
+    await this.sessionStore.createRefreshSession({
+      refreshJti: refreshClaims.jti,
+      userId: user.id,
+      username: user.username,
+      roles,
+      expiresAt: new Date(refreshClaims.exp * 1000).toISOString(),
+    });
 
     return {
       accessToken: this.signToken(accessClaims),
@@ -115,6 +130,11 @@ export class AuthService {
       return null;
     }
 
+    const consumed = await this.sessionStore.consumeRefreshSession(claims.jti, claims.sub);
+    if (!consumed) {
+      return null;
+    }
+
     // Rotate refresh token: the incoming one is single-use.
     await this.revokeToken(refreshToken);
 
@@ -138,6 +158,14 @@ export class AuthService {
       iat: nowSeconds,
       exp: nowSeconds + refreshExpiresIn,
     };
+
+    await this.sessionStore.createRefreshSession({
+      refreshJti: nextRefreshClaims.jti,
+      userId: claims.sub,
+      username: claims.username,
+      roles: claims.roles,
+      expiresAt: new Date(nextRefreshClaims.exp * 1000).toISOString(),
+    });
 
     return {
       accessToken: this.signToken(accessClaims),
@@ -284,6 +312,9 @@ export class AuthService {
     }
 
     await this.revocationStore.revoke(hashToken(token), expiresAtMs);
+    if (claims.tokenType === "refresh") {
+      await this.sessionStore.revokeRefreshSession(claims.jti);
+    }
     return true;
   }
 

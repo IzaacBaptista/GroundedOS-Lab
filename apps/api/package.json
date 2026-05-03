@@ -7,14 +7,15 @@
   "types": "./src/server.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev": "tsx src/server.ts"
+    "dev": "tsx src/server.ts",
+    "jobs:worker": "tsx src/jobs/worker.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
     "@groundedos/agents": "0.1.0",
     "@groundedos/core": "0.1.0",
-    "@groundedos/evals": "0.1.0",
     "@groundedos/etl": "0.1.0",
+    "@groundedos/evals": "0.1.0",
     "@groundedos/memory": "0.1.0",
     "@groundedos/model-routing": "0.1.0",
     "@groundedos/observability": "0.1.0",
@@ -24,9 +25,14 @@
     "@nestjs/common": "^11.1.16",
     "@nestjs/core": "^11.1.16",
     "@nestjs/platform-fastify": "^11.1.16",
+    "bullmq": "^5.76.5",
     "fastify": "^5.8.5",
+    "pg": "^8.20.0",
     "redis": "^4.7.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
   }
 }

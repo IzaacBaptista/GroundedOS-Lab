@@ -442,7 +442,7 @@ describe("App", () => {
     });
   });
 
-  it("logs in, stores only the refresh token, and refreshes indexes", async () => {
+  it("logs in, stores session tokens, and refreshes indexes", async () => {
     render(<App />);
 
     fireEvent.change(screen.getByLabelText(/username/i), {
@@ -462,7 +462,8 @@ describe("App", () => {
       window.localStorage.getItem("groundedos-auth-session") ?? "{}"
     ) as Record<string, unknown>;
     expect(stored.refreshToken).toBe("refresh-token");
-    expect(stored.accessToken).toBeUndefined();
+    expect(stored.accessToken).toBe("access-token");
+    expect(typeof stored.expiresAt).toBe("number");
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/auth/login",
       expect.objectContaining({
