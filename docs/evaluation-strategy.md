@@ -205,10 +205,16 @@ npm run eval:golden -- --dataset datasets/golden/phase-0-baseline.json
 ### Phase 4 model/provider benchmark
 
 ```bash
-# Runs the local extractive baseline and records Ollama/OpenAI as skipped unless configured.
+# Runs the local extractive baseline and records optional providers as skipped unless configured.
 npm run benchmark:models
 
-# Roadmap target run: local Ollama plus one cloud provider.
+# Verified cross-provider run used in the current Phase 4 artifact.
+GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b \
+GROQ_API_KEY=<key> \
+GROQ_MODEL=llama-3.1-8b-instant \
+npm run benchmark:models -- --providers local-extractive,ollama,groq
+
+# Alternative cloud-provider run.
 GROUNDEDOS_OLLAMA_GENERATE_MODEL=qwen2.5:0.5b \
 OPENAI_API_KEY=<key> \
 OPENAI_MODEL=<model> \

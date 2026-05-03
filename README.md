@@ -76,13 +76,24 @@
   `datasets/golden/baselines/phase-4-model-benchmark.json` records
   `phase4ModelBenchmarkPassed: true`
 
+### Phase 5 — Advanced ML ✅ Complete
+
+- Fine-tuning, LoRA and distillation each have real measured artifacts under
+   `datasets/experiments/phase-5/`
+- Quantization has a runnable measured lexical-vector benchmark that preserves
+   retrieval quality while reducing memory; it is the current Phase 5
+   quantization slice, not a full model-weight quantization pipeline
+- `GET /lab/experiments` exposes Phase 5 experiment summaries through the API
+   and the web lab surface
+
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
 |---|---|
 | Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
-| LoRA / fine-tuning / quantization | Phase 5 |
-| Docker / CI / auth hardening (production rollout) | Phase 6 (in progress) |
+| Database-backed user/session persistence | Phase 6 |
+| Production vector database and external observability stack | Phase 6 |
+| Web login UX and default-on auth enforcement | Phase 6 |
 
 ---
 
@@ -777,9 +788,13 @@ implementation focus is Phase 6 Infrastructure & Deploy.
 - Phase 6 baseline infra already landed:
    `docker-compose.yml`, `Dockerfile`, `Dockerfile.web`,
    `apps/worker/Dockerfile`, `.github/workflows/ci.yml`.
-- Authentication/authorization design is documented in
-   `docs/adr/ADR-014-authentication-strategy.md`; endpoint enforcement is the
-   next implementation step.
+- Authentication/authorization baseline already landed:
+   `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`,
+   API-key management, admin endpoints, owner scoping for indexes and memory,
+   and rate limiting / audit hooks.
+- Auth enforcement remains opt-in in local development through
+   `AUTH_ENFORCEMENT=false` by default while the web login flow is still being
+   finalized.
 - Next technical priorities:
    DB-backed auth/session persistence, queue-backed worker jobs, production
    observability and deployment hardening.

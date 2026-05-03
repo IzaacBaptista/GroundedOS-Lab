@@ -1,14 +1,17 @@
 # ADR-014: Authentication & Authorization Strategy
 
 **Date**: 2026-04-25  
-**Status**: Proposed  
+**Status**: Accepted  
 **Context**: Phase 6 Infrastructure & Deploy
 
 ---
 
 ## Problem
 
-GroundedOS Lab currently runs as a completely open local-development system with no authentication or authorization boundaries. Before multi-user deployment or any public exposure:
+GroundedOS Lab now has an authentication and authorization baseline in code,
+but local development still defaults to open access until
+`AUTH_ENFORCEMENT=true` is enabled. Before multi-user deployment or any public
+exposure:
 
 1. **API endpoints must be protected** — all endpoints except health/status should require either:
    - Bearer token (for programmatic or CLI access)
@@ -33,16 +36,30 @@ GroundedOS Lab currently runs as a completely open local-development system with
 ### Boundary Today
 
 ```
-User (any client)
+User (local dev default or authenticated client)
    ↓
-(No auth check)
+Auth middleware available but optional in local dev
    ↓
-API Endpoint
+API Endpoint with owner-aware resource handling
    ↓
 Persisted Index / Memory / Cost Data
 ```
 
-**Risk**: Multiple users would see and modify each other's data.
+**Current state**: when auth enforcement is disabled, requests remain anonymous;
+when enabled, bearer tokens, session cookies and API keys are validated before
+protected endpoints run.
+
+### Implementation Snapshot (current code)
+
+- `POST /auth/login`, `POST /auth/refresh` and `POST /auth/logout` are implemented.
+- Fastify `preHandler` middleware validates bearer tokens, session cookies or
+  API keys when `AUTH_ENFORCEMENT=true`.
+- `/admin/*` routes are admin-only and `/lab/*` routes are gated by
+  `ALLOWED_LAB_ROLES`.
+- RAG index listing/deletion, persisted-index loading and session memory use
+  request `ownerId` scoping.
+- Rate limiting, audit logging and API-key issuance/rotation are implemented.
+- Database-backed users, OAuth and persistent auth storage remain future work.
 
 ### Multiuser Boundary (Phase 6 Target)
 
@@ -154,7 +171,7 @@ POST   /rag/ask                ← Query document
 GET    /rag/memory/:sessionId  ← Retrieve session memory
 POST   /agents/execute         ← Run agent
 GET    /lab/*                  ← Lab features (A/B, benchmarks, evals)
-DELETE /auth/logout            ← Logout
+POST   /auth/logout            ← Logout
 ```
 
 #### Conditional (protected unless public scope explicitly set)
@@ -181,9 +198,11 @@ Certain operations available **only to users in the `admin` role**:
 ```
 DELETE /admin/indexes/all                  ← Clear all user indexes
 GET    /admin/cost/summary                 ← Aggregate cost across all users
-DELETE /admin/cost/ledger                  ← Reset cost tracking
 GET    /admin/audit/logs                   ← Access logs and audit trail
-POST   /admin/user/:userId/disable         ← Disable user account
+POST   /admin/api-keys                     ← Create API key
+GET    /admin/api-keys                     ← List API keys
+DELETE /admin/api-keys/:id                ← Revoke API key
+POST   /admin/api-keys/:id/rotate         ← Rotate API key
 ```
 
 ### 5. **Lab Mode Opt-In**
@@ -208,10 +227,10 @@ POST /lab/experiments
 
 ### Phase 6.1 (Immediate)
 
-- [ ] Implement `POST /auth/login` with hardcoded user list or environment-based credentials
-- [ ] Generate JWT and session cookie on successful login
-- [ ] Add auth middleware to protect endpoints
-- [ ] Scope indexes, memory, and sessions to `userId`
+- [x] Implement `POST /auth/login` with environment-based credentials
+- [x] Generate JWT and session cookie on successful login
+- [x] Add auth middleware to protect endpoints
+- [x] Scope indexes, memory, and sessions to `userId`
 
 **DB Schema Addition**:
 
@@ -243,9 +262,9 @@ ALTER TABLE indexes ADD CONSTRAINT check_owner CHECK (resource_owner IS NOT NULL
 ### Phase 6.2 (Follow-up)
 
 - [ ] OAuth2 integration (GitHub, Google) for easier signup
-- [ ] Rate limiting per user (e.g., 100 requests/hour)
-- [ ] API key generation for programmatic access
-- [ ] Audit logging (user, action, timestamp, resource)
+- [x] Rate limiting per user (configurable requests/hour)
+- [x] API key generation for programmatic access
+- [x] Audit logging (user, action, timestamp, resource)
 
 ### Phase 6.3+ (Future)
 
@@ -260,27 +279,20 @@ ALTER TABLE indexes ADD CONSTRAINT check_owner CHECK (resource_owner IS NOT NULL
 | Trade-off | Decision | Rationale |
 |---|---|---|
 | **Hardcoded credentials** (Phase 6.1) vs **database-backed users** | Start hardcoded for local dev; move to DB in Phase 6.2 | Simpler for initial rollout; no dependency on user creation API |
-| **No rate limiting** (Phase 6.1) vs **per-user limits** (Phase 6.2) | Start unrestricted; add in Phase 6.2 | Focus on scoping first; rate limiting can come after |
+| **Memory-backed rate limiting now** vs **durable/shared limiter later** | Start with in-memory or Redis-backed local limits; expand only if deployment needs it | Keeps the current local stack simple while still enforcing per-user limits when auth is enabled |
 | **JWT stored in localStorage** (web) vs **session-only** (cookies) | Use both: session cookie for web UI (safer), JWT for CLI | Balances security (HttpOnly cookie) with developer ergonomics (JWT for tools) |
 | **HTTPS required** (production) vs **HTTP ok** (local dev) | Enforce HTTPS in production; allow `FORCE_HTTPS=false` locally | Standards-compliant; unblocks local development |
 
 ---
 
-## Rollout Plan
+## Current Rollout Status
 
-1. **Week 1**: Add auth middleware + JWT login (no scoping yet)
-   - All endpoints protected but data not scoped
-   - Local dev still works with test credentials
-
-2. **Week 2**: Scope indexes, memory, sessions to user
-   - Existing data migration: assign to "admin" user
-   - New data automatically scoped
-
-3. **Week 3**: Admin endpoints + Lab Mode opt-in
-   - Cost clearing, audit logs for admins
-   - Jailbreak Playground restricted to explicit roles
-
-4. **Week 4+**: OAuth, rate limiting, audit trail
+1. **Completed in code**: JWT login/refresh/logout, session cookie issuance,
+   API keys, admin routes, audit logging, owner scoping, and rate limiting.
+2. **Enabled selectively**: auth enforcement remains opt-in in local dev via
+   `AUTH_ENFORCEMENT=true` while the web login flow catches up.
+3. **Still pending**: database-backed users/sessions, OAuth, and broader
+   deployment hardening.
 
 ---
 

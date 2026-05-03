@@ -12,10 +12,10 @@ the local AI pipeline.
 
 ## Status
 
-Implemented baseline (Phases 1-4) with Phase 6 hardening in progress: local
-RAG API supports inline JSON, multipart uploads, persisted indexes, index
-management, hybrid retrieval + reranking telemetry, optional Ollama embeddings,
-and session-scoped persistent memory.
+Implemented baseline through Phase 5 with active Phase 6 rollout work: the API
+supports local RAG flows, persisted indexes, session-scoped memory, Phase 4 lab
+benchmark endpoints, and a Phase 6 auth/admin baseline (JWT login, refresh,
+logout, API keys, admin routes, owner scoping, rate limiting and audit hooks).
 
 ## Local usage
 
@@ -35,6 +35,26 @@ repository-root `.env`/`.env.local` files before app-specific env files.
 #### `GET /health`
 
 Returns a basic service health response.
+
+#### `POST /auth/login`
+
+Authenticates with the environment-configured admin credentials, returns access
+and refresh tokens, and sets the `groundedos-session` cookie for browser usage.
+
+#### `POST /auth/refresh`
+
+Rotates a refresh token and returns a new access token pair.
+
+#### `POST /auth/logout`
+
+Clears the session cookie and revokes the presented bearer token or cookie token
+when available.
+
+#### `GET /admin/*`, `POST /admin/*`, `DELETE /admin/*`
+
+Admin endpoints are implemented for index clearing, cost summary, audit-log
+inspection and API-key management. They are accessible only when auth
+enforcement is enabled and the authenticated user has the `admin` role.
 
 #### `POST /rag/ask`
 
@@ -248,8 +268,12 @@ pairs and timestamps.
   opt-in deterministic token/ngram hashing provider.
 - `"ollama"` is available as an opt-in local semantic embedding provider, but it
   requires a running Ollama server and a pulled embedding model.
-- OpenAI and Hugging Face providers are not wired yet.
-- Authentication strategy is documented (ADR-014), but endpoint protection is
-  not enforced yet.
+- `"openai"` embeddings are wired for indexing and ask flows; Hugging Face
+  provider integration is still not implemented.
+- Auth, owner scoping, rate limiting, admin routes and audit logging are
+  implemented, but middleware enforcement is disabled by default in local dev
+  until `AUTH_ENFORCEMENT=true` is set.
+- User storage remains environment-backed for local development; database-backed
+  users and sessions are still pending.
 - Production observability stack and production vector database are still
   pending.

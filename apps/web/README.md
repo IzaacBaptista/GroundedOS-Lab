@@ -16,9 +16,11 @@ grounded retrieval workflows.
 
 ## Status
 
-Implemented baseline (Phases 1-4) with Phase 6 hardening in progress: local
-RAG upload/index/ask flows are implemented, including provider selection,
-optional session-aware asks, provider comparison and a Trade-offs dashboard.
+Implemented baseline through Phase 5 with ongoing Phase 6 integration work: the
+web app exposes local RAG upload/index/ask flows, provider selection, optional
+session-aware asks, concept and lab surfaces, and the Trade-offs dashboard. The
+backend auth baseline exists, but the full interactive login UX is still being
+finished.
 
 ## Local usage
 
@@ -44,7 +46,8 @@ repository-root `.env`/`.env.local` files before app-specific env files.
 
 - Local-development UI is primary; production deployment hardening is tracked in
   Phase 6.
-- Authentication UX is not enforced yet.
+- The backend can enforce JWT/session auth, but the default local web flow still
+  assumes `AUTH_ENFORCEMENT=false` unless you wire tokens/cookies manually.
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Session memory is managed by the API under `.groundedos/memory/` when
