@@ -97,6 +97,24 @@
 - Async jobs are exposed via `/jobs/*` and processed by a BullMQ worker
    (`npm run api:jobs:worker`) when Redis is configured.
 
+Quick async jobs flow:
+
+```bash
+# 1) Start API and worker in separate terminals
+npm run api:dev
+npm run api:jobs:worker
+
+# 2) Enqueue a Phase 5 experiment
+curl -X POST http://localhost:3001/jobs/phase5 \
+   -H 'content-type: application/json' \
+   -H 'authorization: Bearer <access-token>' \
+   -d '{"track":"quantization"}'
+
+# 3) Poll status (replace <job-id>)
+curl http://localhost:3001/jobs/<job-id> \
+   -H 'authorization: Bearer <access-token>'
+```
+
 ### What is NOT yet implemented
 
 | Feature | Planned phase |

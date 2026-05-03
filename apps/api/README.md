@@ -96,6 +96,34 @@ Or from API workspace:
 npm --workspace @groundedos/api run jobs:worker
 ```
 
+These endpoints are protected when auth enforcement is active. Provide a
+bearer token or API key in requests.
+
+Enqueue a Phase 5 track run:
+
+```bash
+curl -X POST http://localhost:3001/jobs/phase5 \
+  -H 'content-type: application/json' \
+  -H 'authorization: Bearer <access-token>' \
+  -d '{"track":"quantization"}'
+```
+
+Enqueue a model benchmark run:
+
+```bash
+curl -X POST http://localhost:3001/jobs/model-benchmark \
+  -H 'content-type: application/json' \
+  -H 'authorization: Bearer <access-token>' \
+  -d '{"providers":["local-extractive","ollama","openai"]}'
+```
+
+Poll a job status (replace `<job-id>` from enqueue response):
+
+```bash
+curl http://localhost:3001/jobs/<job-id> \
+  -H 'authorization: Bearer <access-token>'
+```
+
 If Redis is not configured, jobs endpoints return `503` and worker startup
 fails with a configuration error.
 
