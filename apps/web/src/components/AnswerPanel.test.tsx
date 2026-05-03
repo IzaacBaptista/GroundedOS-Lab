@@ -87,7 +87,7 @@ const response: RagAskResponse = {
         },
       ],
     },
-    cache: { hit: false, hits: 0, misses: 1 },
+    cache: { hit: false },
     workflowContext: {
       workflowId: "wf-1",
       steps: {

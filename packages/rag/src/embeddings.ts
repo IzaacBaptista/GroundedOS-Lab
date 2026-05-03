@@ -787,10 +787,10 @@ function validateOpenAiEmbeddingResponse(
       throw new Error(`${ERROR_PREFIX} openai embedding at index ${position} must be an object.`);
     }
 
-    const index = (item as { index?: unknown }).index;
+    const index = (item as { index?: unknown }).index as unknown;
     const embedding = (item as { embedding?: unknown }).embedding;
 
-    if (!Number.isInteger(index) || index < 0 || index >= expectedCount) {
+    if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= expectedCount) {
       throw new Error(`${ERROR_PREFIX} openai embedding index ${String(index)} is invalid.`);
     }
 

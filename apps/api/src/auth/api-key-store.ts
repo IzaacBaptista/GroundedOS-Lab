@@ -145,7 +145,7 @@ class OptionalRedisApiKeyStore implements ApiKeyStore {
 
     try {
       const payload = await client.hGet(this.byIdKey, id);
-      const current = parseStoredApiKey(payload);
+      const current = parseStoredApiKey(payload ?? null);
 
       if (!current || current.revokedAt) {
         return false;

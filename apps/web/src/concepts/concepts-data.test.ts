@@ -63,10 +63,7 @@ describe("Concepts Data Layer", () => {
 
       const conceptIds = CONCEPTS.map((c) => c.id);
       requiredConcepts.forEach((id) => {
-        expect(conceptIds).toContain(
-          id,
-          `Missing concept: ${id}`
-        );
+        expect(conceptIds).toContain(id);
       });
     });
 
