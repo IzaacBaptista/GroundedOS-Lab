@@ -112,7 +112,7 @@ class OptionalRedisApiKeyStore implements ApiKeyStore {
       }
 
       const payload = await client.hGet(this.byIdKey, id);
-      return parseStoredApiKey(payload);
+      return parseStoredApiKey(payload ?? null);
     } catch {
       this.disabled = true;
       return this.fallback.getByHash(keyHash);
