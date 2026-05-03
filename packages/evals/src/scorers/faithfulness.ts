@@ -49,9 +49,9 @@ export class FaithfulnessEvaluator implements Evaluator {
 
     // Check for ungrounded claims (hedging phrases)
     const ungroundedSignals = [
-      'I think',
-      'I believe',
-      'I assume',
+      'i think',
+      'i believe',
+      'i assume',
       'probably',
       'maybe',
       'perhaps',

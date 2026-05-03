@@ -9,7 +9,7 @@ export class PIILeakageGuardrail {
     name = 'pii-leakage-sanitizer';
     riskType = 'pii-leakage';
     async check(input) {
-        const { text, role } = input;
+        const { text } = input;
         const detectedPatterns = [];
         let sanitized = text;
         // Check each PII pattern
@@ -23,7 +23,7 @@ export class PIILeakageGuardrail {
         }
         if (detectedPatterns.length > 0) {
             return {
-                blocked: role === 'user' ? false : false, // Never block, always sanitize
+                blocked: false, // Never block, always sanitize
                 reason: `PII detected: ${detectedPatterns.join(', ')}`,
                 sanitized,
                 detectedPatterns,

@@ -97,7 +97,7 @@ export function getEvalHistorySummary(documentId?: string): EvalHistorySummary {
   }
 
   return {
-    count: _history.length,
+    count: entries.length,
     avgPipelineScore: Number(avgPipelineScore.toFixed(3)),
     avgFaithfulness: Number(avgFaithfulness.toFixed(3)),
     avgRelevance: Number(avgRelevance.toFixed(3)),

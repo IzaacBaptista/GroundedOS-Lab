@@ -5,6 +5,9 @@
  */
 
 import type { Evaluator, EvalInput, EvalResult, EvalSummary } from '../types.js';
+import { FaithfulnessEvaluator } from './faithfulness.js';
+import { RelevanceEvaluator } from './relevance.js';
+import { RecallEvaluator } from './recall.js';
 
 export class EvaluatorChain {
   private evaluators: Map<string, Evaluator> = new Map();
@@ -56,11 +59,6 @@ export class EvaluatorChain {
  */
 export function createDefaultEvaluatorChain(): EvaluatorChain {
   const chain = new EvaluatorChain();
-
-  // Lazy import to avoid circular deps
-  const { FaithfulnessEvaluator } = require('./faithfulness.js');
-  const { RelevanceEvaluator } = require('./relevance.js');
-  const { RecallEvaluator } = require('./recall.js');
 
   chain.register(new FaithfulnessEvaluator());
   chain.register(new RelevanceEvaluator());

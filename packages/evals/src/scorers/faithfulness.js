@@ -38,9 +38,9 @@ export class FaithfulnessEvaluator {
         const hasGroundingSignal = groundingSignals.some((phrase) => answer.toLowerCase().includes(phrase));
         // Check for ungrounded claims (hedging phrases)
         const ungroundedSignals = [
-            'I think',
-            'I believe',
-            'I assume',
+            'i think',
+            'i believe',
+            'i assume',
             'probably',
             'maybe',
             'perhaps',

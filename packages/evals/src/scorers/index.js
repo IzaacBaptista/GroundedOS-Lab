@@ -3,6 +3,9 @@
  *
  * Execute multiple evaluators and aggregate results.
  */
+import { FaithfulnessEvaluator } from './faithfulness.js';
+import { RelevanceEvaluator } from './relevance.js';
+import { RecallEvaluator } from './recall.js';
 export class EvaluatorChain {
     evaluators = new Map();
     register(evaluator) {
@@ -45,10 +48,6 @@ export class EvaluatorChain {
  */
 export function createDefaultEvaluatorChain() {
     const chain = new EvaluatorChain();
-    // Lazy import to avoid circular deps
-    const { FaithfulnessEvaluator } = require('./faithfulness.js');
-    const { RelevanceEvaluator } = require('./relevance.js');
-    const { RecallEvaluator } = require('./recall.js');
     chain.register(new FaithfulnessEvaluator());
     chain.register(new RelevanceEvaluator());
     chain.register(new RecallEvaluator(3));
