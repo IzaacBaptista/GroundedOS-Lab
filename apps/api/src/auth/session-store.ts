@@ -30,7 +30,9 @@ class InMemoryAuthSessionStore implements AuthSessionStore {
 
   constructor() {
     // Prune expired sessions every 5 minutes so the map does not grow
-    // unbounded in long-running processes.
+    // unbounded in long-running processes. The PostgreSQL implementation uses
+    // a different strategy: it deletes sessions expired more than 7 days ago
+    // at startup (see OptionalPostgresAuthSessionStore.ensureSchema).
     this.pruneTimer = setInterval(() => this.pruneExpired(), 5 * 60 * 1000);
     // Allow the process to exit even if this timer is still pending.
     this.pruneTimer.unref?.();

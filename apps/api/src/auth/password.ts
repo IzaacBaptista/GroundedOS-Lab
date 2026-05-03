@@ -49,10 +49,12 @@ export function verifyPassword(plainText: string, expectedHash: string): boolean
     return safeStringEqual(normalizedExpected, plainText);
   }
 
-  // Backward-compatible: legacy SHA-256 hashes.
+  // Backward-compatible: legacy SHA-256 hashes stored before the scrypt migration.
+  // SHA-256 is used here only to verify an existing stored hash, not to create one.
+  // lgtm[js/insufficient-password-hash]
   if (normalizedExpected.startsWith(SHA256_PREFIX)) {
     const pepper = process.env.AUTH_PASSWORD_PEPPER ?? "";
-    const legacy = `${SHA256_PREFIX}${createHash("sha256").update(`${plainText}${pepper}`).digest("hex")}`;
+    const legacy = `${SHA256_PREFIX}${createHash("sha256").update(`${plainText}${pepper}`).digest("hex")}`; // lgtm[js/insufficient-password-hash]
     return safeStringEqual(normalizedExpected, legacy);
   }
 
