@@ -75,6 +75,30 @@ Admin endpoints are implemented for index clearing, cost summary, audit-log
 inspection and API-key management. They are accessible only when auth
 enforcement is enabled and the authenticated user has the `admin` role.
 
+#### Async jobs (`/jobs/*`)
+
+Async execution endpoints are available through a BullMQ queue when Redis is
+configured (`REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`).
+
+- `POST /jobs/phase5` enqueues a Phase 5 experiment run.
+- `POST /jobs/model-benchmark` enqueues a model benchmark run.
+- `GET /jobs/:jobId` returns queue job status/result metadata.
+
+Start the API worker from repository root:
+
+```bash
+npm run api:jobs:worker
+```
+
+Or from API workspace:
+
+```bash
+npm --workspace @groundedos/api run jobs:worker
+```
+
+If Redis is not configured, jobs endpoints return `503` and worker startup
+fails with a configuration error.
+
 #### `POST /rag/ask`
 
 Runs the local RAG pipeline against inline text content or an uploaded
@@ -295,5 +319,7 @@ pairs and timestamps.
 - User/session storage supports memory (default) and optional PostgreSQL
   backends (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`) with
   memory fallback on DB unavailability.
+- Async jobs require a Redis connection and currently run with single-worker,
+  in-order processing (`concurrency: 1`) without advanced retry policies.
 - Production observability stack and production vector database are still
   pending.

@@ -86,14 +86,24 @@
 - `GET /lab/experiments` exposes Phase 5 experiment summaries through the API
    and the web lab surface
 
+### Phase 6 — Infra/Auth Baseline ✅ In Progress
+
+- JWT login/refresh/logout, API keys, admin-gated routes, audit logging and
+   per-user rate limiting are implemented in API.
+- Auth enforcement is opt-in in local dev and defaults to enabled in
+   non-dev/non-test environments when `AUTH_ENFORCEMENT` is unset.
+- Optional PostgreSQL-backed auth users/sessions are available with memory
+   fallback (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`).
+- Async jobs are exposed via `/jobs/*` and processed by a BullMQ worker
+   (`npm run api:jobs:worker`) when Redis is configured.
+
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
 |---|---|
-| Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
-| Database-backed user/session persistence | Phase 6 |
+| OAuth / external identity providers | Phase 6+ |
 | Production vector database and external observability stack | Phase 6 |
-| Web login UX and default-on auth enforcement | Phase 6 |
+| Queue observability, retries and multi-worker orchestration | Phase 6+ |
 
 ---
 

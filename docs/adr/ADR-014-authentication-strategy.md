@@ -172,6 +172,9 @@ DELETE /rag/indexes/:indexId   ← Delete index
 POST   /rag/ask                ← Query document
 GET    /rag/memory/:sessionId  ← Retrieve session memory
 POST   /agents/execute         ← Run agent
+POST   /jobs/phase5            ← Enqueue Phase 5 async experiment
+POST   /jobs/model-benchmark   ← Enqueue async benchmark run
+GET    /jobs/:jobId            ← Check async job status
 GET    /lab/*                  ← Lab features (A/B, benchmarks, evals)
 POST   /auth/logout            ← Logout
 ```
@@ -292,7 +295,7 @@ ALTER TABLE indexes ADD CONSTRAINT check_owner CHECK (resource_owner IS NOT NULL
 
 1. **Completed in code**: JWT login/refresh/logout, session cookie issuance,
    API keys, admin routes, audit logging, owner scoping, rate limiting,
-   web login/refresh UX integration, and async queue worker scaffolding.
+   web login/refresh UX integration, and async queue worker + `/jobs/*` endpoints.
 2. **Enabled by environment**: auth enforcement is opt-in in local dev,
    and defaults to enabled in non-dev/non-test environments when unset.
 3. **Still pending**: OAuth, external IdP integrations, and broader
