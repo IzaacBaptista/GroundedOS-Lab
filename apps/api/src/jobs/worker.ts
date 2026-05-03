@@ -1,4 +1,4 @@
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Worker } from "bullmq";
 import {
@@ -7,7 +7,7 @@ import {
   type Phase6JobPayload,
 } from "./job-queue";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 async function main(): Promise<void> {
   const connection = resolveQueueConnection();
@@ -21,12 +21,17 @@ async function main(): Promise<void> {
     PHASE6_QUEUE_NAME,
     async (job) => {
       if (job.name === "phase5-experiment" && job.data.type === "phase5-experiment") {
-        return runShellCommand(`npm run experiment:${job.data.track}`);
+        return runCommand("npm", ["run", `experiment:${job.data.track}`]);
       }
 
       if (job.name === "model-benchmark" && job.data.type === "model-benchmark") {
-        const providers = job.data.providers.join(",");
-        return runShellCommand(`npm run benchmark:models -- --providers ${providers}`);
+        return runCommand("npm", [
+          "run",
+          "benchmark:models",
+          "--",
+          "--providers",
+          job.data.providers.join(","),
+        ]);
       }
 
       throw new Error(`Unsupported job type: ${job.name}`);
@@ -48,19 +53,22 @@ async function main(): Promise<void> {
   console.log(`[jobs-worker] listening on queue ${PHASE6_QUEUE_NAME}`);
 }
 
-async function runShellCommand(command: string): Promise<{
+async function runCommand(
+  file: string,
+  args: string[]
+): Promise<{
   command: string;
   stdout: string;
   stderr: string;
 }> {
-  const { stdout, stderr } = await execAsync(command, {
+  const { stdout, stderr } = await execFileAsync(file, args, {
     cwd: process.cwd(),
     env: process.env,
     maxBuffer: 1024 * 1024,
   });
 
   return {
-    command,
+    command: [file, ...args].join(" "),
     stdout,
     stderr,
   };

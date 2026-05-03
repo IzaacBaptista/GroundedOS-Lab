@@ -207,7 +207,10 @@ function resolveAuthEnforcementEnabled(): boolean {
     return explicit.trim().toLowerCase() !== "false";
   }
 
-  const nodeEnv = (process.env.NODE_ENV ?? "development").trim().toLowerCase();
+  // Default to production (fail-closed) when NODE_ENV is not explicitly set so
+  // that environments without a NODE_ENV variable don't accidentally run with
+  // auth disabled.
+  const nodeEnv = (process.env.NODE_ENV ?? "production").trim().toLowerCase();
   return nodeEnv !== "development" && nodeEnv !== "test";
 }
 

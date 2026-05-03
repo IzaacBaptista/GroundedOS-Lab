@@ -147,13 +147,20 @@ class OptionalPostgresAuthUserStore implements AuthUserStore {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
+        username TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         roles TEXT[] NOT NULL DEFAULT ARRAY['user']::TEXT[],
         disabled_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+
+    // Case-insensitive unique index so that lookups and upserts using
+    // LOWER(username) are consistent and prevent case-variant duplicates.
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_lower
+        ON users (LOWER(username))
     `);
   }
 
@@ -169,7 +176,7 @@ class OptionalPostgresAuthUserStore implements AuthUserStore {
       `
         INSERT INTO users (id, username, password_hash, roles, created_at, updated_at)
         VALUES ($1, $2, $3, $4::TEXT[], NOW(), NOW())
-        ON CONFLICT (username)
+        ON CONFLICT (lower(username))
         DO UPDATE SET
           password_hash = EXCLUDED.password_hash,
           roles = EXCLUDED.roles,

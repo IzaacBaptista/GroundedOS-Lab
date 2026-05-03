@@ -64,6 +64,8 @@ function normalizeTrack(value: unknown): Phase5ExperimentTrack {
   return normalized;
 }
 
+const ALLOWED_PROVIDERS = new Set(["local-extractive", "ollama", "openai", "groq"]);
+
 function normalizeProviders(value: unknown): string[] {
   if (!Array.isArray(value)) {
     throw new ApiRequestError("providers must be an array of strings.", 400);
@@ -76,6 +78,14 @@ function normalizeProviders(value: unknown): string[] {
 
   if (providers.length === 0) {
     throw new ApiRequestError("providers must include at least one provider.", 400);
+  }
+
+  const unknown = providers.filter((p) => !ALLOWED_PROVIDERS.has(p));
+  if (unknown.length > 0) {
+    throw new ApiRequestError(
+      `Unknown providers: ${unknown.join(", ")}. Allowed values: ${[...ALLOWED_PROVIDERS].join(", ")}.`,
+      400
+    );
   }
 
   return providers;

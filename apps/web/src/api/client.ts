@@ -23,21 +23,52 @@ const API_PREFIX = "/api";
 const FETCH_DEFAULTS = {
   credentials: "same-origin" as RequestCredentials,
 };
-let accessToken: string | undefined;
+
+const ACCESS_TOKEN_KEY = "groundedos:access-token";
+
+function readAccessToken(): string | undefined {
+  try {
+    if (typeof sessionStorage === "undefined") {
+      return undefined;
+    }
+    const raw = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    return raw && raw.trim().length > 0 ? raw.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function setAuthAccessToken(token: string | undefined): void {
   const normalized = typeof token === "string" ? token.trim() : "";
-  accessToken = normalized.length > 0 ? normalized : undefined;
+  try {
+    if (typeof sessionStorage === "undefined") {
+      return;
+    }
+    if (normalized.length > 0) {
+      sessionStorage.setItem(ACCESS_TOKEN_KEY, normalized);
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    }
+  } catch {
+    // sessionStorage unavailable (e.g., private browsing).
+  }
 }
 
 export function clearAuthAccessToken(): void {
-  accessToken = undefined;
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const headers = normalizeHeaders(init?.headers);
-  if (accessToken && !hasHeader(headers, "authorization")) {
-    headers.authorization = `Bearer ${accessToken}`;
+  const token = readAccessToken();
+  if (token && !hasHeader(headers, "authorization")) {
+    headers.authorization = `Bearer ${token}`;
   }
 
   return fetch(input, {

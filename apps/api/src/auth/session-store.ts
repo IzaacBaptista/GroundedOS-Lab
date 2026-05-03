@@ -25,18 +25,19 @@ export function createAuthSessionStore(): AuthSessionStore {
 }
 
 class InMemoryAuthSessionStore implements AuthSessionStore {
-  private readonly sessions = new Map<
-    string,
-    RefreshSessionRecord & {
-      revokedAt?: string;
-    }
-  >();
+  private readonly sessions = new Map<string, RefreshSessionRecord>();
+  private readonly pruneTimer: ReturnType<typeof setInterval>;
+
+  constructor() {
+    // Prune expired sessions every 5 minutes so the map does not grow
+    // unbounded in long-running processes.
+    this.pruneTimer = setInterval(() => this.pruneExpired(), 5 * 60 * 1000);
+    // Allow the process to exit even if this timer is still pending.
+    this.pruneTimer.unref?.();
+  }
 
   async createRefreshSession(input: RefreshSessionRecord): Promise<void> {
-    this.sessions.set(input.refreshJti, {
-      ...input,
-      revokedAt: undefined,
-    });
+    this.sessions.set(input.refreshJti, { ...input });
   }
 
   async consumeRefreshSession(refreshJti: string, userId: string): Promise<boolean> {
@@ -49,29 +50,34 @@ class InMemoryAuthSessionStore implements AuthSessionStore {
       return false;
     }
 
-    if (current.revokedAt) {
-      return false;
-    }
-
     const expiresAt = Date.parse(current.expiresAt);
     if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      this.sessions.delete(refreshJti);
       return false;
     }
 
-    current.revokedAt = new Date().toISOString();
-    this.sessions.set(refreshJti, current);
+    // Delete on consume — single-use tokens should not remain in the map.
+    this.sessions.delete(refreshJti);
     return true;
   }
 
   async revokeRefreshSession(refreshJti: string): Promise<boolean> {
-    const current = this.sessions.get(refreshJti);
-    if (!current || current.revokedAt) {
+    if (!this.sessions.has(refreshJti)) {
       return false;
     }
 
-    current.revokedAt = new Date().toISOString();
-    this.sessions.set(refreshJti, current);
+    this.sessions.delete(refreshJti);
     return true;
+  }
+
+  private pruneExpired(): void {
+    const now = Date.now();
+    for (const [jti, session] of this.sessions) {
+      const expiresAt = Date.parse(session.expiresAt);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+        this.sessions.delete(jti);
+      }
+    }
   }
 }
 
@@ -232,5 +238,11 @@ class OptionalPostgresAuthSessionStore implements AuthSessionStore {
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at)`
     );
+
+    // Remove sessions expired more than 7 days ago to prevent unbounded table growth.
+    await pool.query(`
+      DELETE FROM user_sessions
+      WHERE expires_at < NOW() - INTERVAL '7 days'
+    `);
   }
 }
