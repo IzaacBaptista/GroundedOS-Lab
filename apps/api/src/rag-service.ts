@@ -2020,8 +2020,29 @@ async function runLocalRag(
         rerankResults: result.output!.devMode!.resultCount,
         scores: result.output!.devMode!.results.map((item) => item.score),
       }),
-      contextEngineering: buildContextEngineering(result.output!, finalAnswer),
-      agentLoop: buildAgentLoopTrace(result.context, result.output!, finalAnswer),
+      contextEngineering: buildContextEngineering(
+        {
+          rawQuery: result.output!.rawQuery,
+          retrievalQuery: result.output!.retrievalQuery,
+          processedQuery: result.output!.processedQuery,
+          memoryMatches: result.output!.memoryMatches,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          devMode: result.output!.devMode!,
+        },
+        finalAnswer
+      ),
+      agentLoop: buildAgentLoopTrace(
+        result.context,
+        {
+          processedQuery: result.output!.processedQuery,
+          routingDecision: result.output!.routingDecision,
+          initialRoutingDecision: result.output!.initialRoutingDecision,
+          devMode: result.output!.devMode!,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          orchestration: result.output!.orchestration,
+        },
+        finalAnswer
+      ),
     },
   };
 
@@ -2639,8 +2660,29 @@ async function runPersistedRag(
         rerankResults: result.output!.devMode!.resultCount,
         scores: result.output!.devMode!.results.map((item) => item.score),
       }),
-      contextEngineering: buildContextEngineering(result.output!, finalAnswer),
-      agentLoop: buildAgentLoopTrace(result.context, result.output!, finalAnswer),
+      contextEngineering: buildContextEngineering(
+        {
+          rawQuery: result.output!.rawQuery,
+          retrievalQuery: result.output!.retrievalQuery,
+          processedQuery: result.output!.processedQuery,
+          memoryMatches: result.output!.memoryMatches,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          devMode: result.output!.devMode!,
+        },
+        finalAnswer
+      ),
+      agentLoop: buildAgentLoopTrace(
+        result.context,
+        {
+          processedQuery: result.output!.processedQuery,
+          routingDecision: result.output!.routingDecision,
+          initialRoutingDecision: result.output!.initialRoutingDecision,
+          devMode: result.output!.devMode!,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          orchestration: result.output!.orchestration,
+        },
+        finalAnswer
+      ),
     },
   };
 
