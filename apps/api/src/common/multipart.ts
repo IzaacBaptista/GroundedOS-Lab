@@ -82,6 +82,23 @@ export function parsePositiveInteger(value: string | undefined, fieldName: strin
   return parsed;
 }
 
+export function parseBoolean(value: string | undefined, fieldName: string): boolean | undefined {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+
+  if (normalized === "false") {
+    return false;
+  }
+
+  throw new ApiRequestError(`${fieldName} must be "true" or "false".`);
+}
+
 export function parseMetadata(value: string | undefined): Record<string, unknown> | undefined {
   if (!value) {
     return undefined;
@@ -113,6 +130,6 @@ function sanitizeFilename(filename: string): string {
 export const MULTIPART_LIMITS = {
   fileSize: MAX_UPLOAD_BYTES,
   files: 1,
-  fields: 8,
-  parts: 10,
+  fields: 12,
+  parts: 14,
 };

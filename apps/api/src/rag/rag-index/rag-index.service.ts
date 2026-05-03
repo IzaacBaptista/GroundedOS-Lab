@@ -13,15 +13,15 @@ import { ApiConfigService } from "../../config/api-config";
 export class RagIndexService {
   constructor(@Inject(ApiConfigService) private readonly config: ApiConfigService) {}
 
-  list(): Promise<RagIndexListResponse> {
-    return listPersistedRagIndexes(this.config.indexDir);
+  list(ownerId?: string): Promise<RagIndexListResponse> {
+    return listPersistedRagIndexes(this.config.indexDir, ownerId);
   }
 
-  embeddingMap(documentId: string): Promise<RagEmbeddingMapResponse> {
-    return getPersistedRagEmbeddingMap(documentId, this.config.indexDir);
+  embeddingMap(documentId: string, ownerId?: string): Promise<RagEmbeddingMapResponse> {
+    return getPersistedRagEmbeddingMap(documentId, this.config.indexDir, ownerId);
   }
 
-  delete(documentId: string): Promise<RagIndexDeleteResponse> {
-    return deletePersistedRagIndex(documentId, this.config.indexDir);
+  delete(documentId: string, ownerId?: string): Promise<RagIndexDeleteResponse> {
+    return deletePersistedRagIndex(documentId, this.config.indexDir, ownerId);
   }
 }

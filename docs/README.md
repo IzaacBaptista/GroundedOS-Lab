@@ -20,7 +20,7 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 | [`evaluation-strategy.md`](./evaluation-strategy.md) | How quality is measured: golden dataset, metrics, baselines, eval process. |
 | [`phase-0-mvp-plan.md`](./phase-0-mvp-plan.md) | Phase 0 implementation plan and milestone definitions. |
 | [`phase-1-handoff.md`](./phase-1-handoff.md) | Phase 1 baseline, verified commands and open implementation issues. |
-| [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md) | Phase 1 Dev Mode retrieval output contract (schema + example). |
+| [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md) | Stable Dev Mode output contract (retrieval baseline + adaptive extensions: cache/routing/orchestration/evals/cost). |
 | [`phase-1-local-rag.md`](./phase-1-local-rag.md) | Local RAG usage guide (commands, limits, providers). |
 | [`phase-1-rag-internals.md`](./phase-1-rag-internals.md) | End-to-end Phase 1 RAG internals guide mapping concepts to code. |
 | [`ollama-setup.md`](./ollama-setup.md) | Ollama installation and GroundedOS integration guide. |

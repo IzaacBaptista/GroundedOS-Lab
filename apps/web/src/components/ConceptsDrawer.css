@@ -1,0 +1,263 @@
+.concepts-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.concepts-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.36);
+}
+
+.concepts-drawer__panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(1100px, 94vw);
+  height: 100vh;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.concepts-drawer__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.concepts-drawer__header h2 {
+  margin: 0;
+}
+
+.concepts-drawer__header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.concepts-drawer__content {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 33%) 1fr;
+}
+
+.concepts-drawer__left,
+.concepts-drawer__right {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 18px;
+}
+
+.concepts-drawer__left {
+  border-right: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.concept-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+
+.concept-category-list {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+
+.concept-category-item {
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 10px;
+}
+
+.concept-category-item--active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+.concept-search-results {
+  display: grid;
+  gap: 8px;
+}
+
+.concept-list-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.concept-list-item p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.concept-list-item--active {
+  border-color: var(--accent);
+  background: var(--panel-strong);
+}
+
+.concept-detail-panel,
+.learning-path-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  padding: 14px;
+}
+
+.concept-detail-panel + .learning-path-panel {
+  margin-top: 14px;
+}
+
+.concept-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.concept-detail-header h3 {
+  margin: 0;
+}
+
+.concept-detail-header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+
+.concept-detail-empty {
+  color: var(--muted);
+}
+
+.concept-detail-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.concept-detail-section h4 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+
+.concept-detail-section p,
+.concept-detail-section ul {
+  margin: 0;
+  color: var(--text);
+}
+
+.concept-detail-section ul {
+  padding-left: 18px;
+}
+
+.concept-detail-section li + li {
+  margin-top: 5px;
+}
+
+.learning-path-panel h3 {
+  margin: 0;
+}
+
+.learning-path-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.learning-path-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px;
+}
+
+.learning-path-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.learning-path-head h4 {
+  margin: 0;
+  font-size: 0.93rem;
+}
+
+.learning-path-item p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.learning-path-difficulty {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+
+.difficulty-beginner {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.difficulty-intermediate {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.difficulty-advanced {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.learning-path-concepts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.learning-path-concept {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.learning-path-concept:hover {
+  border-color: var(--accent);
+}
+
+@media (max-width: 980px) {
+  .concepts-drawer__content {
+    grid-template-columns: 1fr;
+  }
+
+  .concepts-drawer__left {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}

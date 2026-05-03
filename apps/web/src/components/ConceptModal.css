@@ -1,0 +1,190 @@
+.concept-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(2px);
+}
+
+.concept-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  max-height: 88vh;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26);
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────── */
+.concept-modal__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-strong);
+  flex-shrink: 0;
+}
+
+.concept-modal__title-group h2 {
+  margin: 0 0 4px;
+  font-size: 1.3rem;
+}
+
+.concept-modal__title-group p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 560px;
+  line-height: 1.4;
+}
+
+.concept-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.concept-modal__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.concept-modal__close:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ── Body ─────────────────────────────────────── */
+.concept-modal__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.concept-modal__col {
+  padding: 18px 20px;
+}
+
+.concept-modal__col--left {
+  border-right: 1px solid var(--line);
+}
+
+/* ── Sections ─────────────────────────────────── */
+.concept-modal__section {
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.concept-modal__section:first-child {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
+.concept-modal__section h4 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.concept-modal__section p {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.concept-modal__section ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+.concept-modal__section li {
+  margin-bottom: 4px;
+  line-height: 1.45;
+  font-size: 0.88rem;
+}
+
+.concept-modal__section--highlight {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 12px 14px !important;
+  margin-bottom: 12px;
+}
+
+.concept-modal__section--highlight h4 {
+  color: var(--accent-strong);
+  margin-bottom: 10px;
+}
+
+.concept-modal__section--highlight ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.concept-modal__section--highlight li {
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: 0.87rem;
+}
+
+.concept-btn-experiment {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 200ms ease;
+}
+
+.concept-btn-experiment:hover {
+  background: var(--accent-strong);
+}
+
+.concept-btn-experiment:active {
+  opacity: 0.9;
+}
+
+/* ── Responsive ───────────────────────────────── */
+@media (max-width: 720px) {
+  .concept-modal__body {
+    grid-template-columns: 1fr;
+  }
+
+  .concept-modal__col--left {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+}

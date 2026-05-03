@@ -40,6 +40,9 @@ import type {
 import { useApiHealth } from "./hooks/useApiHealth";
 import { useIndexList } from "./hooks/useIndexList";
 import { AnswerPanel, type AnswerTab as PedagogicalAnswerTab } from "./components/AnswerPanel";
+import { ConceptBadgeGroup } from "./components/ConceptBadge";
+import { ConceptModal } from "./components/ConceptModal";
+import { ConceptsSidebar } from "./components/ConceptsSidebar";
 import { ChunksList } from "./components/ResultParts";
 import { ExplainBox } from "./components/shared/ExplainBox";
 import { Pill } from "./components/shared/Pill";
@@ -80,9 +83,19 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "api-lexical",
   "local-hash",
   "ollama",
+  "openai",
 ];
 
-type ResultMode = "answer" | "compare" | "embeddings" | "models" | "lab";
+type ResultMode =
+  | "answer"
+  | "compare"
+  | "embeddings"
+  | "models"
+  | "routing"
+  | "context"
+  | "cache"
+  | "evals"
+  | "lab";
 
 interface CompareState {
   providerA: EmbeddingProviderId;
@@ -115,6 +128,9 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [topK, setTopK] = useState(3);
   const [sessionId, setSessionId] = useState("");
+  const [useMultiModelOrchestration, setUseMultiModelOrchestration] = useState(true);
+  const [reasoningEnabled, setReasoningEnabled] = useState(false);
+  const [enableShadowRetrieval, setEnableShadowRetrieval] = useState(true);
 
   // Output state
   const [outputTab, setOutputTab] = useState<ResultMode>("answer");
@@ -388,6 +404,9 @@ export default function App() {
               query: trimmedQuery,
               topK,
               sessionId: sessionId.trim() || undefined,
+              useMultiModelOrchestration,
+              reasoningEnabled,
+              enableShadowRetrieval,
             })
           : sourceMode === "file"
             ? await runAskFile(trimmedQuery, topK, embeddingProvider)
@@ -432,6 +451,9 @@ export default function App() {
       embeddingProvider: provider,
       sessionId: sessionId.trim() || undefined,
       title: fileTitle.trim() || undefined,
+      useMultiModelOrchestration,
+      reasoningEnabled,
+      enableShadowRetrieval,
     });
   };
 
@@ -453,6 +475,9 @@ export default function App() {
       embeddingProvider: provider,
       sessionId: sessionId.trim() || undefined,
       title: textTitle.trim() || undefined,
+      useMultiModelOrchestration,
+      reasoningEnabled,
+      enableShadowRetrieval,
     });
   };
 
@@ -479,6 +504,9 @@ export default function App() {
     setQuery("");
     setTopK(3);
     setSessionId("");
+    setUseMultiModelOrchestration(true);
+    setReasoningEnabled(false);
+    setEnableShadowRetrieval(true);
     setResult(undefined);
     setCompare((state) => ({
       ...state,
@@ -670,6 +698,7 @@ export default function App() {
     };
   }, [activeIndex, appState, stateDetail]);
 
+  const [conceptModalId, setConceptModalId] = useState<string | null>(null);
   const busy = appState === "indexing" || appState === "asking";
 
   return (
@@ -691,7 +720,9 @@ export default function App() {
         </div>
       </header>
 
-      <section className="workspace" aria-label="Local RAG workspace">
+      <div className="app-body">
+        <ConceptsSidebar onConceptClick={setConceptModalId} />
+        <section className="workspace" aria-label="Local RAG workspace">
         <form className="panel input-panel" onSubmit={handleSubmit}>
           <div className="panel__header">
             <h2>Source</h2>
@@ -899,6 +930,30 @@ export default function App() {
                 onChange={(event) => setTopK(Number(event.target.value))}
               />
             </label>
+            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={useMultiModelOrchestration}
+                onChange={(event) => setUseMultiModelOrchestration(event.target.checked)}
+              />
+              <span>Multi-model orchestration</span>
+            </label>
+            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={reasoningEnabled}
+                onChange={(event) => setReasoningEnabled(event.target.checked)}
+              />
+              <span>Reasoning mode (summary only)</span>
+            </label>
+            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={enableShadowRetrieval}
+                onChange={(event) => setEnableShadowRetrieval(event.target.checked)}
+              />
+              <span>Shadow retrieval for cache quality</span>
+            </label>
           </details>
 
           <div className="run-row">
@@ -969,8 +1024,34 @@ export default function App() {
           onRefreshLabExperiments={() => void loadLabExperiments()}
           labMessage={labMessage}
           labMessageIsError={labMessageIsError}
+          onConceptClick={setConceptModalId}
         />
       </section>
+      </div>
+      <ConceptModal
+        conceptId={conceptModalId}
+        onClose={() => setConceptModalId(null)}
+        onSelectConcept={setConceptModalId}
+        onRunExperiment={(conceptId) => {
+          // Suggested experiment for each concept
+          const experiments: Record<string, { question: string; topK?: number }> = {
+            "chunking": { question: "Qual é o tamanho típico de um chunk?" },
+            "embeddings": { question: "Como os embeddings medem similaridade semântica?" },
+            "vector-database": { question: "Qual é a velocidade de recuperação com muitos documentos?" },
+            "rag": { question: "Como o RAG garante respostas baseadas em documentos?" },
+            "grounding": { question: "Como verificar se uma resposta foi fundamentada?" },
+          };
+          const exp = experiments[conceptId];
+          if (exp) {
+            const questionField = document.querySelector("textarea[placeholder*='Faça uma pergunta']") as HTMLTextAreaElement;
+            if (questionField) {
+              questionField.value = exp.question;
+              questionField.focus();
+            }
+          }
+          setConceptModalId(null);
+        }}
+      />
     </main>
   );
 }
@@ -1013,6 +1094,7 @@ interface ResultPanelProps {
   onRefreshLabExperiments: () => void;
   labMessage: string;
   labMessageIsError: boolean;
+  onConceptClick: (id: string) => void;
 }
 
 function ResultPanel({
@@ -1053,6 +1135,7 @@ function ResultPanel({
   onRefreshLabExperiments,
   labMessage,
   labMessageIsError,
+  onConceptClick,
 }: ResultPanelProps) {
   const [answerPanelTab, setAnswerPanelTab] = useState<PedagogicalAnswerTab>("chunks");
   const results = result?.devMode?.results ?? [];
@@ -1079,6 +1162,29 @@ function ResultPanel({
           ? "Guardrails playground"
         : "No result";
   const showPanelHeader = outputTab === "embeddings" || outputTab === "models";
+
+  const tabConcepts: string[] =
+    outputTab === "answer"
+      ? answerPanelTab === "chunks"
+        ? ["semantic-caching", "latency", "rag"]
+        : answerPanelTab === "citations"
+          ? ["grounding", "data-lineage", "chunking"]
+          : answerPanelTab === "workflow"
+            ? ["rag", "embeddings", "context-engineering"]
+            : ["cost-analysis", "latency", "observability"]
+      : outputTab === "compare"
+        ? ["hybrid-search", "reranking", "embeddings"]
+        : outputTab === "routing"
+          ? ["tool-calling", "inference", "cost-analysis"]
+          : outputTab === "context"
+            ? ["context-engineering", "chunking", "long-term-memory"]
+          : outputTab === "cache"
+            ? ["rag", "hybrid-search", "observability"]
+            : outputTab === "evals"
+              ? ["grounding", "observability", "cost-analysis"]
+        : outputTab === "lab"
+          ? ["guardrails", "grounding"]
+          : [];
 
   return (
     <section className="panel output-panel" aria-label="RAG output">
@@ -1148,6 +1254,42 @@ function ResultPanel({
           Compare mode
         </button>
         <button
+          className={`result-tab${outputTab === "routing" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "routing"}
+          onClick={() => setOutputTab("routing")}
+        >
+          Routing
+        </button>
+        <button
+          className={`result-tab${outputTab === "context" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "context"}
+          onClick={() => setOutputTab("context")}
+        >
+          Context
+        </button>
+        <button
+          className={`result-tab${outputTab === "cache" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "cache"}
+          onClick={() => setOutputTab("cache")}
+        >
+          Cache
+        </button>
+        <button
+          className={`result-tab${outputTab === "evals" ? " result-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={outputTab === "evals"}
+          onClick={() => setOutputTab("evals")}
+        >
+          Evals
+        </button>
+        <button
           className={`result-tab${outputTab === "lab" ? " result-tab--active" : ""}`}
           type="button"
           role="tab"
@@ -1157,6 +1299,13 @@ function ResultPanel({
           Guardrails
         </button>
       </div>
+
+      {tabConcepts.length > 0 && (
+        <div className="concepts-tab-hints" aria-label="Referências de conceitos desta visualização">
+          <span className="chunk-text">Conceitos nesta visualização:</span>
+          <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={onConceptClick} />
+        </div>
+      )}
 
       {outputTab === "answer" && (
         <AnswerPanel
@@ -1229,7 +1378,7 @@ function ResultPanel({
 
           <p
             className="compare-tip"
-            title="api-lexical e local-hash são estratégias lexicais; ollama é semântico e tende a divergir mais em ranking."
+            title="api-lexical e local-hash são estratégias lexicais; ollama e openai são semânticos e tendem a divergir mais em ranking."
           >
             {explainCompareTip(compare.providerA, compare.providerB)}
           </p>
@@ -1307,9 +1456,18 @@ function ResultPanel({
         />
       )}
 
+      {outputTab === "routing" && <RoutingView response={result} />}
+
+  {outputTab === "context" && <ContextView response={result} />}
+
+      {outputTab === "cache" && <CacheView response={result} />}
+
+      {outputTab === "evals" && <EvalsView response={result} />}
+
       {outputTab === "lab" && (
         <LabExperimentsView />
       )}
+
     </section>
   );
 }
@@ -2198,6 +2356,381 @@ function ModelProviderDetails({ provider }: { provider: ModelBenchmarkProviderRu
         </div>
       </section>
     </>
+  );
+}
+
+function RoutingView({ response }: { response: RagAskResponse | undefined }) {
+  const routing = response?.devMode.routing;
+  const orchestration = response?.devMode.orchestration;
+  const reasoning = response?.devMode.reasoning;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect routing decisions.</p>;
+  }
+
+  if (!routing) {
+    return <p className="chunk-text">No routing metadata available for this run.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Routing Decision</h3>
+        <Pill variant="teal">{routing.selectedModel}</Pill>
+      </div>
+      <div className="result-row__meta">
+        <Pill variant="gray">provider: {routing.selectedProvider}</Pill>
+        <Pill variant="gray">stage: {routing.stage ?? "pre-retrieval"}</Pill>
+        <Pill variant="gray">strategy: {routing.strategy ?? "query-only"}</Pill>
+        <Pill variant="blue">confidence: {(routing.confidence * 100).toFixed(0)}%</Pill>
+        <Pill variant="amber">cost: {routing.tradeoff.cost}</Pill>
+        <Pill variant="amber">latency: {routing.tradeoff.latency}</Pill>
+        <Pill variant="green">quality: {routing.tradeoff.quality}</Pill>
+      </div>
+      <ExplainBox>{routing.reason}</ExplainBox>
+
+      {routing.initialDecision && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Hybrid routing refinement</h3>
+          </div>
+          <div className="result-row__meta">
+            <Pill variant="gray">pre: {routing.initialDecision.selectedModel}</Pill>
+            <Pill variant="teal">post: {routing.selectedModel}</Pill>
+            <Pill variant={routing.refinement?.changed ? "amber" : "green"}>
+              {routing.refinement?.changed ? "changed" : "confirmed"}
+            </Pill>
+          </div>
+          <p className="chunk-text">{routing.refinement?.reason ?? "No refinement note captured."}</p>
+          {routing.refinement?.triggeredBy && routing.refinement.triggeredBy.length > 0 && (
+            <p className="chunk-text">Signals: {routing.refinement.triggeredBy.join(", ")}.</p>
+          )}
+        </section>
+      )}
+
+      {routing.retrievalSignals && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Post-retrieval signals</h3>
+          </div>
+          <div className="tradeoffs-grid">
+            <MetricCard label="Top score" value={routing.retrievalSignals.topScore.toFixed(3)} />
+            <MetricCard label="Avg score" value={routing.retrievalSignals.avgScore.toFixed(3)} />
+            <MetricCard label="Score spread" value={routing.retrievalSignals.scoreSpread.toFixed(3)} />
+            <MetricCard
+              label="Grounded ratio"
+              value={`${Math.round(routing.retrievalSignals.groundedResultRatio * 100)}%`}
+            />
+          </div>
+        </section>
+      )}
+
+      {routing.alternatives.length > 0 && (
+        <div className="result-list">
+          {routing.alternatives.map((candidate) => (
+            <article key={`${candidate.provider}-${candidate.model}`} className="result-row">
+              <div className="result-row__meta">
+                <Pill variant="gray">{candidate.model}</Pill>
+                <Pill variant="blue">{candidate.provider}</Pill>
+              </div>
+              <p className="chunk-text">{candidate.reason}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Multi-model orchestration</h3>
+        </div>
+        <p className="chunk-text">
+          {orchestration?.enabled
+            ? `Mode: ${orchestration.mode} | steps: ${orchestration.steps.length}`
+            : "Orchestration disabled."}
+        </p>
+        {orchestration?.steps?.map((step) => (
+          <article key={step.id} className="result-row">
+            <div className="result-row__meta">
+              <Pill variant="gray">{step.role}</Pill>
+              <Pill variant="blue">{step.model}</Pill>
+              <Pill variant="amber">{step.durationMs} ms</Pill>
+            </div>
+            <p className="chunk-text">{step.outputPreview}</p>
+          </article>
+        ))}
+      </section>
+
+      {reasoning?.enabled && reasoning.summary.length > 0 && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Reasoning summary</h3>
+          </div>
+          <ul className="chunk-text" style={{ margin: 0, paddingInlineStart: "1.1rem" }}>
+            {reasoning.summary.map((line, index) => (
+              <li key={`${line}-${index}`}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </section>
+  );
+}
+
+function ContextView({ response }: { response: RagAskResponse | undefined }) {
+  const contextEngineering = response?.devMode.contextEngineering;
+  const agentLoop = response?.devMode.agentLoop;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect context assembly.</p>;
+  }
+
+  if (!contextEngineering) {
+    return <p className="chunk-text">No context engineering metadata available for this run.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Context Engineering</h3>
+      </div>
+      <ExplainBox label="retrieval query">{contextEngineering.retrievalQuery}</ExplainBox>
+
+      <div className="tradeoffs-grid">
+        <MetricCard label="Candidates" value={String(contextEngineering.candidateCount)} />
+        <MetricCard label="Returned" value={String(contextEngineering.returnedCount)} />
+        <MetricCard
+          label="Memory recall"
+          value={`${contextEngineering.memoryRecallCount} ${contextEngineering.memoryAugmented ? "used" : "unused"}`}
+        />
+        <MetricCard
+          label="Kept ratio"
+          value={`${Math.round(contextEngineering.truncation.keptRatio * 100)}%`}
+        />
+      </div>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Assembly details</h3>
+        </div>
+        <div className="result-row__meta">
+          <Pill variant="gray">raw q: {contextEngineering.tokenEstimate.rawQuery} tok</Pill>
+          <Pill variant="gray">retrieval q: {contextEngineering.tokenEstimate.retrievalQuery} tok</Pill>
+          <Pill variant="gray">ctx: {contextEngineering.tokenEstimate.retrievedContext} tok</Pill>
+          <Pill variant="gray">answer: {contextEngineering.tokenEstimate.answer} tok</Pill>
+        </div>
+        <p className="chunk-text">
+          {contextEngineering.rewrittenQuery
+            ? `Rewritten query: ${contextEngineering.rewrittenQuery}`
+            : "No query rewrite was applied."}
+        </p>
+        <p className="chunk-text">
+          Expansions: {contextEngineering.expansionTerms.join(", ") || "none"}
+        </p>
+        <p className="chunk-text">
+          Selected chunks: {contextEngineering.selectedChunkIds.join(", ") || "none"}
+        </p>
+      </section>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Agent loop trace</h3>
+          <Pill variant={agentLoop?.enabled ? "green" : "amber"}>
+            {agentLoop?.mode ?? "disabled"}
+          </Pill>
+        </div>
+        {agentLoop?.steps?.length ? (
+          <div className="result-list">
+            {agentLoop.steps.map((step) => (
+              <article key={step.id} className="result-row">
+                <div className="result-row__meta">
+                  <Pill variant="gray">{step.type}</Pill>
+                  {step.model ? <Pill variant="blue">{step.model}</Pill> : null}
+                  {typeof step.durationMs === "number" ? (
+                    <Pill variant="amber">{step.durationMs} ms</Pill>
+                  ) : null}
+                </div>
+                <p className="chunk-text" style={{ marginBottom: 4, fontWeight: 600 }}>
+                  {step.title}
+                </p>
+                <p className="chunk-text">{step.detail}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="chunk-text">No agent loop trace available.</p>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function CacheView({ response }: { response: RagAskResponse | undefined }) {
+  const cache = response?.devMode.cache;
+  const cacheAware = response?.devMode.cacheAwareRetrieval;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect cache behavior.</p>;
+  }
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Cache Trace</h3>
+        <Pill variant={cache?.hit ? "green" : "amber"}>{cache?.hit ? "HIT" : "MISS"}</Pill>
+      </div>
+      <div className="tradeoffs-grid">
+        <MetricCard label="Similarity" value={(cache?.similarity ?? 0).toFixed(3)} />
+        <MetricCard label="Threshold used" value={(cache?.thresholdUsed ?? 0).toFixed(2)} />
+        <MetricCard label="Hit rate" value={`${Math.round((cache?.hitRate ?? 0) * 100)}%`} />
+        <MetricCard label="Saved ms" value={`${Math.round(cache?.savingsMs ?? 0)} ms`} />
+      </div>
+
+      <ExplainBox label="why this happened">
+        {cache?.reason ?? "No cache reason captured."} | {cache?.adaptiveThresholdReason ?? "default"}
+      </ExplainBox>
+
+      <div className="result-row__meta">
+        <Pill variant="gray">key: {cache?.cacheKey ?? "n/a"}</Pill>
+        <Pill variant="gray">ctx: {cache?.contextHash ?? "n/a"}</Pill>
+        <Pill variant="blue">
+          quality: {cache?.quality?.label ?? "n/a"} ({(cache?.quality?.score ?? 0).toFixed(2)})
+        </Pill>
+      </div>
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Cache-aware retrieval</h3>
+        </div>
+        <p className="chunk-text">
+          {cacheAware?.influenced
+            ? `Cache influenced ranking (${cacheAware.hybridScoreMode}). Boosted chunks: ${cacheAware.boostedChunkIds.join(", ") || "none"}.`
+            : "Cache did not influence ranking in this run."}
+        </p>
+      </section>
+    </section>
+  );
+}
+
+function EvalsView({ response }: { response: RagAskResponse | undefined }) {
+  const evals = response?.devMode.evals;
+  const costBreakdown = response?.devMode.costBreakdown;
+
+  if (!response) {
+    return <p className="chunk-text">Run Ask to inspect eval metrics.</p>;
+  }
+
+  if (!evals) {
+    return <p className="chunk-text">No eval metrics available for this run.</p>;
+  }
+
+  const scorers = evals.scorerResults;
+  const history = evals.evalHistory;
+
+  return (
+    <section className="output-section">
+      <div className="section-title">
+        <h3>Evaluation Scores</h3>
+        <span className="count">pipeline</span>
+      </div>
+      <div className="tradeoffs-grid">
+        <MetricCard label="Groundedness" value={evals.groundedness.toFixed(3)} />
+        <MetricCard label="Answer overlap" value={evals.answerOverlap.toFixed(3)} />
+        <MetricCard label="Retrieval accuracy" value={evals.retrievalAccuracy.toFixed(3)} />
+        <MetricCard label="Pipeline score" value={evals.pipelineScore.toFixed(3)} />
+        <MetricCard label="Model score" value={evals.modelScore.toFixed(3)} />
+      </div>
+
+      {scorers && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Structured Scorers</h3>
+            <span className="count">{scorers.passedCount}/{3} passed · avg {scorers.averageScore.toFixed(3)}</span>
+          </div>
+          <div className="result-list">
+            {(["faithfulness", "relevance", "recall"] as const).map((key) => {
+              const s = scorers[key];
+              if (!s) return null;
+              return (
+                <article key={key} className="result-row">
+                  <div className="result-row__meta">
+                    <span className="result-row__chunk-id">{key}</span>
+                    <span
+                      className="routing-pill"
+                      style={{
+                        background: s.passed ? "var(--color-success, #2d6a2d)" : "var(--color-error, #8b2e2e)",
+                      }}
+                    >
+                      {s.passed ? "PASS" : "FAIL"}
+                    </span>
+                    <span className="result-row__score">{s.score.toFixed(3)}</span>
+                  </div>
+                  {s.reason && <p className="chunk-text">{s.reason}</p>}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {history && history.count > 0 && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Eval Trend</h3>
+            <span className="count">
+              {history.count} total ·{" "}
+              <span
+                style={{
+                  color:
+                    history.trend === "improving"
+                      ? "var(--color-success, #4caf50)"
+                      : history.trend === "declining"
+                        ? "var(--color-error, #f44336)"
+                        : undefined,
+                }}
+              >
+                {history.trend}
+              </span>
+            </span>
+          </div>
+          <div className="tradeoffs-grid">
+            <MetricCard label="Avg pipeline" value={history.avgPipelineScore.toFixed(3)} />
+            <MetricCard label="Avg faithfulness" value={history.avgFaithfulness.toFixed(3)} />
+            <MetricCard label="Avg relevance" value={history.avgRelevance.toFixed(3)} />
+          </div>
+          {history.recent.length > 0 && (
+            <div className="result-list" style={{ marginTop: "0.5rem" }}>
+              {history.recent.map((entry, i) => (
+                <article key={i} className="result-row">
+                  <div className="result-row__meta">
+                    <span className="chunk-text" style={{ maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {entry.query}
+                    </span>
+                    <span className="result-row__score">p={entry.pipelineScore.toFixed(3)}</span>
+                    {entry.scorerResults && (
+                      <span className="cache-badge">
+                        {entry.scorerResults.passedCount}/3 · avg {entry.scorerResults.averageScore.toFixed(3)}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="output-section">
+        <div className="section-title">
+          <h3>Cost Breakdown</h3>
+        </div>
+        <div className="tradeoffs-grid">
+          <MetricCard label="Embeddings" value={`$${(costBreakdown?.embeddingsUsd ?? 0).toFixed(6)}`} />
+          <MetricCard label="Retrieval" value={`$${(costBreakdown?.retrievalUsd ?? 0).toFixed(6)}`} />
+          <MetricCard label="Generation" value={`$${(costBreakdown?.generationUsd ?? 0).toFixed(6)}`} />
+          <MetricCard label="Total" value={`$${(costBreakdown?.totalUsd ?? 0).toFixed(6)}`} />
+        </div>
+      </section>
+    </section>
   );
 }
 

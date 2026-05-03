@@ -12,6 +12,7 @@ const DEFAULT_INDEX_DIR = ".groundedos/indexes";
 export type PersistedRagIndex = {
   schemaVersion: typeof SCHEMA_VERSION;
   createdAt: string;
+  resourceOwner?: string;
   document: RagDocumentSummary;
   index: RagIndexSummary;
   embeddedChunks: EmbeddedChunk[];
@@ -25,6 +26,7 @@ export type SavedRagIndex = {
 
 export type PersistedRagIndexListItem = {
   createdAt: string;
+  resourceOwner?: string;
   document: RagDocumentSummary;
   index: RagIndexSummary;
   storage: {
@@ -61,7 +63,8 @@ export async function saveRagIndex(
 
 export async function loadRagIndex(
   documentId: string,
-  indexDir?: string
+  indexDir?: string,
+  ownerId?: string
 ): Promise<SavedRagIndex> {
   const resolvedIndexDir = resolveIndexDir(indexDir);
   const indexPath = createIndexPath(documentId, resolvedIndexDir);
@@ -71,6 +74,7 @@ export async function loadRagIndex(
     const record = JSON.parse(raw) as PersistedRagIndex;
 
     validatePersistedRagIndex(record, documentId);
+    validateResourceOwnership(record, ownerId, documentId);
 
     return {
       record,
@@ -93,7 +97,10 @@ export async function loadRagIndex(
   }
 }
 
-export async function listRagIndexes(indexDir?: string): Promise<PersistedRagIndexListItem[]> {
+export async function listRagIndexes(
+  indexDir?: string,
+  ownerId?: string
+): Promise<PersistedRagIndexListItem[]> {
   const resolvedIndexDir = resolveIndexDir(indexDir);
 
   try {
@@ -105,7 +112,12 @@ export async function listRagIndexes(indexDir?: string): Promise<PersistedRagInd
       .map((entry) => join(resolvedIndexDir, entry.name));
     const items = await Promise.all(indexFiles.map(readIndexListItem));
 
-    return items.sort((left, right) => {
+    const scopedItems =
+      ownerId === undefined
+        ? items
+        : items.filter((item) => item.resourceOwner === ownerId);
+
+    return scopedItems.sort((left, right) => {
       const createdAtOrder = right.createdAt.localeCompare(left.createdAt);
 
       if (createdAtOrder !== 0) {
@@ -129,9 +141,10 @@ export async function listRagIndexes(indexDir?: string): Promise<PersistedRagInd
 
 export async function deleteRagIndex(
   documentId: string,
-  indexDir?: string
+  indexDir?: string,
+  ownerId?: string
 ): Promise<PersistedRagIndexListItem> {
-  const saved = await loadRagIndex(documentId, indexDir);
+  const saved = await loadRagIndex(documentId, indexDir, ownerId);
 
   try {
     await unlink(saved.indexPath);
@@ -169,6 +182,7 @@ function hashDocumentId(documentId: string): string {
 function toListItem(record: PersistedRagIndex, indexPath: string): PersistedRagIndexListItem {
   return {
     createdAt: record.createdAt,
+    resourceOwner: record.resourceOwner,
     document: record.document,
     index: record.index,
     storage: {
@@ -196,6 +210,30 @@ function validatePersistedRagIndex(record: PersistedRagIndex, documentId: string
 
   if (!record.index || !Array.isArray(record.embeddedChunks)) {
     throw new ApiRequestError(`Persisted RAG index "${documentId}" is incomplete.`, 500);
+  }
+}
+
+function validateResourceOwnership(
+  record: PersistedRagIndex,
+  ownerId: string | undefined,
+  documentId: string
+): void {
+  if (!ownerId) {
+    return;
+  }
+
+  if (!record.resourceOwner) {
+    throw new ApiRequestError(
+      `No persisted RAG index found for documentId "${documentId}".`,
+      404
+    );
+  }
+
+  if (record.resourceOwner !== ownerId) {
+    throw new ApiRequestError(
+      `No persisted RAG index found for documentId "${documentId}".`,
+      404
+    );
   }
 }
 

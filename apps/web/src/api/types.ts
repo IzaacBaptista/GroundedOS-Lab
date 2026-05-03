@@ -6,7 +6,7 @@
  * only the JSON surface the web client reads.
  */
 
-export type EmbeddingProviderId = "api-lexical" | "local-hash" | "ollama";
+export type EmbeddingProviderId = "api-lexical" | "local-hash" | "ollama" | "openai";
 
 export interface EmbeddingModelInfo {
   provider: string;
@@ -55,6 +55,126 @@ export interface DevModeResult {
 
 export interface DevModeOutput {
   results: DevModeResult[];
+  cache?: {
+    hit: boolean;
+    similarity?: number;
+    thresholdUsed?: number;
+    adaptiveThresholdReason?: string;
+    cacheKey?: string;
+    contextHash?: string;
+    reason?: string;
+    savingsMs?: number;
+    hitRate?: number;
+    quality?: {
+      score?: number;
+      label?: "high" | "medium" | "low";
+      shadowChecked?: boolean;
+    };
+  };
+  routing?: {
+    selectedModel: string;
+    selectedProvider: string;
+    reason: string;
+    stage?: "pre-retrieval" | "post-retrieval";
+    strategy?: "query-only" | "hybrid";
+    confidence: number;
+    tradeoff: {
+      latency: string;
+      cost: string;
+      quality: string;
+    };
+    alternatives: Array<{
+      model: string;
+      provider: string;
+      reason: string;
+    }>;
+    features: Record<string, unknown>;
+    retrievalSignals?: {
+      resultCount: number;
+      topScore: number;
+      avgScore: number;
+      scoreSpread: number;
+      groundedResultRatio: number;
+      uniqueDocuments: number;
+    };
+    initialDecision?: {
+      selectedModel: string;
+      selectedProvider: string;
+      reason: string;
+      confidence: number;
+      tradeoff: {
+        latency: string;
+        cost: string;
+        quality: string;
+      };
+    };
+    refinement?: {
+      changed: boolean;
+      reason: string;
+      triggeredBy: string[];
+    };
+  };
+  orchestration?: {
+    mode: "single-model" | "multi-model";
+    enabled: boolean;
+    steps: Array<{
+      id: string;
+      model: string;
+      role: string;
+      inputPreview: string;
+      outputPreview: string;
+      durationMs: number;
+      grounded?: boolean;
+      qualityDelta?: number;
+    }>;
+    comparison?: {
+      singleModelAnswer: string;
+      multiModelAnswer: string;
+    };
+  };
+  reasoning?: {
+    enabled: boolean;
+    summary: string[];
+    decisionSteps: string[];
+  };
+  evals?: {
+    groundedness: number;
+    answerOverlap: number;
+    retrievalAccuracy: number;
+    pipelineScore: number;
+    modelScore: number;
+    scorerResults?: {
+      faithfulness?: { score: number; passed: boolean; reason?: string };
+      relevance?: { score: number; passed: boolean; reason?: string };
+      recall?: { score: number; passed: boolean; reason?: string };
+      averageScore: number;
+      passedCount: number;
+    };
+    evalHistory?: {
+      count: number;
+      avgPipelineScore: number;
+      avgFaithfulness: number;
+      avgRelevance: number;
+      trend: "improving" | "declining" | "stable";
+      recent: Array<{
+        timestamp: number;
+        query: string;
+        pipelineScore: number;
+        scorerResults?: { averageScore: number; passedCount: number };
+      }>;
+    };
+  };
+  cacheAwareRetrieval?: {
+    influenced: boolean;
+    boostedChunkIds: string[];
+    hybridScoreMode: string;
+  };
+  costBreakdown?: {
+    embeddingsUsd: number;
+    retrievalUsd: number;
+    generationUsd: number;
+    totalUsd: number;
+  };
   hybrid?: {
     mode: "hybrid";
     denseWeight: number;
@@ -82,6 +202,39 @@ export interface DevModeOutput {
       hybridScore: number;
       lexicalOverlapScore: number;
       finalScore: number;
+    }>;
+  };
+  contextEngineering?: {
+    retrievalQuery: string;
+    rewrittenQuery?: string;
+    expansionTerms: string[];
+    memoryAugmented: boolean;
+    memoryRecallCount: number;
+    candidateCount: number;
+    returnedCount: number;
+    selectedChunkIds: string[];
+    selectedSections: string[];
+    tokenEstimate: {
+      rawQuery: number;
+      retrievalQuery: number;
+      retrievedContext: number;
+      answer: number;
+    };
+    truncation: {
+      applied: boolean;
+      keptRatio: number;
+    };
+  };
+  agentLoop?: {
+    enabled: boolean;
+    mode: "inline-rag-agent";
+    steps: Array<{
+      id: string;
+      type: "reasoning" | "tool" | "decision";
+      title: string;
+      detail: string;
+      model?: string;
+      durationMs?: number;
     }>;
   };
   [key: string]: unknown;

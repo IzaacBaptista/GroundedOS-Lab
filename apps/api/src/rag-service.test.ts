@@ -188,7 +188,9 @@ describe("askRag", () => {
         query: "x",
         embeddingProvider: "semantic-placeholder" as unknown as "api-lexical",
       })
-    ).rejects.toThrow('embeddingProvider must be "api-lexical", "local-hash" or "ollama".');
+    ).rejects.toThrow(
+      'embeddingProvider must be "api-lexical", "local-hash", "ollama" or "openai".'
+    );
   });
 
   it("uses typed request errors for validation failures", async () => {
@@ -418,6 +420,62 @@ describe("persisted RAG indexes", () => {
     }
   });
 
+  it("can index and ask with the OpenAI provider when configured", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalApiKey = process.env.OPENAI_API_KEY;
+    const indexDir = await createTempIndexDir();
+
+    globalThis.fetch = createFakeOpenAiFetch();
+    process.env.OPENAI_API_KEY = "test-openai-key";
+
+    try {
+      const indexed = await indexRag({
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "OpenAI API Test",
+        documentId: "openai-api-test",
+        embeddingProvider: "openai",
+        indexDir,
+      });
+
+      expect(indexed.index).toMatchObject({
+        chunkCount: 2,
+        embeddingProvider: "openai",
+        embeddingDimensions: 1536,
+        embeddingModel: {
+          provider: "openai",
+          model: "text-embedding-3-small",
+          dimensions: 1536,
+          normalized: true,
+        },
+      });
+
+      const output = await askRag({
+        documentId: "openai-api-test",
+        query: "What explains vector search?",
+        topK: 1,
+        embeddingProvider: "api-lexical",
+        indexDir,
+      });
+
+      expect(output.index).toMatchObject({
+        embeddingProvider: "openai",
+        embeddingDimensions: 1536,
+      });
+      expect(output.answer.grounded).toBe(true);
+      expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalApiKey === undefined) {
+        delete process.env.OPENAI_API_KEY;
+      } else {
+        process.env.OPENAI_API_KEY = originalApiKey;
+      }
+      await rm(indexDir, { recursive: true, force: true });
+    }
+  });
+
   it("lists and deletes persisted indexes", async () => {
     const indexDir = await createTempIndexDir();
 
@@ -532,4 +590,35 @@ function createFakeOllamaVector(input: string, dimensions: number): number[] {
 
   vector[1] = 1;
   return vector;
+}
+
+function createFakeOpenAiFetch(): typeof fetch {
+  return (async (_url, init) => {
+    const body = JSON.parse(String(init?.body)) as {
+      input?: string | string[];
+      dimensions?: number;
+    };
+    const inputs = Array.isArray(body.input) ? body.input : [body.input ?? ""];
+    const dimensions = body.dimensions ?? 1536;
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          object: "list",
+          data: inputs.map((input, index) => ({
+            object: "embedding",
+            index,
+            embedding: createFakeOllamaVector(input, dimensions),
+          })),
+          model: "text-embedding-3-small",
+          usage: {
+            prompt_tokens: 12,
+            total_tokens: 12,
+          },
+        };
+      },
+    } as Response;
+  }) as typeof fetch;
 }

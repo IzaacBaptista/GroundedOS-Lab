@@ -67,7 +67,7 @@ JSON request body:
 | `title` | No | Optional document title for metadata and Dev Mode output. |
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | Additional object metadata passed into ETL. |
-| `embeddingProvider` | No | `"api-lexical"`, `"local-hash"` or `"ollama"`. Defaults to `"api-lexical"`. |
+| `embeddingProvider` | No | `"api-lexical"`, `"local-hash"`, `"ollama"` or `"openai"`. Defaults to `"api-lexical"`. |
 | `sessionId` | No | Optional session identifier for persistent per-session memory recall/store. |
 
 Response includes `document`, `answer`, `index`, and `devMode`.
@@ -108,7 +108,7 @@ Multipart fields:
 | `title` | No | Optional document title for metadata and Dev Mode output. |
 | `documentId` | No | Optional stable document ID. |
 | `metadata` | No | JSON object string with additional metadata passed into ETL. |
-| `embeddingProvider` | No | `"api-lexical"`, `"local-hash"` or `"ollama"`. Defaults to `"api-lexical"`. |
+| `embeddingProvider` | No | `"api-lexical"`, `"local-hash"`, `"ollama"` or `"openai"`. Defaults to `"api-lexical"`. |
 | `sessionId` | No | Optional session identifier for persistent per-session memory recall/store. |
 
 #### `POST /rag/index`
@@ -166,6 +166,21 @@ Optional environment variables:
 
 For a full install and verification tutorial, see
 [`docs/ollama-setup.md`](../../docs/ollama-setup.md).
+
+### OpenAI embeddings
+
+`embeddingProvider: "openai"` uses OpenAI embeddings via `POST /v1/embeddings`.
+It is opt-in and requires an API key:
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | unset | Required OpenAI API key |
+| `GROUNDEDOS_OPENAI_BASE_URL` | `https://api.openai.com/v1` | Optional OpenAI-compatible base URL |
+| `GROUNDEDOS_OPENAI_EMBED_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
+| `GROUNDEDOS_OPENAI_EMBED_DIMENSIONS` | `1536` | Expected vector dimensions saved with the index |
+| `GROUNDEDOS_OPENAI_REQUEST_TIMEOUT_MS` | package default | Request timeout override |
+| `OPENAI_ORG_ID` | unset | Optional organization header |
+| `OPENAI_PROJECT_ID` | unset | Optional project header |
 
 #### `GET /rag/indexes`
 

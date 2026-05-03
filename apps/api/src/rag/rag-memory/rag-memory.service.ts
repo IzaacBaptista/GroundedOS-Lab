@@ -6,7 +6,11 @@ import {
 
 @Injectable()
 export class RagMemoryService {
-  async listSession(sessionId: string, limit?: number): Promise<RagSessionMemoryResponse> {
-    return getRagSessionMemory(sessionId, limit);
+  async listSession(
+    sessionId: string,
+    ownerId?: string,
+    limit?: number
+  ): Promise<RagSessionMemoryResponse> {
+    return getRagSessionMemory(sessionId, limit, ownerId);
   }
 }

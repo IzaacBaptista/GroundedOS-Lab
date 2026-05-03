@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "fs/promises";
+import { createHmac, randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -8,6 +9,8 @@ import { createApiServer } from "./server";
 
 const servers: NestFastifyApplication[] = [];
 const tempDirs: string[] = [];
+
+process.env.AUTH_ENFORCEMENT = "false";
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
@@ -29,6 +32,976 @@ describe("api server", () => {
       status: "ok",
       service: "groundedos-api",
     });
+  });
+
+  it("serves POST /auth/login and returns bearer token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const body = response.json() as {
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+        user: { userId: string; username: string; roles: string[] };
+      };
+
+      expect(response.statusCode).toBe(200);
+      expect(body.accessToken).toBeTruthy();
+      expect(body.refreshToken).toBeTruthy();
+      expect(body.expiresIn).toBeGreaterThan(0);
+      expect(body.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
+      expect(body.user.roles).toContain("admin");
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("serves POST /auth/logout and revokes the active bearer token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const beforeLogout = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(beforeLogout.statusCode).toBe(200);
+
+      const logoutResponse = await app.inject({
+        method: "POST",
+        url: "/auth/logout",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(logoutResponse.statusCode).toBe(200);
+      expect(logoutResponse.json()).toEqual({
+        loggedOut: true,
+        tokenRevoked: true,
+      });
+
+      const afterLogout = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(afterLogout.statusCode).toBe(401);
+      expect(afterLogout.json()).toEqual({
+        error: {
+          message: "Invalid or expired token.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("serves POST /auth/refresh and rotates refresh token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as {
+        accessToken: string;
+        refreshToken: string;
+      };
+
+      const refreshResponse = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: loginBody.refreshToken,
+        },
+      });
+      const refreshBody = refreshResponse.json() as {
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+        user: { username: string };
+      };
+
+      expect(refreshResponse.statusCode).toBe(200);
+      expect(refreshBody.accessToken).toBeTruthy();
+      expect(refreshBody.accessToken).not.toBe(loginBody.accessToken);
+      expect(refreshBody.refreshToken).toBeTruthy();
+      expect(refreshBody.refreshToken).not.toBe(loginBody.refreshToken);
+      expect(refreshBody.expiresIn).toBeGreaterThan(0);
+      expect(refreshBody.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
+
+      const usingRefreshedAccess = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${refreshBody.accessToken}`,
+        },
+      });
+      expect(usingRefreshedAccess.statusCode).toBe(200);
+
+      const reusedOldRefresh = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: loginBody.refreshToken,
+        },
+      });
+      expect(reusedOldRefresh.statusCode).toBe(401);
+      expect(reusedOldRefresh.json()).toEqual({
+        error: {
+          message: "invalid refresh token.",
+        },
+      });
+
+      const rotatedRefresh = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: refreshBody.refreshToken,
+        },
+      });
+      expect(rotatedRefresh.statusCode).toBe(200);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("rejects using refresh token as bearer access token", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as {
+        refreshToken: string;
+      };
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.refreshToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Invalid or expired token.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("blocks protected endpoints when auth is enabled and no token is provided", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Authentication required.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("allows protected endpoints with bearer token when auth is enabled", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        count: expect.any(Number),
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("enforces per-user rate limits on protected endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousRateLimit = process.env.RATE_LIMIT_REQUESTS_PER_HOUR;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.RATE_LIMIT_REQUESTS_PER_HOUR = "1";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const firstProtectedCall = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(firstProtectedCall.statusCode).toBe(200);
+      expect(firstProtectedCall.headers["x-ratelimit-limit"]).toBe("1");
+      expect(firstProtectedCall.headers["x-ratelimit-remaining"]).toBe("0");
+
+      const secondProtectedCall = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+
+      expect(secondProtectedCall.statusCode).toBe(429);
+      expect(secondProtectedCall.headers["retry-after"]).toBeTruthy();
+      expect(secondProtectedCall.json()).toEqual({
+        error: {
+          message: "Rate limit exceeded.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.RATE_LIMIT_REQUESTS_PER_HOUR = previousRateLimit;
+    }
+  });
+
+  it("supports API key authentication for protected endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createApiKeyResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        payload: {
+          label: "integration-key",
+        },
+      });
+      const createApiKeyBody = createApiKeyResponse.json() as {
+        apiKey: string;
+        key: { id: string; label?: string };
+      };
+
+      expect(createApiKeyResponse.statusCode).toBe(201);
+      expect(createApiKeyBody.apiKey).toBeTruthy();
+      expect(createApiKeyBody.key.label).toBe("integration-key");
+
+      const secondCreateApiKeyResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        payload: {
+          label: "integration-key-2",
+        },
+      });
+      expect(secondCreateApiKeyResponse.statusCode).toBe(201);
+
+      const listFirstPage = await app.inject({
+        method: "GET",
+        url: "/admin/api-keys?limit=1",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listFirstPageBody = listFirstPage.json() as {
+        count: number;
+        nextCursor?: string;
+        keys: Array<{ id: string }>;
+      };
+      expect(listFirstPage.statusCode).toBe(200);
+      expect(listFirstPageBody.count).toBe(1);
+      expect(listFirstPageBody.nextCursor).toBeTruthy();
+
+      const listSecondPage = await app.inject({
+        method: "GET",
+        url: `/admin/api-keys?limit=1&cursor=${encodeURIComponent(listFirstPageBody.nextCursor ?? "")}`,
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listSecondPageBody = listSecondPage.json() as {
+        count: number;
+        keys: Array<{ id: string }>;
+      };
+      expect(listSecondPage.statusCode).toBe(200);
+      expect(listSecondPageBody.count).toBe(1);
+      expect(listSecondPageBody.keys[0]?.id).not.toBe(listFirstPageBody.keys[0]?.id);
+
+      const listAsc = await app.inject({
+        method: "GET",
+        url: "/admin/api-keys?limit=2&sort=createdAt:asc",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listAscBody = listAsc.json() as {
+        count: number;
+        keys: Array<{ id: string }>;
+      };
+      expect(listAsc.statusCode).toBe(200);
+      expect(listAscBody.count).toBe(2);
+      expect(listAscBody.keys[0]?.id).toBe(createApiKeyBody.key.id);
+
+      const listDesc = await app.inject({
+        method: "GET",
+        url: "/admin/api-keys?limit=2&sort=createdAt:desc",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const listDescBody = listDesc.json() as {
+        count: number;
+        keys: Array<{ id: string }>;
+      };
+      expect(listDesc.statusCode).toBe(200);
+      expect(listDescBody.count).toBe(2);
+      expect(listDescBody.keys.map((key) => key.id).sort()).toEqual(
+        listAscBody.keys.map((key) => key.id).sort()
+      );
+
+      const withApiKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": createApiKeyBody.apiKey,
+        },
+      });
+
+      expect(withApiKey.statusCode).toBe(200);
+
+      const revokeResponse = await app.inject({
+        method: "DELETE",
+        url: `/admin/api-keys/${createApiKeyBody.key.id}`,
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      expect(revokeResponse.statusCode).toBe(200);
+      expect(revokeResponse.json()).toEqual({
+        revoked: true,
+        id: createApiKeyBody.key.id,
+      });
+
+      const withRevokedKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": createApiKeyBody.apiKey,
+        },
+      });
+
+      expect(withRevokedKey.statusCode).toBe(401);
+      expect(withRevokedKey.json()).toEqual({
+        error: {
+          message: "Invalid API key.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("supports API key rotation and invalidates the previous key", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const created = createResponse.json() as {
+        apiKey: string;
+        key: { id: string };
+      };
+
+      const rotateResponse = await app.inject({
+        method: "POST",
+        url: `/admin/api-keys/${created.key.id}/rotate`,
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const rotated = rotateResponse.json() as {
+        rotated: true;
+        replacedId: string;
+        apiKey: string;
+        key: { id: string };
+      };
+
+      expect(rotateResponse.statusCode).toBe(201);
+      expect(rotated.replacedId).toBe(created.key.id);
+      expect(rotated.apiKey).toBeTruthy();
+      expect(rotated.apiKey).not.toBe(created.apiKey);
+
+      const withOldKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": created.apiKey,
+        },
+      });
+      expect(withOldKey.statusCode).toBe(401);
+
+      const withNewKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": rotated.apiKey,
+        },
+      });
+      expect(withNewKey.statusCode).toBe(200);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("rejects expired API keys", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousApiKeyTtl = process.env.API_KEY_TTL;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.API_KEY_TTL = "1ms";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+      });
+      const created = createResponse.json() as { apiKey: string };
+
+      await sleep(10);
+
+      const withExpiredKey = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": created.apiKey,
+        },
+      });
+
+      expect(withExpiredKey.statusCode).toBe(401);
+      expect(withExpiredKey.json()).toEqual({
+        error: {
+          message: "Invalid API key.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.API_KEY_TTL = previousApiKeyTtl;
+    }
+  });
+
+  it("scopes persisted indexes by owner when auth is enabled", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const adminToken = createTestToken({
+        sub: "user-admin",
+        username: "admin",
+        roles: ["admin", "user"],
+      });
+      const otherToken = createTestToken({
+        sub: "user-other",
+        username: "other",
+        roles: ["user"],
+      });
+
+      const indexResponse = await app.inject({
+        method: "POST",
+        url: "/rag/index",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          type: "text",
+          content: "Scoped index content.",
+          title: "Scoped Index",
+          documentId: "scoped-index-1",
+        },
+      });
+      expect(indexResponse.statusCode).toBe(200);
+
+      const ownerList = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const ownerListBody = ownerList.json() as { count: number };
+      expect(ownerList.statusCode).toBe(200);
+      expect(ownerListBody.count).toBeGreaterThanOrEqual(1);
+
+      const otherList = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          authorization: `Bearer ${otherToken}`,
+        },
+      });
+      expect(otherList.statusCode).toBe(200);
+      expect(otherList.json()).toEqual({ count: 0, indexes: [] });
+
+      const otherAsk = await app.inject({
+        method: "POST",
+        url: "/rag/ask",
+        headers: {
+          authorization: `Bearer ${otherToken}`,
+        },
+        payload: {
+          documentId: "scoped-index-1",
+          query: "What is this?",
+        },
+      });
+
+      expect(otherAsk.statusCode).toBe(404);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("scopes session memory by owner when auth is enabled", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const ownerToken = createTestToken({
+        sub: "user-owner",
+        username: "owner",
+        roles: ["user"],
+      });
+      const otherToken = createTestToken({
+        sub: "user-other",
+        username: "other",
+        roles: ["user"],
+      });
+      const sessionId = `scoped-session-${Date.now()}`;
+
+      const askResponse = await app.inject({
+        method: "POST",
+        url: "/rag/ask",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+        },
+        payload: {
+          type: "text",
+          content: "Alpha notes.\n\nBeta notes about retrieval metrics.",
+          query: "What mentions retrieval?",
+          topK: 1,
+          sessionId,
+        },
+      });
+      expect(askResponse.statusCode).toBe(200);
+
+      const ownerMemory = await app.inject({
+        method: "GET",
+        url: `/rag/memory/${encodeURIComponent(sessionId)}`,
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+        },
+      });
+      const ownerBody = ownerMemory.json() as { count: number };
+      expect(ownerMemory.statusCode).toBe(200);
+      expect(ownerBody.count).toBeGreaterThanOrEqual(1);
+
+      const otherMemory = await app.inject({
+        method: "GET",
+        url: `/rag/memory/${encodeURIComponent(sessionId)}`,
+        headers: {
+          authorization: `Bearer ${otherToken}`,
+        },
+      });
+      expect(otherMemory.statusCode).toBe(200);
+      expect(otherMemory.json()).toMatchObject({
+        sessionId,
+        count: 0,
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("blocks /lab endpoints when user role is not allowed", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousAllowedLabRoles = process.env.ALLOWED_LAB_ROLES;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.ALLOWED_LAB_ROLES = "admin,power-user";
+
+    try {
+      const app = await createTestServer();
+      const regularUserToken = createTestToken({
+        sub: "user-regular",
+        username: "regular",
+        roles: ["user"],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/lab/experiments",
+        headers: {
+          authorization: `Bearer ${regularUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Lab Mode features require one of: admin, power-user.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.ALLOWED_LAB_ROLES = previousAllowedLabRoles;
+    }
+  });
+
+  it("allows /lab endpoints when role is configured in ALLOWED_LAB_ROLES", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousAllowedLabRoles = process.env.ALLOWED_LAB_ROLES;
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.ALLOWED_LAB_ROLES = "admin,power-user";
+
+    try {
+      const app = await createTestServer();
+      const powerUserToken = createTestToken({
+        sub: "user-power",
+        username: "power",
+        roles: ["power-user"],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/lab/experiments",
+        headers: {
+          authorization: `Bearer ${powerUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        domains: expect.any(Array),
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.ALLOWED_LAB_ROLES = previousAllowedLabRoles;
+    }
+  });
+
+  it("blocks /admin endpoints for non-admin users", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const regularUserToken = createTestToken({
+        sub: "user-regular",
+        username: "regular",
+        roles: ["user"],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/cost/summary",
+        headers: {
+          authorization: `Bearer ${regularUserToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({
+        error: {
+          message: "Admin role required.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("allows admin to access /admin endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const indexDir = await createTempIndexDir();
+      const app = await createTestServer(indexDir);
+      const adminToken = createTestToken({
+        sub: "user-admin",
+        username: "admin",
+        roles: ["admin", "user"],
+      });
+
+      const seeded = await app.inject({
+        method: "POST",
+        url: "/rag/index",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: {
+          type: "text",
+          content: "Admin index seed content.",
+          title: "Admin Seed",
+          documentId: "admin-seed-index",
+        },
+      });
+      expect(seeded.statusCode).toBe(200);
+
+      const costSummary = await app.inject({
+        method: "GET",
+        url: "/admin/cost/summary",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(costSummary.statusCode).toBe(200);
+      expect(costSummary.json()).toMatchObject({
+        dailyTotalUsd: expect.any(Number),
+        tradeoffs: expect.any(Object),
+      });
+
+      const costSummarySecond = await app.inject({
+        method: "GET",
+        url: "/admin/cost/summary",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(costSummarySecond.statusCode).toBe(200);
+
+      const clearIndexes = await app.inject({
+        method: "DELETE",
+        url: "/admin/indexes/all",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(clearIndexes.statusCode).toBe(200);
+      expect(clearIndexes.json()).toMatchObject({
+        deletedCount: expect.any(Number),
+        deletedDocumentIds: expect.any(Array),
+      });
+
+      const auditLogs = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=1",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditBody = auditLogs.json() as {
+        count: number;
+        nextCursor?: string;
+        events: Array<{ action: string; userId?: string; resource?: string }>;
+      };
+
+      expect(auditLogs.statusCode).toBe(200);
+      expect(auditBody.count).toBe(1);
+      expect(auditBody.nextCursor).toBeTruthy();
+
+      const auditLogsPage2 = await app.inject({
+        method: "GET",
+        url: `/admin/audit/logs?limit=1&cursor=${encodeURIComponent(auditBody.nextCursor ?? "")}`,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditBodyPage2 = auditLogsPage2.json() as {
+        count: number;
+        events: Array<{ action: string; userId?: string; resource?: string }>;
+      };
+
+      expect(auditLogsPage2.statusCode).toBe(200);
+      expect(auditBodyPage2.count).toBe(1);
+
+      const costAuditFiltered = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=1&action=admin.cost.summary.read",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const costAuditBody = costAuditFiltered.json() as {
+        count: number;
+        events: Array<{ action: string }>;
+      };
+
+      expect(costAuditFiltered.statusCode).toBe(200);
+      expect(costAuditBody.count).toBeGreaterThanOrEqual(1);
+      expect(costAuditBody.events[0]?.action).toBe("admin.cost.summary.read");
+
+      const clearAuditFiltered = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=1&action=admin.indexes.clear_all",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const clearAuditBody = clearAuditFiltered.json() as {
+        count: number;
+        events: Array<{ action: string }>;
+      };
+
+      expect(clearAuditFiltered.statusCode).toBe(200);
+      expect(clearAuditBody.count).toBeGreaterThanOrEqual(1);
+      expect(clearAuditBody.events[0]?.action).toBe("admin.indexes.clear_all");
+
+      const auditCreatedDesc = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=2&action=admin.cost.summary.read&sort=createdAt:desc",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditCreatedDescBody = auditCreatedDesc.json() as {
+        count: number;
+        events: Array<{ id: string; action: string }>;
+      };
+      expect(auditCreatedDesc.statusCode).toBe(200);
+      expect(auditCreatedDescBody.count).toBeGreaterThanOrEqual(2);
+
+      const auditCreatedAsc = await app.inject({
+        method: "GET",
+        url: "/admin/audit/logs?limit=2&action=admin.cost.summary.read&sort=createdAt:asc",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const auditCreatedAscBody = auditCreatedAsc.json() as {
+        count: number;
+        events: Array<{ id: string; action: string }>;
+      };
+      expect(auditCreatedAsc.statusCode).toBe(200);
+      expect(auditCreatedAscBody.count).toBeGreaterThanOrEqual(2);
+
+      const descIdsSorted = auditCreatedDescBody.events.map((event) => event.id).sort();
+      const ascIdsSorted = auditCreatedAscBody.events.map((event) => event.id).sort();
+      expect(ascIdsSorted).toEqual(descIdsSorted);
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
   });
 
   it("serves JSON POST /rag/ask", async () => {
@@ -420,4 +1393,45 @@ async function createTempIndexDir(): Promise<string> {
   tempDirs.push(tempDir);
 
   return tempDir;
+}
+
+function createTestToken(input: {
+  sub: string;
+  username: string;
+  roles: string[];
+  tokenType?: "access" | "refresh";
+  expiresInSeconds?: number;
+}): string {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const payload = {
+    sub: input.sub,
+    username: input.username,
+    roles: input.roles,
+    tokenType: input.tokenType ?? "access",
+    jti: randomUUID(),
+    iat: nowSeconds,
+    exp: nowSeconds + (input.expiresInSeconds ?? 3600),
+  };
+  const header = {
+    alg: "HS256",
+    typ: "JWT",
+  };
+
+  const encodedHeader = toBase64Url(Buffer.from(JSON.stringify(header), "utf8"));
+  const encodedPayload = toBase64Url(Buffer.from(JSON.stringify(payload), "utf8"));
+  const data = `${encodedHeader}.${encodedPayload}`;
+  const secret = process.env.JWT_SECRET ?? "dev-secret-change-in-production-immediately";
+  const signature = toBase64Url(createHmac("sha256", secret).update(data).digest());
+
+  return `${data}.${signature}`;
+}
+
+function toBase64Url(input: Buffer): string {
+  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

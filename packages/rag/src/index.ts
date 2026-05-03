@@ -16,6 +16,7 @@ export {
 export {
   DeterministicEmbeddingProvider,
   LocalHashEmbeddingsProvider,
+  OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   createEmbeddingProviderRegistry,
   embeddingProviderToSemantic,
@@ -31,6 +32,7 @@ export {
   type EmbeddingProviderRegistry,
   type EmbeddingVector,
   type LocalHashEmbeddingsProviderOptions,
+  type OpenAIEmbeddingsProviderOptions,
   type OllamaEmbeddingsProviderOptions,
   type SemanticEmbeddingsProvider,
 } from "./embeddings";
@@ -68,8 +70,15 @@ export {
 // Semantic Cache (Phase 2 — Concept 4)
 export {
   SemanticCache,
+  buildCacheKey,
+  hashContextSignature,
+  selectAdaptiveCacheThreshold,
   type CacheEntry,
   type SemanticCacheConfig,
   type CacheLookupResult,
   type CacheMetrics,
+  type CacheLookupContext,
+  type CacheStoreContext,
+  type CacheShadowEvalInput,
+  type AdaptiveThresholdInput,
 } from "./semantic-cache";

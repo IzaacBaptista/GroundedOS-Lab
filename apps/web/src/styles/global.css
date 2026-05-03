@@ -176,12 +176,19 @@ h3 {
   color: var(--danger);
 }
 
+.app-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 18px;
+  align-items: start;
+  padding-top: 18px;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-  padding-top: 18px;
 }
 
 .panel {
@@ -462,6 +469,14 @@ textarea:focus {
   border-color: rgba(180, 178, 169, 0.55);
   color: var(--text);
   box-shadow: inset 0 0 0 1px rgba(180, 178, 169, 0.2);
+}
+
+.concepts-tab-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: -8px 0 14px;
 }
 
 .empty-state {
@@ -1309,6 +1324,10 @@ textarea:focus {
 
   .topbar__meta {
     justify-content: flex-start;
+  }
+
+  .app-body {
+    grid-template-columns: 1fr;
   }
 
   .workspace {

@@ -15,7 +15,10 @@ export default defineConfig({
     host: "0.0.0.0",
     proxy: {
       "/api": {
-        target: process.env.API_BASE_URL ?? DEFAULT_API_BASE_URL,
+        target:
+          process.env.VITE_API_BASE_URL ??
+          process.env.API_BASE_URL ??
+          DEFAULT_API_BASE_URL,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },

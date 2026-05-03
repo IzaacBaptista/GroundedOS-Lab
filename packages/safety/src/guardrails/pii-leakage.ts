@@ -13,7 +13,7 @@ export class PIILeakageGuardrail implements Guardrail {
   readonly riskType = 'pii-leakage' as const;
 
   async check(input: GuardrailInput): Promise<GuardrailResult> {
-    const { text, role } = input;
+    const { text } = input;
 
     const detectedPatterns: string[] = [];
     let sanitized = text;
@@ -31,7 +31,7 @@ export class PIILeakageGuardrail implements Guardrail {
 
     if (detectedPatterns.length > 0) {
       return {
-        blocked: role === 'user' ? false : false, // Never block, always sanitize
+        blocked: false, // Never block, always sanitize
         reason: `PII detected: ${detectedPatterns.join(', ')}`,
         sanitized,
         detectedPatterns,

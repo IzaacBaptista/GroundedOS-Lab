@@ -156,6 +156,9 @@ export interface AskTextParams {
   embeddingProvider: EmbeddingProviderId;
   sessionId?: string;
   title?: string;
+  useMultiModelOrchestration?: boolean;
+  reasoningEnabled?: boolean;
+  enableShadowRetrieval?: boolean;
 }
 
 export async function askWithText(
@@ -172,6 +175,9 @@ export async function askWithText(
       embeddingProvider: params.embeddingProvider,
       sessionId: params.sessionId || undefined,
       title: params.title || undefined,
+      useMultiModelOrchestration: params.useMultiModelOrchestration ?? true,
+      reasoningEnabled: params.reasoningEnabled ?? false,
+      enableShadowRetrieval: params.enableShadowRetrieval ?? true,
     }),
   });
   return parseResponse<RagAskResponse>(response);
@@ -185,6 +191,9 @@ export interface AskFileParams {
   embeddingProvider: EmbeddingProviderId;
   sessionId?: string;
   title?: string;
+  useMultiModelOrchestration?: boolean;
+  reasoningEnabled?: boolean;
+  enableShadowRetrieval?: boolean;
 }
 
 export async function askWithFile(
@@ -206,6 +215,13 @@ export async function askWithFile(
     form.append("title", params.title);
   }
 
+  form.append(
+    "useMultiModelOrchestration",
+    String(params.useMultiModelOrchestration ?? true)
+  );
+  form.append("reasoningEnabled", String(params.reasoningEnabled ?? false));
+  form.append("enableShadowRetrieval", String(params.enableShadowRetrieval ?? true));
+
   const response = await fetch(`${API_PREFIX}/rag/ask`, {
     method: "POST",
     body: form,
@@ -218,6 +234,9 @@ export interface AskPersistedParams {
   query: string;
   topK: number;
   sessionId?: string;
+  useMultiModelOrchestration?: boolean;
+  reasoningEnabled?: boolean;
+  enableShadowRetrieval?: boolean;
 }
 
 export async function askWithPersisted(

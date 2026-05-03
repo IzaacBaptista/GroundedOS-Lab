@@ -24,10 +24,7 @@ export class IndirectInjectionGuardrail implements Guardrail {
   readonly riskType = 'indirect-injection' as const;
 
   async check(input: GuardrailInput): Promise<GuardrailResult> {
-    const { text, metadata } = input;
-
-    // This guardrail is primarily for document content
-    const isDocumentContent = metadata?.source === 'document' || metadata?.type === 'chunk';
+    const { text } = input;
 
     const detectedPatterns: string[] = [];
 
@@ -40,13 +37,14 @@ export class IndirectInjectionGuardrail implements Guardrail {
     if (detectedPatterns.length > 0) {
       let sanitized = text;
 
-      // Sanitize by replacing patterns with neutral placeholders
+      // Sanitize by replacing patterns with neutral placeholders (use global flag to replace all occurrences)
       for (const pattern of DOCUMENT_INJECTION_PATTERNS) {
-        sanitized = sanitized.replace(pattern, '[REDACTED_INSTRUCTION]');
+        const globalPattern = new RegExp(pattern.source, pattern.global ? pattern.flags : pattern.flags + 'g');
+        sanitized = sanitized.replace(globalPattern, '[REDACTED_INSTRUCTION]');
       }
 
       return {
-        blocked: isDocumentContent ? false : false, // Never block, but sanitize
+        blocked: false, // Never block, but sanitize
         reason: 'Embedded instruction patterns detected in document',
         sanitized,
         detectedPatterns,

@@ -8,7 +8,7 @@
  * ----------
  * - `ingest(input)`       — unified entry point; routes to the correct extractor
  * - `TextExtractor`       — working plain-text extractor
- * - `PdfExtractor`        — stub (Phase 1)
+ * - `PdfExtractor`        — implemented (full PDF text extraction)
  * - `ImageExtractor`      — stub (Phase 1)
  * - `AudioExtractor`      — stub (Phase 1)
  *

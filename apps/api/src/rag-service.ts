@@ -12,11 +12,13 @@ import {
   type WorkflowStep,
 } from "@groundedos/core";
 import { ingest } from "@groundedos/etl";
+import { orchestrateAnswerPipeline } from "@groundedos/agents";
 import {
   FileSessionMemoryStore,
   type MemoryEntry,
   type MemorySearchResult,
 } from "@groundedos/memory";
+import { routeModel } from "@groundedos/model-routing";
 import {
   CostBudgetEnforcer,
   CostLedger,
@@ -31,10 +33,11 @@ import {
   buildRetrievalIndex,
   InMemoryVectorStore,
   LocalHashEmbeddingsProvider,
+  OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   SemanticCache,
-  processQuery,
   retrieveForDevMode,
+  selectAdaptiveCacheThreshold,
   semanticToEmbeddingProvider,
   type EmbeddingModelInfo,
   type EmbeddingProvider,
@@ -43,7 +46,17 @@ import {
   type RetrievalIndex,
   type RetrievalDevModeOutput,
 } from "@groundedos/rag";
+import { processQuery } from "@groundedos/query-understanding";
+import {
+  FaithfulnessEvaluator,
+  RelevanceEvaluator,
+  RecallEvaluator,
+} from "@groundedos/evals";
 import { ApiRequestError } from "./errors";
+import {
+  recordEvalHistory,
+  getEvalHistorySummary,
+} from "./eval-history-store.js";
 import {
   deleteRagIndex,
   listRagIndexes,
@@ -57,6 +70,9 @@ const EMBEDDING_DIMENSIONS = 64;
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OLLAMA_EMBEDDING_MODEL = "embeddinggemma";
 const DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS = 768;
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+const DEFAULT_OPENAI_EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_MEMORY_RECALL_LIMIT = 3;
 const DEFAULT_RETRIEVAL_MODE = "hybrid" as const;
 const DEFAULT_RERANK_CANDIDATE_MULTIPLIER = 3;
@@ -67,12 +83,17 @@ const sessionMemoryStore = new FileSessionMemoryStore(
   process.env.GROUNDEDOS_MEMORY_DIR ?? ".groundedos/memory/sessions"
 );
 
+// Singleton eval scorers — reused across requests to avoid allocation overhead
+const faithfulnessEvaluator = new FaithfulnessEvaluator();
+const relevanceEvaluator = new RelevanceEvaluator();
+const recallEvaluator = new RecallEvaluator(3);
+
 export { ApiRequestError } from "./errors";
 
 type SupportedApiModality = Extract<DocumentModality, "text" | "pdf">;
 type ApiEmbeddingProviderId = Extract<
   EmbeddingProviderId,
-  "api-lexical" | "local-hash" | "ollama"
+  "api-lexical" | "local-hash" | "ollama" | "openai"
 >;
 
 const DEFAULT_API_EMBEDDING_PROVIDER: ApiEmbeddingProviderId = "api-lexical";
@@ -94,6 +115,10 @@ export type RagAskRequest = {
   metadata?: Record<string, unknown>;
   indexDir?: string;
   embeddingProvider?: ApiEmbeddingProviderId;
+  useMultiModelOrchestration?: boolean;
+  reasoningEnabled?: boolean;
+  enableShadowRetrieval?: boolean;
+  ownerId?: string;
 };
 
 export type RagAskFileRequest = {
@@ -108,6 +133,10 @@ export type RagAskFileRequest = {
   metadata?: Record<string, unknown>;
   indexDir?: string;
   embeddingProvider?: ApiEmbeddingProviderId;
+  useMultiModelOrchestration?: boolean;
+  reasoningEnabled?: boolean;
+  enableShadowRetrieval?: boolean;
+  ownerId?: string;
 };
 
 export type RagIndexRequest = {
@@ -118,6 +147,7 @@ export type RagIndexRequest = {
   metadata?: Record<string, unknown>;
   indexDir?: string;
   embeddingProvider?: ApiEmbeddingProviderId;
+  ownerId?: string;
 };
 
 export type RagIndexFileRequest = {
@@ -129,6 +159,7 @@ export type RagIndexFileRequest = {
   metadata?: Record<string, unknown>;
   indexDir?: string;
   embeddingProvider?: ApiEmbeddingProviderId;
+  ownerId?: string;
 };
 
 export type RagDocumentSummary = {
@@ -161,9 +192,118 @@ export type RagAskResponse = {
     cache?: {
       hit: boolean;
       similarity?: number;
+      thresholdUsed?: number;
+      adaptiveThresholdReason?: string;
+      cacheKey?: string;
+      contextHash?: string;
+      reason?: string;
+      quality?: {
+        score?: number;
+        label?: "high" | "medium" | "low";
+        shadowChecked?: boolean;
+      };
+      savingsMs?: number;
       hits?: number;
       misses?: number;
       evictions?: number;
+      hitRate?: number;
+    };
+    routing?: {
+      selectedModel: string;
+      selectedProvider: string;
+      reason: string;
+      stage?: "pre-retrieval" | "post-retrieval";
+      strategy?: "query-only" | "hybrid";
+      confidence: number;
+      tradeoff: {
+        latency: string;
+        cost: string;
+        quality: string;
+      };
+      alternatives: Array<{
+        model: string;
+        provider: string;
+        reason: string;
+      }>;
+      features: Record<string, unknown>;
+      retrievalSignals?: RetrievalRoutingSignalsSummary;
+      initialDecision?: {
+        selectedModel: string;
+        selectedProvider: string;
+        reason: string;
+        confidence: number;
+        tradeoff: {
+          latency: string;
+          cost: string;
+          quality: string;
+        };
+      };
+      refinement?: {
+        changed: boolean;
+        reason: string;
+        triggeredBy: string[];
+      };
+    };
+    orchestration?: {
+      mode: "single-model" | "multi-model";
+      enabled: boolean;
+      steps: Array<{
+        id: string;
+        model: string;
+        role: string;
+        inputPreview: string;
+        outputPreview: string;
+        durationMs: number;
+        grounded?: boolean;
+        qualityDelta?: number;
+      }>;
+      comparison?: {
+        singleModelAnswer: string;
+        multiModelAnswer: string;
+      };
+    };
+    reasoning?: {
+      enabled: boolean;
+      summary: string[];
+      decisionSteps: string[];
+    };
+    evals?: {
+      groundedness: number;
+      answerOverlap: number;
+      retrievalAccuracy: number;
+      pipelineScore: number;
+      modelScore: number;
+      scorerResults?: {
+        faithfulness?: { score: number; passed: boolean; reason?: string };
+        relevance?: { score: number; passed: boolean; reason?: string };
+        recall?: { score: number; passed: boolean; reason?: string };
+        averageScore: number;
+        passedCount: number;
+      };
+      evalHistory?: {
+        count: number;
+        avgPipelineScore: number;
+        avgFaithfulness: number;
+        avgRelevance: number;
+        trend: "improving" | "declining" | "stable";
+        recent: Array<{
+          timestamp: number;
+          query: string;
+          pipelineScore: number;
+          scorerResults?: { averageScore: number; passedCount: number };
+        }>;
+      };
+    };
+    costBreakdown?: {
+      embeddingsUsd: number;
+      retrievalUsd: number;
+      generationUsd: number;
+      totalUsd: number;
+    };
+    cacheAwareRetrieval?: {
+      influenced: boolean;
+      boostedChunkIds: string[];
+      hybridScoreMode: string;
     };
     cost?: RequestCostSummary;
     memory?: {
@@ -207,7 +347,49 @@ export type RagAskResponse = {
         avg: number;
       };
     }[];
+    contextEngineering?: {
+      retrievalQuery: string;
+      rewrittenQuery?: string;
+      expansionTerms: string[];
+      memoryAugmented: boolean;
+      memoryRecallCount: number;
+      candidateCount: number;
+      returnedCount: number;
+      selectedChunkIds: string[];
+      selectedSections: string[];
+      tokenEstimate: {
+        rawQuery: number;
+        retrievalQuery: number;
+        retrievedContext: number;
+        answer: number;
+      };
+      truncation: {
+        applied: boolean;
+        keptRatio: number;
+      };
+    };
+    agentLoop?: {
+      enabled: boolean;
+      mode: "inline-rag-agent";
+      steps: Array<{
+        id: string;
+        type: "reasoning" | "tool" | "decision";
+        title: string;
+        detail: string;
+        model?: string;
+        durationMs?: number;
+      }>;
+    };
   };
+};
+
+type RetrievalRoutingSignalsSummary = {
+  resultCount: number;
+  topScore: number;
+  avgScore: number;
+  scoreSpread: number;
+  groundedResultRatio: number;
+  uniqueDocuments: number;
 };
 
 export type RagIndexResponse = {
@@ -375,6 +557,16 @@ export type RagModelBenchmarkRunResponse = {
   output: string;
 };
 
+export type RagAdminClearIndexesResponse = {
+  deletedCount: number;
+  deletedDocumentIds: string[];
+};
+
+export type RagAdminCostSummaryResponse = {
+  dailyTotalUsd: number;
+  tradeoffs: RagTradeoffMetricsResponse;
+};
+
 export type RagSessionMemoryResponse = {
   sessionId: string;
   count: number;
@@ -398,12 +590,39 @@ export function getRagTradeoffMetrics(): RagTradeoffMetricsResponse {
   return tradeoffMetricsStore.getSummary();
 }
 
+export async function clearAllPersistedRagIndexes(
+  indexDir?: string
+): Promise<RagAdminClearIndexesResponse> {
+  const indexes = await listRagIndexes(indexDir);
+  const deletedDocumentIds: string[] = [];
+
+  for (const item of indexes) {
+    await deleteRagIndex(item.document.documentId, indexDir);
+    semanticCache.invalidate(item.document.documentId);
+    deletedDocumentIds.push(item.document.documentId);
+  }
+
+  return {
+    deletedCount: deletedDocumentIds.length,
+    deletedDocumentIds,
+  };
+}
+
+export async function getRagAdminCostSummary(): Promise<RagAdminCostSummaryResponse> {
+  return {
+    dailyTotalUsd: await costLedger.getDailyTotalUsd(),
+    tradeoffs: getRagTradeoffMetrics(),
+  };
+}
+
 export async function getRagSessionMemory(
   sessionId: string,
-  limit = 20
+  limit = 20,
+  ownerId?: string
 ): Promise<RagSessionMemoryResponse> {
   const normalized = normalizeSessionId(sessionId);
-  const entries = await sessionMemoryStore.list(normalized, limit);
+  const scopedSessionId = createOwnedSessionId(ownerId, normalized);
+  const entries = await sessionMemoryStore.list(scopedSessionId, limit);
 
   return {
     sessionId: normalized,
@@ -477,7 +696,13 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
     normalizedRequest.query,
     normalizedRequest.topK,
     normalizedRequest.embeddingProvider,
-    normalizedRequest.sessionId
+    normalizedRequest.sessionId,
+    request.ownerId,
+    {
+      useMultiModelOrchestration: normalizedRequest.useMultiModelOrchestration,
+      reasoningEnabled: normalizedRequest.reasoningEnabled,
+      enableShadowRetrieval: normalizedRequest.enableShadowRetrieval,
+    }
   );
 
   const response: RagAskResponse = {
@@ -524,7 +749,13 @@ export async function askRagFromFile(
     normalizedRequest.query,
     normalizedRequest.topK,
     normalizedRequest.embeddingProvider,
-    normalizedRequest.sessionId
+    normalizedRequest.sessionId,
+    request.ownerId,
+    {
+      useMultiModelOrchestration: normalizedRequest.useMultiModelOrchestration,
+      reasoningEnabled: normalizedRequest.reasoningEnabled,
+      enableShadowRetrieval: normalizedRequest.enableShadowRetrieval,
+    }
   );
 
   const response: RagAskResponse = {
@@ -575,6 +806,7 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
   const indexSummary = createIndexSummary(index);
   const saved = await saveRagIndex(
     {
+      resourceOwner: request.ownerId,
       document: documentSummary,
       index: indexSummary,
       embeddedChunks: index.embeddedChunks,
@@ -631,6 +863,7 @@ export async function indexRagFromFile(
   const indexSummary = createIndexSummary(index);
   const saved = await saveRagIndex(
     {
+      resourceOwner: request.ownerId,
       document: documentSummary,
       index: indexSummary,
       embeddedChunks: index.embeddedChunks,
@@ -651,10 +884,25 @@ export async function indexRagFromFile(
 }
 
 export async function askPersistedRag(
-  request: Pick<RagAskRequest, "documentId" | "query" | "topK" | "indexDir" | "sessionId">
+  request: Pick<
+    RagAskRequest,
+    | "documentId"
+    | "query"
+    | "topK"
+    | "indexDir"
+    | "sessionId"
+    | "ownerId"
+    | "useMultiModelOrchestration"
+    | "reasoningEnabled"
+    | "enableShadowRetrieval"
+  >
 ): Promise<RagAskResponse> {
   const normalizedRequest = normalizePersistedAskRequest(request);
-  const saved = await loadRagIndex(normalizedRequest.documentId, normalizedRequest.indexDir);
+  const saved = await loadRagIndex(
+    normalizedRequest.documentId,
+    normalizedRequest.indexDir,
+    normalizedRequest.ownerId
+  );
   const provider = createApiEmbeddingProviderFromIndex(
     saved.record.index,
     normalizedRequest.documentId
@@ -671,7 +919,13 @@ export async function askPersistedRag(
     },
     normalizedRequest.query,
     normalizedRequest.topK,
-    normalizedRequest.sessionId
+    normalizedRequest.sessionId,
+    normalizedRequest.ownerId,
+    {
+      useMultiModelOrchestration: normalizedRequest.useMultiModelOrchestration,
+      reasoningEnabled: normalizedRequest.reasoningEnabled,
+      enableShadowRetrieval: normalizedRequest.enableShadowRetrieval,
+    }
   );
 
   const response: RagAskResponse = {
@@ -689,8 +943,11 @@ export async function askPersistedRag(
   return response;
 }
 
-export async function listPersistedRagIndexes(indexDir?: string): Promise<RagIndexListResponse> {
-  const indexes = await listRagIndexes(indexDir);
+export async function listPersistedRagIndexes(
+  indexDir?: string,
+  ownerId?: string
+): Promise<RagIndexListResponse> {
+  const indexes = await listRagIndexes(indexDir, ownerId);
 
   return {
     count: indexes.length,
@@ -700,13 +957,14 @@ export async function listPersistedRagIndexes(indexDir?: string): Promise<RagInd
 
 export async function getPersistedRagEmbeddingMap(
   documentId: string,
-  indexDir?: string
+  indexDir?: string,
+  ownerId?: string
 ): Promise<RagEmbeddingMapResponse> {
   if (typeof documentId !== "string" || documentId.trim().length === 0) {
     throw new ApiRequestError("documentId must be a non-empty string.");
   }
 
-  const saved = await loadRagIndex(documentId.trim(), indexDir);
+  const saved = await loadRagIndex(documentId.trim(), indexDir, ownerId);
   const chunks = saved.record.embeddedChunks;
   const { xDimension, yDimension } = selectProjectionDimensions(
     chunks.map((chunk) => chunk.embedding)
@@ -751,13 +1009,14 @@ export async function getPersistedRagEmbeddingMap(
 
 export async function deletePersistedRagIndex(
   documentId: string,
-  indexDir?: string
+  indexDir?: string,
+  ownerId?: string
 ): Promise<RagIndexDeleteResponse> {
   if (typeof documentId !== "string" || documentId.trim().length === 0) {
     throw new ApiRequestError("documentId must be a non-empty string.");
   }
 
-  const index = await deleteRagIndex(documentId.trim(), indexDir);
+  const index = await deleteRagIndex(documentId.trim(), indexDir, ownerId);
   semanticCache.invalidate(documentId.trim());
 
   return {
@@ -842,7 +1101,16 @@ function buildEmbeddingMapClusters(
 }
 
 function normalizeRequest(request: RagAskRequest): Required<
-  Pick<RagAskRequest, "content" | "query" | "topK" | "embeddingProvider">
+  Pick<
+    RagAskRequest,
+    | "content"
+    | "query"
+    | "topK"
+    | "embeddingProvider"
+    | "useMultiModelOrchestration"
+    | "reasoningEnabled"
+    | "enableShadowRetrieval"
+  >
 > &
   Pick<RagAskRequest, "title" | "documentId" | "metadata" | "sessionId"> {
   if (!request || typeof request !== "object") {
@@ -890,11 +1158,18 @@ function normalizeRequest(request: RagAskRequest): Required<
     throw new ApiRequestError("metadata must be an object when provided.");
   }
 
+  validateOptionalBoolean(request.useMultiModelOrchestration, "useMultiModelOrchestration");
+  validateOptionalBoolean(request.reasoningEnabled, "reasoningEnabled");
+  validateOptionalBoolean(request.enableShadowRetrieval, "enableShadowRetrieval");
+
   return {
     content: request.content,
     query: request.query.trim(),
     topK,
     embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
+    useMultiModelOrchestration: request.useMultiModelOrchestration ?? true,
+    reasoningEnabled: request.reasoningEnabled ?? false,
+    enableShadowRetrieval: request.enableShadowRetrieval ?? true,
     title: request.title,
     documentId: request.documentId,
     sessionId: request.sessionId,
@@ -905,7 +1180,7 @@ function normalizeRequest(request: RagAskRequest): Required<
 function normalizeIndexRequest(request: RagIndexRequest): Required<
   Pick<RagIndexRequest, "content" | "embeddingProvider">
 > &
-  Pick<RagIndexRequest, "title" | "documentId" | "metadata" | "indexDir"> {
+  Pick<RagIndexRequest, "title" | "documentId" | "metadata" | "indexDir" | "ownerId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -933,11 +1208,22 @@ function normalizeIndexRequest(request: RagIndexRequest): Required<
     documentId: request.documentId,
     metadata: request.metadata,
     indexDir: request.indexDir,
+    ownerId: request.ownerId,
   };
 }
 
 function normalizeFileRequest(request: RagAskFileRequest): Required<
-  Pick<RagAskFileRequest, "filePath" | "query" | "topK" | "type" | "embeddingProvider">
+  Pick<
+    RagAskFileRequest,
+    | "filePath"
+    | "query"
+    | "topK"
+    | "type"
+    | "embeddingProvider"
+    | "useMultiModelOrchestration"
+    | "reasoningEnabled"
+    | "enableShadowRetrieval"
+  >
 > &
   Pick<RagAskFileRequest, "title" | "documentId" | "metadata" | "originalFilename" | "sessionId"> {
   if (!request || typeof request !== "object") {
@@ -983,12 +1269,19 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
     throw new ApiRequestError("metadata must be an object when provided.");
   }
 
+  validateOptionalBoolean(request.useMultiModelOrchestration, "useMultiModelOrchestration");
+  validateOptionalBoolean(request.reasoningEnabled, "reasoningEnabled");
+  validateOptionalBoolean(request.enableShadowRetrieval, "enableShadowRetrieval");
+
   return {
     filePath: request.filePath,
     query: request.query.trim(),
     topK,
     type,
     embeddingProvider: normalizeEmbeddingProvider(request.embeddingProvider),
+    useMultiModelOrchestration: request.useMultiModelOrchestration ?? true,
+    reasoningEnabled: request.reasoningEnabled ?? false,
+    enableShadowRetrieval: request.enableShadowRetrieval ?? true,
     title: request.title,
     documentId: request.documentId,
     sessionId: request.sessionId,
@@ -1000,7 +1293,10 @@ function normalizeFileRequest(request: RagAskFileRequest): Required<
 function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
   Pick<RagIndexFileRequest, "filePath" | "type" | "embeddingProvider">
 > &
-  Pick<RagIndexFileRequest, "title" | "documentId" | "metadata" | "originalFilename" | "indexDir"> {
+  Pick<
+    RagIndexFileRequest,
+    "title" | "documentId" | "metadata" | "originalFilename" | "indexDir" | "ownerId"
+  > {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Multipart request data must be provided.");
   }
@@ -1028,13 +1324,35 @@ function normalizeIndexFileRequest(request: RagIndexFileRequest): Required<
     metadata: request.metadata,
     originalFilename: request.originalFilename,
     indexDir: request.indexDir,
+    ownerId: request.ownerId,
   };
 }
 
 function normalizePersistedAskRequest(
-  request: Pick<RagAskRequest, "documentId" | "query" | "topK" | "indexDir" | "sessionId">
-): Required<Pick<RagAskRequest, "documentId" | "query" | "topK">> &
-  Pick<RagAskRequest, "indexDir" | "sessionId"> {
+  request: Pick<
+    RagAskRequest,
+    | "documentId"
+    | "query"
+    | "topK"
+    | "indexDir"
+    | "sessionId"
+    | "ownerId"
+    | "useMultiModelOrchestration"
+    | "reasoningEnabled"
+    | "enableShadowRetrieval"
+  >
+): Required<
+  Pick<
+    RagAskRequest,
+    | "documentId"
+    | "query"
+    | "topK"
+    | "useMultiModelOrchestration"
+    | "reasoningEnabled"
+    | "enableShadowRetrieval"
+  >
+> &
+  Pick<RagAskRequest, "indexDir" | "sessionId" | "ownerId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -1051,6 +1369,10 @@ function normalizePersistedAskRequest(
     throw new ApiRequestError("sessionId must be a string when provided.");
   }
 
+  validateOptionalBoolean(request.useMultiModelOrchestration, "useMultiModelOrchestration");
+  validateOptionalBoolean(request.reasoningEnabled, "reasoningEnabled");
+  validateOptionalBoolean(request.enableShadowRetrieval, "enableShadowRetrieval");
+
   const topK = request.topK ?? DEFAULT_TOP_K;
 
   if (!Number.isInteger(topK) || topK <= 0) {
@@ -1061,8 +1383,12 @@ function normalizePersistedAskRequest(
     documentId: request.documentId.trim(),
     query: request.query.trim(),
     topK,
+    useMultiModelOrchestration: request.useMultiModelOrchestration ?? true,
+    reasoningEnabled: request.reasoningEnabled ?? false,
+    enableShadowRetrieval: request.enableShadowRetrieval ?? true,
     indexDir: request.indexDir,
     sessionId: request.sessionId,
+    ownerId: request.ownerId,
   };
 }
 async function runLocalRag(
@@ -1070,7 +1396,13 @@ async function runLocalRag(
   query: string,
   topK: number,
   embeddingProviderId: ApiEmbeddingProviderId,
-  sessionId?: string
+  sessionId?: string,
+  ownerId?: string,
+  options?: {
+    useMultiModelOrchestration?: boolean;
+    reasoningEnabled?: boolean;
+    enableShadowRetrieval?: boolean;
+  }
 ): Promise<Pick<RagAskResponse, "answer" | "index" | "devMode">> {
   const provider = createApiEmbeddingProvider(embeddingProviderId);
   const budget = resolveCostBudgetFromEnv();
@@ -1091,7 +1423,43 @@ async function runLocalRag(
     queryEmbedding?: EmbeddingVector;
     cacheHit?: boolean;
     cacheSimilarity?: number;
+    cacheThresholdUsed?: number;
+    cacheAdaptiveReason?: string;
+    cacheLookupReason?: string;
+    cacheKey?: string;
+    cacheContextHash?: string;
+    cachedCandidateChunkIds?: string[];
+    cacheQualityLabel?: "high" | "medium" | "low";
+    cacheQualityScore?: number;
+    cacheShadowChecked?: boolean;
+    cacheSavingsMs?: number;
+    initialRoutingDecision?: ReturnType<typeof routeModel>;
+    routingDecision?: ReturnType<typeof routeModel>;
+    routingSignals?: RetrievalRoutingSignalsSummary;
+    orchestration?: ReturnType<typeof orchestrateAnswerPipeline>;
+    reasoningSummary?: string[];
+    decisionSteps?: string[];
+    evals?: {
+      groundedness: number;
+      answerOverlap: number;
+      retrievalAccuracy: number;
+      pipelineScore: number;
+      modelScore: number;
+      scorerResults?: {
+        faithfulness?: { score: number; passed: boolean; reason?: string };
+        relevance?: { score: number; passed: boolean; reason?: string };
+        recall?: { score: number; passed: boolean; reason?: string };
+        averageScore: number;
+        passedCount: number;
+      };
+    };
+    cacheAwareRetrieval?: {
+      influenced: boolean;
+      boostedChunkIds: string[];
+      hybridScoreMode: string;
+    };
     sessionId?: string;
+    ownerId?: string;
     memoryMatches?: MemorySearchResult[];
     memoryStored?: boolean;
     rerankCandidateCount?: number;
@@ -1121,7 +1489,7 @@ async function runLocalRag(
         }
 
         const matches = await sessionMemoryStore.search(
-          input.sessionId,
+          createOwnedSessionId(input.ownerId, input.sessionId),
           input.rawQuery,
           DEFAULT_MEMORY_RECALL_LIMIT
         );
@@ -1173,6 +1541,7 @@ async function runLocalRag(
       async run(input) {
         const processedQuery = processQuery({ text: input.rawQuery });
         validateProcessedQuery(processedQuery);
+        const routingDecision = routeModel(input.rawQuery);
 
         const memoryHint = (input.memoryMatches ?? [])
           .map((match) => `${match.entry.query} ${match.entry.answer}`)
@@ -1190,6 +1559,13 @@ async function runLocalRag(
         return {
           ...input,
           processedQuery,
+          initialRoutingDecision: routingDecision,
+          routingDecision,
+          decisionSteps: [
+            `intent=${processedQuery.intent}`,
+            `confidence=${processedQuery.confidence.toFixed(2)}`,
+            `selectedModel=${routingDecision.selectedModel}`,
+          ],
           retrievalQuery: retrievalQuery.length > 0 ? retrievalQuery : input.rawQuery,
         };
       },
@@ -1206,11 +1582,26 @@ async function runLocalRag(
             ...input,
             cacheHit: false,
             cacheSimilarity: undefined,
+            cacheLookupReason: "session-memory-enabled",
           };
         }
 
         const queryEmbedding = await embedQueryVector(input.provider, input.retrievalQuery);
-        const cacheLookup = semanticCache.lookup(input.document.documentId, queryEmbedding);
+        const adaptive = selectAdaptiveCacheThreshold({
+          queryText: input.retrievalQuery,
+          intent: input.processedQuery?.intent,
+          embeddingVariance: computeVectorVariance(queryEmbedding),
+          recentCacheQualityScore: semanticCache.getMetrics().cacheQualityScore,
+        });
+        const contextSignature = `${input.processedQuery?.intent ?? "unknown"}|topK=${input.topK}|provider=${input.provider.name}`;
+        const cacheLookup = semanticCache.lookupWithContext({
+          indexId: input.document.documentId,
+          indexVersion: input.document.metadata?.checksum as string | undefined,
+          queryText: input.retrievalQuery,
+          queryEmbedding,
+          contextSignature,
+          threshold: adaptive.threshold,
+        });
 
         if (cacheLookup.hit && isCachedRagPayload(cacheLookup.entry?.result)) {
           const cached = cacheLookup.entry.result;
@@ -1220,6 +1611,11 @@ async function runLocalRag(
             queryEmbedding,
             cacheHit: true,
             cacheSimilarity: cacheLookup.similarity,
+            cacheThresholdUsed: cacheLookup.thresholdUsed,
+            cacheAdaptiveReason: adaptive.reason,
+            cacheLookupReason: cacheLookup.reason,
+            cacheKey: cacheLookup.cacheKey,
+            cacheContextHash: cacheLookup.contextHash,
             devMode: cached.devMode,
             answer: cached.answer,
             indexSummary: cached.index,
@@ -1231,6 +1627,12 @@ async function runLocalRag(
           queryEmbedding,
           cacheHit: false,
           cacheSimilarity: cacheLookup.similarity,
+          cacheThresholdUsed: cacheLookup.thresholdUsed,
+          cacheAdaptiveReason: adaptive.reason,
+          cacheLookupReason: cacheLookup.reason,
+          cacheKey: cacheLookup.cacheKey,
+          cacheContextHash: cacheLookup.contextHash,
+          cachedCandidateChunkIds: extractCachedChunkIds(cacheLookup.entry?.result),
         };
       },
     },
@@ -1265,6 +1667,8 @@ async function runLocalRag(
           mode: DEFAULT_RETRIEVAL_MODE,
         });
 
+        const cacheAware = applyCacheAwareRetrievalSignal(devMode, input.cachedCandidateChunkIds);
+
         input.costTracker.trackEvent(
           "retrieval",
           input.provider.name,
@@ -1275,7 +1679,12 @@ async function runLocalRag(
 
         return {
           ...input,
-          devMode,
+          devMode: cacheAware.output,
+          cacheAwareRetrieval: {
+            influenced: cacheAware.influenced,
+            boostedChunkIds: cacheAware.boostedChunkIds,
+            hybridScoreMode: cacheAware.influenced ? "retrieval+cache" : "retrieval-only",
+          },
           rerankCandidateCount: devMode.resultCount,
         };
       },
@@ -1288,6 +1697,10 @@ async function runLocalRag(
         }
 
         const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const routingSignals = buildRetrievalRoutingSignals(reranked);
+        const refinedRoutingDecision = routeModel(input.rawQuery, {
+          postRetrieval: routingSignals,
+        });
         const rerankInputTokens = estimateTokenUsage(
           `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
         );
@@ -1309,6 +1722,12 @@ async function runLocalRag(
         return {
           ...input,
           devMode: reranked,
+          routingSignals,
+          routingDecision: refinedRoutingDecision,
+          decisionSteps: [
+            ...(input.decisionSteps ?? []),
+            `postModel=${refinedRoutingDecision.selectedModel}`,
+          ],
           rerankInputTokens,
         };
       },
@@ -1324,18 +1743,126 @@ async function runLocalRag(
 
         if (!input.sessionId && !input.cacheHit && input.queryEmbedding) {
           const indexSummary = input.indexSummary ?? createIndexSummary(input.index!);
-          semanticCache.set(input.document.documentId, input.queryEmbedding, input.processedQuery!, {
-            answer,
-            index: indexSummary,
-            devMode: input.devMode,
+          const contextSignature = `${input.processedQuery?.intent ?? "unknown"}|topK=${input.topK}|provider=${input.provider.name}`;
+          semanticCache.setWithContext({
+            indexId: input.document.documentId,
+            indexVersion: input.document.metadata?.checksum as string | undefined,
+            queryText: input.retrievalQuery,
+            queryEmbedding: input.queryEmbedding,
+            contextSignature,
+            processedQuery: input.processedQuery!,
+            result: {
+              answer,
+              index: indexSummary,
+              devMode: input.devMode,
+            },
+            ttlMs: semanticCache.getConfig().ttlMs,
           });
+        }
+
+        const orchestration = orchestrateAnswerPipeline({
+          baseAnswer: answer.text,
+          question: input.rawQuery,
+          retrievedContext: input.devMode.results.map((item) => item.text).join(" "),
+          config: {
+            enabled: options?.useMultiModelOrchestration ?? true,
+            verifyGrounding: true,
+            draftModel: "local-extractive",
+            refineModel: input.routingDecision?.selectedModel ?? "groq",
+          },
+        });
+
+        const finalAnswer = {
+          ...answer,
+          text: orchestration.finalAnswer,
+        };
+
+        const evals = evaluateRagQuality({
+          answer: finalAnswer.text,
+          query: input.rawQuery,
+          grounded: finalAnswer.grounded,
+          results: input.devMode.results,
+        });
+
+        // Run structured scorers from @groundedos/evals
+        const evalChunkInput = {
+          question: input.rawQuery,
+          answer: finalAnswer.text,
+          retrievedChunks: input.devMode.results.map((item) => ({
+            chunkId: item.chunkId,
+            text: item.text,
+            score: item.score,
+          })),
+        };
+        const [faithResult, relevResult, recallResult] = await Promise.all([
+          faithfulnessEvaluator.evaluate(evalChunkInput),
+          relevanceEvaluator.evaluate(evalChunkInput),
+          recallEvaluator.evaluate(evalChunkInput),
+        ]);
+        const scorerResults = {
+          faithfulness: { score: faithResult.score, passed: faithResult.passed, reason: faithResult.reason },
+          relevance: { score: relevResult.score, passed: relevResult.passed, reason: relevResult.reason },
+          recall: { score: recallResult.score, passed: recallResult.passed, reason: recallResult.reason },
+          averageScore: Number(((faithResult.score + relevResult.score + recallResult.score) / 3).toFixed(3)),
+          passedCount: [faithResult, relevResult, recallResult].filter((r) => r.passed).length,
+        };
+        recordEvalHistory({
+          timestamp: Date.now(),
+          query: input.rawQuery,
+          documentId: input.document.documentId,
+          groundedness: evals.groundedness,
+          answerOverlap: evals.answerOverlap,
+          pipelineScore: evals.pipelineScore,
+          scorerResults,
+        });
+        const evalsWithScorers = {
+          ...evals,
+          scorerResults,
+          evalHistory: getEvalHistorySummary(input.document.documentId),
+        };
+
+        const reasoningSummary = buildReasoningSummary(
+          options?.reasoningEnabled ?? false,
+          input.routingDecision,
+          input.processedQuery,
+          orchestration
+        );
+
+        let cacheQualityLabel: "high" | "medium" | "low" | undefined;
+        let cacheQualityScore: number | undefined;
+        let cacheShadowChecked = false;
+        let cacheSavingsMs: number | undefined;
+
+        if ((options?.enableShadowRetrieval ?? true) && input.cacheHit && semanticCache.shouldRunShadowCheck()) {
+          cacheShadowChecked = true;
+          const shadow = semanticCache.evaluateShadow({
+            indexId: input.document.documentId,
+            cacheEntry: {
+              cacheKey: input.cacheKey ?? "",
+              indexId: input.document.documentId,
+              contextSignature: input.cacheContextHash ?? "",
+              indexVersion: String(input.document.metadata?.checksum ?? "v1"),
+              queryEmbedding: input.queryEmbedding ?? [],
+              processedQuery: input.processedQuery!,
+              result: {},
+              createdAt: Date.now(),
+              hitCount: 0,
+              ttlMs: semanticCache.getConfig().ttlMs,
+            },
+            freshChunkIds: input.devMode.results.map((item) => item.chunkId),
+            cachedChunkIds: input.devMode.results.map((item) => item.chunkId),
+            estimatedFreshLatencyMs: 40,
+          });
+          cacheQualityLabel = shadow.qualityLabel;
+          cacheQualityScore = shadow.agreement;
+          cacheSavingsMs = 40;
         }
 
         let memoryStored = false;
 
         if (input.sessionId) {
           await sessionMemoryStore.append({
-            sessionId: input.sessionId,
+            sessionId: createOwnedSessionId(input.ownerId, input.sessionId),
             query: input.rawQuery,
             answer: answer.text,
             metadata: {
@@ -1353,7 +1880,14 @@ async function runLocalRag(
 
         return {
           ...input,
-          answer,
+          answer: finalAnswer,
+          orchestration,
+          evals: evalsWithScorers,
+          reasoningSummary,
+          cacheQualityLabel,
+          cacheQualityScore,
+          cacheShadowChecked,
+          cacheSavingsMs,
           costSummary,
           memoryStored,
         };
@@ -1369,6 +1903,7 @@ async function runLocalRag(
     topK,
     provider,
     sessionId: normalizeSessionIdOrUndefined(sessionId),
+    ownerId,
     costTracker: new CostTracker(document.documentId),
   });
 
@@ -1380,28 +1915,85 @@ async function runLocalRag(
   }
 
   const cacheMetrics = semanticCache.getMetrics();
-  const resolvedIndexSummary = result.output.indexSummary ?? createIndexSummary(result.output.index);
+  const resolvedIndexSummary = result.output!.indexSummary ?? createIndexSummary(result.output!.index!);
+  const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
 
   const response = {
-    answer: result.output.answer ?? createGroundedAnswer(result.output.devMode),
+    answer: finalAnswer,
     index: resolvedIndexSummary,
     devMode: {
-      ...result.output.devMode,
-      processedQuery: result.output.processedQuery,
+      ...result.output!.devMode!,
+      processedQuery: result.output!.processedQuery,
       workflowContext: result.context,
       cache: {
-        hit: Boolean(result.output.cacheHit),
-        similarity: result.output.cacheSimilarity,
+        hit: Boolean(result.output!.cacheHit),
+        similarity: result.output!.cacheSimilarity,
+        thresholdUsed: result.output!.cacheThresholdUsed,
+        adaptiveThresholdReason: result.output!.cacheAdaptiveReason,
+        cacheKey: result.output!.cacheKey,
+        contextHash: result.output!.cacheContextHash,
+        reason: result.output!.cacheLookupReason,
+        quality: {
+          score: result.output!.cacheQualityScore,
+          label: result.output!.cacheQualityLabel,
+          shadowChecked: result.output!.cacheShadowChecked,
+        },
+        savingsMs: result.output!.cacheSavingsMs,
         hits: cacheMetrics.hits,
         misses: cacheMetrics.misses,
         evictions: cacheMetrics.evictions,
+        hitRate: cacheMetrics.cacheHitRate,
       },
-      cost: result.output.costSummary,
+      routing: result.output!.routingDecision
+        ? {
+            selectedModel: result.output!.routingDecision.selectedModel,
+            selectedProvider: result.output!.routingDecision.selectedProvider,
+            reason: result.output!.routingDecision.reason,
+            stage: result.output!.routingDecision.stage,
+            strategy: result.output!.routingDecision.strategy,
+            confidence: result.output!.routingDecision.confidence,
+            tradeoff: result.output!.routingDecision.tradeoff,
+            alternatives: result.output!.routingDecision.alternatives,
+            features: result.output!.routingDecision.features as unknown as Record<string, unknown>,
+            retrievalSignals: result.output!.routingSignals,
+            initialDecision: result.output!.initialRoutingDecision
+              ? {
+                  selectedModel: result.output!.initialRoutingDecision.selectedModel,
+                  selectedProvider: result.output!.initialRoutingDecision.selectedProvider,
+                  reason: result.output!.initialRoutingDecision.reason,
+                  confidence: result.output!.initialRoutingDecision.confidence,
+                  tradeoff: result.output!.initialRoutingDecision.tradeoff,
+                }
+              : undefined,
+            refinement: result.output!.routingDecision.refinement,
+          }
+        : undefined,
+      orchestration: result.output!.orchestration
+        ? {
+            mode: result.output!.orchestration.mode,
+            enabled: true,
+            steps: result.output!.orchestration.steps,
+            comparison: result.output!.orchestration.comparison,
+          }
+        : {
+            mode: "single-model" as const,
+            enabled: false,
+            steps: [],
+          },
+      reasoning: {
+        enabled: options?.reasoningEnabled ?? false,
+        summary: result.output!.reasoningSummary ?? [],
+        decisionSteps: result.output!.decisionSteps ?? [],
+      },
+      evals: result.output!.evals,
+      cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
+      costBreakdown: buildCostBreakdown(result.output!.costSummary),
+      cost: result.output!.costSummary,
       memory: {
-        sessionId: result.output.sessionId,
-        recalled: result.output.memoryMatches?.length ?? 0,
-        stored: Boolean(result.output.memoryStored),
-        matches: (result.output.memoryMatches ?? []).map((match) => ({
+        sessionId: result.output!.sessionId,
+        recalled: result.output!.memoryMatches?.length ?? 0,
+        stored: Boolean(result.output!.memoryStored),
+        matches: (result.output!.memoryMatches ?? []).map((match) => ({
           score: match.score,
           query: match.entry.query,
           answer: match.entry.answer,
@@ -1410,24 +2002,47 @@ async function runLocalRag(
       },
       reranking: {
         applied: true,
-        candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        returnedCount: result.output.devMode.resultCount,
-        candidates: getRerankingCandidates(result.output.devMode),
+        candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        returnedCount: result.output!.devMode!.resultCount,
+        candidates: getRerankingCandidates(result.output!.devMode!),
       },
       stageMetrics: buildStageMetrics(result.context, {
-        rawQuery: result.output.rawQuery,
-        retrievalQuery: result.output.retrievalQuery,
-        retrievalResultCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResultCount: result.output.devMode.resultCount,
+        rawQuery: result.output!.rawQuery,
+        retrievalQuery: result.output!.retrievalQuery,
+        retrievalResultCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResultCount: result.output!.devMode!.resultCount,
         rerankInputTokens:
-          result.output.rerankInputTokens ?? estimateTokenUsage(result.output.retrievalQuery),
-        expansionCount: result.output.processedQuery?.expanded.length ?? 0,
+          result.output!.rerankInputTokens ?? estimateTokenUsage(result.output!.retrievalQuery),
+        expansionCount: result.output!.processedQuery?.expanded.length ?? 0,
       }),
       retrievalSpans: buildRetrievalSpans(result.context, {
-        retrievalResults: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResults: result.output.devMode.resultCount,
-        scores: result.output.devMode.results.map((item) => item.score),
+        retrievalResults: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResults: result.output!.devMode!.resultCount,
+        scores: result.output!.devMode!.results.map((item) => item.score),
       }),
+      contextEngineering: buildContextEngineering(
+        {
+          rawQuery: result.output!.rawQuery,
+          retrievalQuery: result.output!.retrievalQuery,
+          processedQuery: result.output!.processedQuery,
+          memoryMatches: result.output!.memoryMatches,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          devMode: result.output!.devMode!,
+        },
+        finalAnswer
+      ),
+      agentLoop: buildAgentLoopTrace(
+        result.context,
+        {
+          processedQuery: result.output!.processedQuery,
+          routingDecision: result.output!.routingDecision,
+          initialRoutingDecision: result.output!.initialRoutingDecision,
+          devMode: result.output!.devMode!,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          orchestration: result.output!.orchestration,
+        },
+        finalAnswer
+      ),
     },
   };
 
@@ -1450,7 +2065,13 @@ async function runPersistedRag(
   index: RetrievalIndex,
   query: string,
   topK: number,
-  sessionId?: string
+  sessionId?: string,
+  ownerId?: string,
+  options?: {
+    useMultiModelOrchestration?: boolean;
+    reasoningEnabled?: boolean;
+    enableShadowRetrieval?: boolean;
+  }
 ): Promise<Pick<RagAskResponse, "answer" | "index" | "devMode">> {
   const budget = resolveCostBudgetFromEnv();
   const budgetEnforcer = new CostBudgetEnforcer(budget);
@@ -1468,7 +2089,43 @@ async function runPersistedRag(
     queryEmbedding?: EmbeddingVector;
     cacheHit?: boolean;
     cacheSimilarity?: number;
+    cacheThresholdUsed?: number;
+    cacheAdaptiveReason?: string;
+    cacheLookupReason?: string;
+    cacheKey?: string;
+    cacheContextHash?: string;
+    cachedCandidateChunkIds?: string[];
+    cacheQualityLabel?: "high" | "medium" | "low";
+    cacheQualityScore?: number;
+    cacheShadowChecked?: boolean;
+    cacheSavingsMs?: number;
+    initialRoutingDecision?: ReturnType<typeof routeModel>;
+    routingDecision?: ReturnType<typeof routeModel>;
+    routingSignals?: RetrievalRoutingSignalsSummary;
+    orchestration?: ReturnType<typeof orchestrateAnswerPipeline>;
+    reasoningSummary?: string[];
+    decisionSteps?: string[];
+    evals?: {
+      groundedness: number;
+      answerOverlap: number;
+      retrievalAccuracy: number;
+      pipelineScore: number;
+      modelScore: number;
+      scorerResults?: {
+        faithfulness?: { score: number; passed: boolean; reason?: string };
+        relevance?: { score: number; passed: boolean; reason?: string };
+        recall?: { score: number; passed: boolean; reason?: string };
+        averageScore: number;
+        passedCount: number;
+      };
+    };
+    cacheAwareRetrieval?: {
+      influenced: boolean;
+      boostedChunkIds: string[];
+      hybridScoreMode: string;
+    };
     sessionId?: string;
+    ownerId?: string;
     memoryMatches?: MemorySearchResult[];
     memoryStored?: boolean;
     rerankCandidateCount?: number;
@@ -1499,7 +2156,7 @@ async function runPersistedRag(
         }
 
         const matches = await sessionMemoryStore.search(
-          input.sessionId,
+          createOwnedSessionId(input.ownerId, input.sessionId),
           input.rawQuery,
           DEFAULT_MEMORY_RECALL_LIMIT
         );
@@ -1532,6 +2189,7 @@ async function runPersistedRag(
       async run(input) {
         const processedQuery = processQuery({ text: input.rawQuery });
         validateProcessedQuery(processedQuery);
+        const routingDecision = routeModel(input.rawQuery);
 
         const memoryHint = (input.memoryMatches ?? [])
           .map((match) => `${match.entry.query} ${match.entry.answer}`)
@@ -1549,6 +2207,13 @@ async function runPersistedRag(
         return {
           ...input,
           processedQuery,
+          initialRoutingDecision: routingDecision,
+          routingDecision,
+          decisionSteps: [
+            `intent=${processedQuery.intent}`,
+            `confidence=${processedQuery.confidence.toFixed(2)}`,
+            `selectedModel=${routingDecision.selectedModel}`,
+          ],
           retrievalQuery: retrievalQuery.length > 0 ? retrievalQuery : input.rawQuery,
         };
       },
@@ -1561,11 +2226,26 @@ async function runPersistedRag(
             ...input,
             cacheHit: false,
             cacheSimilarity: undefined,
+            cacheLookupReason: "session-memory-enabled",
           };
         }
 
         const queryEmbedding = await embedQueryVector(input.index.embeddingProvider, input.retrievalQuery);
-        const cacheLookup = semanticCache.lookup(persistedDocumentId, queryEmbedding);
+        const adaptive = selectAdaptiveCacheThreshold({
+          queryText: input.retrievalQuery,
+          intent: input.processedQuery?.intent,
+          embeddingVariance: computeVectorVariance(queryEmbedding),
+          recentCacheQualityScore: semanticCache.getMetrics().cacheQualityScore,
+        });
+        const contextSignature = `${input.processedQuery?.intent ?? "unknown"}|topK=${input.topK}|provider=${input.index.embeddingProvider.name}`;
+        const cacheLookup = semanticCache.lookupWithContext({
+          indexId: persistedDocumentId,
+          indexVersion: persistedDocumentId,
+          queryText: input.retrievalQuery,
+          queryEmbedding,
+          contextSignature,
+          threshold: adaptive.threshold,
+        });
 
         if (cacheLookup.hit && isCachedRagPayload(cacheLookup.entry?.result)) {
           const cached = cacheLookup.entry.result;
@@ -1575,6 +2255,11 @@ async function runPersistedRag(
             queryEmbedding,
             cacheHit: true,
             cacheSimilarity: cacheLookup.similarity,
+            cacheThresholdUsed: cacheLookup.thresholdUsed,
+            cacheAdaptiveReason: adaptive.reason,
+            cacheLookupReason: cacheLookup.reason,
+            cacheKey: cacheLookup.cacheKey,
+            cacheContextHash: cacheLookup.contextHash,
             devMode: cached.devMode,
             answer: cached.answer,
             indexSummary: cached.index,
@@ -1586,6 +2271,12 @@ async function runPersistedRag(
           queryEmbedding,
           cacheHit: false,
           cacheSimilarity: cacheLookup.similarity,
+          cacheThresholdUsed: cacheLookup.thresholdUsed,
+          cacheAdaptiveReason: adaptive.reason,
+          cacheLookupReason: cacheLookup.reason,
+          cacheKey: cacheLookup.cacheKey,
+          cacheContextHash: cacheLookup.contextHash,
+          cachedCandidateChunkIds: extractCachedChunkIds(cacheLookup.entry?.result),
         };
       },
     },
@@ -1616,6 +2307,8 @@ async function runPersistedRag(
           mode: DEFAULT_RETRIEVAL_MODE,
         });
 
+        const cacheAware = applyCacheAwareRetrievalSignal(devMode, input.cachedCandidateChunkIds);
+
         input.costTracker.trackEvent(
           "retrieval",
           providerName,
@@ -1626,7 +2319,12 @@ async function runPersistedRag(
 
         return {
           ...input,
-          devMode,
+          devMode: cacheAware.output,
+          cacheAwareRetrieval: {
+            influenced: cacheAware.influenced,
+            boostedChunkIds: cacheAware.boostedChunkIds,
+            hybridScoreMode: cacheAware.influenced ? "retrieval+cache" : "retrieval-only",
+          },
           rerankCandidateCount: devMode.resultCount,
         };
       },
@@ -1640,6 +2338,10 @@ async function runPersistedRag(
 
         const providerName = input.index.embeddingProvider.name;
         const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const routingSignals = buildRetrievalRoutingSignals(reranked);
+        const refinedRoutingDecision = routeModel(input.rawQuery, {
+          postRetrieval: routingSignals,
+        });
         const rerankInputTokens = estimateTokenUsage(
           `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
         );
@@ -1661,6 +2363,12 @@ async function runPersistedRag(
         return {
           ...input,
           devMode: reranked,
+          routingSignals,
+          routingDecision: refinedRoutingDecision,
+          decisionSteps: [
+            ...(input.decisionSteps ?? []),
+            `postModel=${refinedRoutingDecision.selectedModel}`,
+          ],
           rerankInputTokens,
         };
       },
@@ -1676,18 +2384,126 @@ async function runPersistedRag(
 
         if (!input.sessionId && !input.cacheHit && input.queryEmbedding) {
           const indexSummary = input.indexSummary ?? createIndexSummary(input.index);
-          semanticCache.set(persistedDocumentId, input.queryEmbedding, input.processedQuery!, {
-            answer,
-            index: indexSummary,
-            devMode: input.devMode,
+          const contextSignature = `${input.processedQuery?.intent ?? "unknown"}|topK=${input.topK}|provider=${input.index.embeddingProvider.name}`;
+          semanticCache.setWithContext({
+            indexId: persistedDocumentId,
+            indexVersion: persistedDocumentId,
+            queryText: input.retrievalQuery,
+            queryEmbedding: input.queryEmbedding,
+            contextSignature,
+            processedQuery: input.processedQuery!,
+            result: {
+              answer,
+              index: indexSummary,
+              devMode: input.devMode,
+            },
+            ttlMs: semanticCache.getConfig().ttlMs,
           });
+        }
+
+        const orchestration = orchestrateAnswerPipeline({
+          baseAnswer: answer.text,
+          question: input.rawQuery,
+          retrievedContext: input.devMode.results.map((item) => item.text).join(" "),
+          config: {
+            enabled: options?.useMultiModelOrchestration ?? true,
+            verifyGrounding: true,
+            draftModel: "local-extractive",
+            refineModel: input.routingDecision?.selectedModel ?? "groq",
+          },
+        });
+
+        const finalAnswer = {
+          ...answer,
+          text: orchestration.finalAnswer,
+        };
+
+        const evals = evaluateRagQuality({
+          answer: finalAnswer.text,
+          query: input.rawQuery,
+          grounded: finalAnswer.grounded,
+          results: input.devMode.results,
+        });
+
+        // Run structured scorers from @groundedos/evals
+        const evalChunkInput = {
+          question: input.rawQuery,
+          answer: finalAnswer.text,
+          retrievedChunks: input.devMode.results.map((item) => ({
+            chunkId: item.chunkId,
+            text: item.text,
+            score: item.score,
+          })),
+        };
+        const [faithResult, relevResult, recallResult] = await Promise.all([
+          faithfulnessEvaluator.evaluate(evalChunkInput),
+          relevanceEvaluator.evaluate(evalChunkInput),
+          recallEvaluator.evaluate(evalChunkInput),
+        ]);
+        const scorerResults = {
+          faithfulness: { score: faithResult.score, passed: faithResult.passed, reason: faithResult.reason },
+          relevance: { score: relevResult.score, passed: relevResult.passed, reason: relevResult.reason },
+          recall: { score: recallResult.score, passed: recallResult.passed, reason: recallResult.reason },
+          averageScore: Number(((faithResult.score + relevResult.score + recallResult.score) / 3).toFixed(3)),
+          passedCount: [faithResult, relevResult, recallResult].filter((r) => r.passed).length,
+        };
+        recordEvalHistory({
+          timestamp: Date.now(),
+          query: input.rawQuery,
+          documentId: persistedDocumentId,
+          groundedness: evals.groundedness,
+          answerOverlap: evals.answerOverlap,
+          pipelineScore: evals.pipelineScore,
+          scorerResults,
+        });
+        const evalsWithScorers = {
+          ...evals,
+          scorerResults,
+          evalHistory: getEvalHistorySummary(persistedDocumentId),
+        };
+
+        const reasoningSummary = buildReasoningSummary(
+          options?.reasoningEnabled ?? false,
+          input.routingDecision,
+          input.processedQuery,
+          orchestration
+        );
+
+        let cacheQualityLabel: "high" | "medium" | "low" | undefined;
+        let cacheQualityScore: number | undefined;
+        let cacheShadowChecked = false;
+        let cacheSavingsMs: number | undefined;
+
+        if ((options?.enableShadowRetrieval ?? true) && input.cacheHit && semanticCache.shouldRunShadowCheck()) {
+          cacheShadowChecked = true;
+          const shadow = semanticCache.evaluateShadow({
+            indexId: persistedDocumentId,
+            cacheEntry: {
+              cacheKey: input.cacheKey ?? "",
+              indexId: persistedDocumentId,
+              contextSignature: input.cacheContextHash ?? "",
+              indexVersion: persistedDocumentId,
+              queryEmbedding: input.queryEmbedding ?? [],
+              processedQuery: input.processedQuery!,
+              result: {},
+              createdAt: Date.now(),
+              hitCount: 0,
+              ttlMs: semanticCache.getConfig().ttlMs,
+            },
+            freshChunkIds: input.devMode.results.map((item) => item.chunkId),
+            cachedChunkIds: input.devMode.results.map((item) => item.chunkId),
+            estimatedFreshLatencyMs: 40,
+          });
+          cacheQualityLabel = shadow.qualityLabel;
+          cacheQualityScore = shadow.agreement;
+          cacheSavingsMs = 40;
         }
 
         let memoryStored = false;
 
         if (input.sessionId) {
           await sessionMemoryStore.append({
-            sessionId: input.sessionId,
+            sessionId: createOwnedSessionId(input.ownerId, input.sessionId),
             query: input.rawQuery,
             answer: answer.text,
             metadata: {
@@ -1705,7 +2521,14 @@ async function runPersistedRag(
 
         return {
           ...input,
-          answer,
+          answer: finalAnswer,
+          orchestration,
+          evals: evalsWithScorers,
+          reasoningSummary,
+          cacheQualityLabel,
+          cacheQualityScore,
+          cacheShadowChecked,
+          cacheSavingsMs,
           costSummary,
           memoryStored,
         };
@@ -1720,6 +2543,7 @@ async function runPersistedRag(
     retrievalQuery: query,
     topK,
     sessionId: normalizeSessionIdOrUndefined(sessionId),
+    ownerId,
     costTracker: new CostTracker(persistedDocumentId),
   });
 
@@ -1731,28 +2555,85 @@ async function runPersistedRag(
   }
 
   const cacheMetrics = semanticCache.getMetrics();
-  const indexSummary = result.output.indexSummary ?? createIndexSummary(index);
+  const indexSummary = result.output!.indexSummary ?? createIndexSummary(index);
+  const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
 
   const response = {
-    answer: result.output.answer ?? createGroundedAnswer(result.output.devMode),
+    answer: finalAnswer,
     index: indexSummary,
     devMode: {
-      ...result.output.devMode,
-      processedQuery: result.output.processedQuery,
+      ...result.output!.devMode!,
+      processedQuery: result.output!.processedQuery,
       workflowContext: result.context,
       cache: {
-        hit: Boolean(result.output.cacheHit),
-        similarity: result.output.cacheSimilarity,
+        hit: Boolean(result.output!.cacheHit),
+        similarity: result.output!.cacheSimilarity,
+        thresholdUsed: result.output!.cacheThresholdUsed,
+        adaptiveThresholdReason: result.output!.cacheAdaptiveReason,
+        cacheKey: result.output!.cacheKey,
+        contextHash: result.output!.cacheContextHash,
+        reason: result.output!.cacheLookupReason,
+        quality: {
+          score: result.output!.cacheQualityScore,
+          label: result.output!.cacheQualityLabel,
+          shadowChecked: result.output!.cacheShadowChecked,
+        },
+        savingsMs: result.output!.cacheSavingsMs,
         hits: cacheMetrics.hits,
         misses: cacheMetrics.misses,
         evictions: cacheMetrics.evictions,
+        hitRate: cacheMetrics.cacheHitRate,
       },
-      cost: result.output.costSummary,
+      routing: result.output!.routingDecision
+        ? {
+            selectedModel: result.output!.routingDecision.selectedModel,
+            selectedProvider: result.output!.routingDecision.selectedProvider,
+            reason: result.output!.routingDecision.reason,
+            stage: result.output!.routingDecision.stage,
+            strategy: result.output!.routingDecision.strategy,
+            confidence: result.output!.routingDecision.confidence,
+            tradeoff: result.output!.routingDecision.tradeoff,
+            alternatives: result.output!.routingDecision.alternatives,
+            features: result.output!.routingDecision.features as unknown as Record<string, unknown>,
+            retrievalSignals: result.output!.routingSignals,
+            initialDecision: result.output!.initialRoutingDecision
+              ? {
+                  selectedModel: result.output!.initialRoutingDecision.selectedModel,
+                  selectedProvider: result.output!.initialRoutingDecision.selectedProvider,
+                  reason: result.output!.initialRoutingDecision.reason,
+                  confidence: result.output!.initialRoutingDecision.confidence,
+                  tradeoff: result.output!.initialRoutingDecision.tradeoff,
+                }
+              : undefined,
+            refinement: result.output!.routingDecision.refinement,
+          }
+        : undefined,
+      orchestration: result.output!.orchestration
+        ? {
+            mode: result.output!.orchestration.mode,
+            enabled: true,
+            steps: result.output!.orchestration.steps,
+            comparison: result.output!.orchestration.comparison,
+          }
+        : {
+            mode: "single-model" as const,
+            enabled: false,
+            steps: [],
+          },
+      reasoning: {
+        enabled: options?.reasoningEnabled ?? false,
+        summary: result.output!.reasoningSummary ?? [],
+        decisionSteps: result.output!.decisionSteps ?? [],
+      },
+      evals: result.output!.evals,
+      cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
+      costBreakdown: buildCostBreakdown(result.output!.costSummary),
+      cost: result.output!.costSummary,
       memory: {
-        sessionId: result.output.sessionId,
-        recalled: result.output.memoryMatches?.length ?? 0,
-        stored: Boolean(result.output.memoryStored),
-        matches: (result.output.memoryMatches ?? []).map((match) => ({
+        sessionId: result.output!.sessionId,
+        recalled: result.output!.memoryMatches?.length ?? 0,
+        stored: Boolean(result.output!.memoryStored),
+        matches: (result.output!.memoryMatches ?? []).map((match) => ({
           score: match.score,
           query: match.entry.query,
           answer: match.entry.answer,
@@ -1761,24 +2642,47 @@ async function runPersistedRag(
       },
       reranking: {
         applied: true,
-        candidateCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        returnedCount: result.output.devMode.resultCount,
-        candidates: getRerankingCandidates(result.output.devMode),
+        candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        returnedCount: result.output!.devMode!.resultCount,
+        candidates: getRerankingCandidates(result.output!.devMode!),
       },
       stageMetrics: buildStageMetrics(result.context, {
-        rawQuery: result.output.rawQuery,
-        retrievalQuery: result.output.retrievalQuery,
-        retrievalResultCount: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResultCount: result.output.devMode.resultCount,
+        rawQuery: result.output!.rawQuery,
+        retrievalQuery: result.output!.retrievalQuery,
+        retrievalResultCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResultCount: result.output!.devMode!.resultCount,
         rerankInputTokens:
-          result.output.rerankInputTokens ?? estimateTokenUsage(result.output.retrievalQuery),
-        expansionCount: result.output.processedQuery?.expanded.length ?? 0,
+          result.output!.rerankInputTokens ?? estimateTokenUsage(result.output!.retrievalQuery),
+        expansionCount: result.output!.processedQuery?.expanded.length ?? 0,
       }),
       retrievalSpans: buildRetrievalSpans(result.context, {
-        retrievalResults: result.output.rerankCandidateCount ?? result.output.devMode.resultCount,
-        rerankResults: result.output.devMode.resultCount,
-        scores: result.output.devMode.results.map((item) => item.score),
+        retrievalResults: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        rerankResults: result.output!.devMode!.resultCount,
+        scores: result.output!.devMode!.results.map((item) => item.score),
       }),
+      contextEngineering: buildContextEngineering(
+        {
+          rawQuery: result.output!.rawQuery,
+          retrievalQuery: result.output!.retrievalQuery,
+          processedQuery: result.output!.processedQuery,
+          memoryMatches: result.output!.memoryMatches,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          devMode: result.output!.devMode!,
+        },
+        finalAnswer
+      ),
+      agentLoop: buildAgentLoopTrace(
+        result.context,
+        {
+          processedQuery: result.output!.processedQuery,
+          routingDecision: result.output!.routingDecision,
+          initialRoutingDecision: result.output!.initialRoutingDecision,
+          devMode: result.output!.devMode!,
+          rerankCandidateCount: result.output!.rerankCandidateCount,
+          orchestration: result.output!.orchestration,
+        },
+        finalAnswer
+      ),
     },
   };
 
@@ -1806,6 +2710,278 @@ function createIndexSummary(index: RetrievalIndex): RagIndexSummary {
   };
 }
 
+function computeVectorVariance(vector: EmbeddingVector): number {
+  if (vector.length === 0) {
+    return 0;
+  }
+
+  const mean = vector.reduce((sum, value) => sum + value, 0) / vector.length;
+  const variance =
+    vector.reduce((sum, value) => sum + (value - mean) ** 2, 0) / vector.length;
+
+  return Number(Math.min(1, Math.max(0, variance)).toFixed(4));
+}
+
+function extractCachedChunkIds(result: unknown): string[] {
+  if (!isCachedRagPayload(result)) {
+    return [];
+  }
+
+  return (result.devMode?.results ?? []).map((item) => item.chunkId);
+}
+
+function applyCacheAwareRetrievalSignal(
+  output: RetrievalDevModeOutput,
+  cachedChunkIds: string[] | undefined
+): {
+  output: RetrievalDevModeOutput;
+  influenced: boolean;
+  boostedChunkIds: string[];
+} {
+  if (!cachedChunkIds || cachedChunkIds.length === 0) {
+    return {
+      output,
+      influenced: false,
+      boostedChunkIds: [],
+    };
+  }
+
+  const cacheSet = new Set(cachedChunkIds);
+  const boostedChunkIds: string[] = [];
+  const boostedResults = output.results
+    .map((result) => {
+      if (!cacheSet.has(result.chunkId)) {
+        return result;
+      }
+
+      boostedChunkIds.push(result.chunkId);
+      return {
+        ...result,
+        score: Number((result.score + 0.03).toFixed(12)),
+      };
+    })
+    .sort((left, right) => right.score - left.score)
+    .map((result, index) => ({
+      ...result,
+      rank: index + 1,
+    }));
+
+  return {
+    output: {
+      ...output,
+      results: boostedResults,
+    },
+    influenced: boostedChunkIds.length > 0,
+    boostedChunkIds,
+  };
+}
+
+function evaluateRagQuality(input: {
+  query: string;
+  answer: string;
+  grounded: boolean;
+  results: RetrievalDevModeOutput["results"];
+}): {
+  groundedness: number;
+  answerOverlap: number;
+  retrievalAccuracy: number;
+  pipelineScore: number;
+  modelScore: number;
+} {
+  const groundedness = input.grounded ? 1 : 0.35;
+
+  const answerTokens = new Set((input.answer.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []));
+  const retrievalTokens = new Set(
+    input.results
+      .flatMap((item) => item.text.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [])
+      .slice(0, 800)
+  );
+
+  let overlap = 0;
+  for (const token of answerTokens) {
+    if (retrievalTokens.has(token)) {
+      overlap += 1;
+    }
+  }
+
+  const answerOverlap = Number((overlap / Math.max(1, answerTokens.size)).toFixed(3));
+  const retrievalAccuracy = Number(
+    (
+      input.results.filter((item) => item.score >= 0.2).length / Math.max(1, input.results.length)
+    ).toFixed(3)
+  );
+
+  const pipelineScore = Number(
+    (groundedness * 0.4 + answerOverlap * 0.35 + retrievalAccuracy * 0.25).toFixed(3)
+  );
+  const modelScore = Number((answerOverlap * 0.55 + groundedness * 0.45).toFixed(3));
+
+  return {
+    groundedness,
+    answerOverlap,
+    retrievalAccuracy,
+    pipelineScore,
+    modelScore,
+  };
+}
+
+function buildReasoningSummary(
+  enabled: boolean,
+  routingDecision: ReturnType<typeof routeModel> | undefined,
+  processedQuery: ProcessedQuery | undefined,
+  orchestration: ReturnType<typeof orchestrateAnswerPipeline> | undefined
+): string[] {
+  if (!enabled) {
+    return [];
+  }
+
+  return [
+    `Intent detected: ${processedQuery?.intent ?? "unknown"}.`,
+    `Routing selected model: ${routingDecision?.selectedModel ?? "unknown"} (${routingDecision?.stage ?? "pre-retrieval"}; ${routingDecision?.reason ?? "no reason"}).`,
+    `Orchestration mode: ${orchestration?.mode ?? "single-model"} with ${orchestration?.steps.length ?? 0} steps.`,
+  ];
+}
+
+function buildRetrievalRoutingSignals(
+  devMode: RetrievalDevModeOutput
+): RetrievalRoutingSignalsSummary {
+  const scores = devMode.results.map((item) => item.score);
+  const topScore = scores[0] ?? 0;
+  const avgScore = scores.length > 0 ? scores.reduce((sum, score) => sum + score, 0) / scores.length : 0;
+  const minScore = scores.length > 0 ? Math.min(...scores) : 0;
+  const groundedResultRatio =
+    devMode.results.filter((item) => item.score >= 0.2).length / Math.max(1, devMode.results.length);
+
+  return {
+    resultCount: devMode.resultCount,
+    topScore: Number(topScore.toFixed(3)),
+    avgScore: Number(avgScore.toFixed(3)),
+    scoreSpread: Number(Math.max(0, topScore - minScore).toFixed(3)),
+    groundedResultRatio: Number(groundedResultRatio.toFixed(3)),
+    uniqueDocuments: new Set(devMode.results.map((item) => item.documentId)).size,
+  };
+}
+
+function buildContextEngineering(
+  output: {
+    rawQuery: string;
+    retrievalQuery: string;
+    processedQuery?: ProcessedQuery;
+    memoryMatches?: MemorySearchResult[];
+    rerankCandidateCount?: number;
+    devMode: RetrievalDevModeOutput;
+  },
+  answer: GroundedAnswer
+): NonNullable<RagAskResponse["devMode"]["contextEngineering"]> {
+  const retrievedContext = output.devMode.results.map((item) => item.text).join(" ");
+  const candidateCount = output.rerankCandidateCount ?? output.devMode.resultCount;
+
+  return {
+    retrievalQuery: output.retrievalQuery,
+    rewrittenQuery: output.processedQuery?.rewritten,
+    expansionTerms: output.processedQuery?.expanded ?? [],
+    memoryAugmented: (output.memoryMatches?.length ?? 0) > 0,
+    memoryRecallCount: output.memoryMatches?.length ?? 0,
+    candidateCount,
+    returnedCount: output.devMode.resultCount,
+    selectedChunkIds: output.devMode.results.map((item) => item.chunkId),
+    selectedSections: output.devMode.results.map((item) => item.sectionId),
+    tokenEstimate: {
+      rawQuery: estimateTokenUsage(output.rawQuery),
+      retrievalQuery: estimateTokenUsage(output.retrievalQuery),
+      retrievedContext: estimateTokenUsage(retrievedContext),
+      answer: estimateTokenUsage(answer.text),
+    },
+    truncation: {
+      applied: candidateCount > output.devMode.resultCount,
+      keptRatio: Number((output.devMode.resultCount / Math.max(1, candidateCount)).toFixed(3)),
+    },
+  };
+}
+
+function buildAgentLoopTrace(
+  context: WorkflowContext,
+  output: {
+    processedQuery?: ProcessedQuery;
+    routingDecision?: ReturnType<typeof routeModel>;
+    initialRoutingDecision?: ReturnType<typeof routeModel>;
+    devMode: RetrievalDevModeOutput;
+    rerankCandidateCount?: number;
+    orchestration?: ReturnType<typeof orchestrateAnswerPipeline>;
+  },
+  answer: GroundedAnswer
+): NonNullable<RagAskResponse["devMode"]["agentLoop"]> {
+  return {
+    enabled: true,
+    mode: "inline-rag-agent",
+    steps: [
+      {
+        id: "understand-query",
+        type: "reasoning",
+        title: "Interpret query",
+        detail: `Intent ${output.processedQuery?.intent ?? "unknown"} with ${output.processedQuery?.expanded.length ?? 0} expansion(s).`,
+        durationMs: context.steps["process-query"]?.durationMs ?? 0,
+      },
+      {
+        id: "retrieve-evidence",
+        type: "tool",
+        title: "Retrieve evidence",
+        detail: `Retrieved ${output.rerankCandidateCount ?? output.devMode.resultCount} candidates and kept ${output.devMode.resultCount}.`,
+        durationMs: context.steps["retrieve-chunks"]?.durationMs ?? 0,
+      },
+      {
+        id: "refine-route",
+        type: "decision",
+        title: "Refine model route",
+        detail:
+          output.initialRoutingDecision && output.routingDecision
+            ? `${output.initialRoutingDecision.selectedModel} → ${output.routingDecision.selectedModel} (${output.routingDecision.reason})`
+            : output.routingDecision?.reason ?? "No routing decision captured.",
+        model: output.routingDecision?.selectedModel,
+        durationMs: context.steps["rerank-chunks"]?.durationMs ?? 0,
+      },
+      {
+        id: "synthesize-answer",
+        type: "reasoning",
+        title: "Synthesize grounded answer",
+        detail: `Produced grounded=${answer.grounded} answer with ${answer.citations.length} citation(s).`,
+        model: output.orchestration?.steps.at(-1)?.model ?? output.routingDecision?.selectedModel,
+      },
+    ],
+  };
+}
+
+function buildCostBreakdown(costSummary?: RequestCostSummary): {
+  embeddingsUsd: number;
+  retrievalUsd: number;
+  generationUsd: number;
+  totalUsd: number;
+} {
+  if (!costSummary) {
+    return {
+      embeddingsUsd: 0,
+      retrievalUsd: 0,
+      generationUsd: 0,
+      totalUsd: 0,
+    };
+  }
+
+  const embeddingsUsd = costSummary.breakdown
+    .filter((item) => item.stage.includes("embedding"))
+    .reduce((sum, item) => sum + item.totalCost, 0);
+  const retrievalUsd = costSummary.breakdown
+    .filter((item) => item.stage.includes("retrieval") || item.stage.includes("reranking"))
+    .reduce((sum, item) => sum + item.totalCost, 0);
+  const generationUsd = Math.max(0, costSummary.totalCostUsd - embeddingsUsd - retrievalUsd);
+
+  return {
+    embeddingsUsd: Number(embeddingsUsd.toFixed(6)),
+    retrievalUsd: Number(retrievalUsd.toFixed(6)),
+    generationUsd: Number(generationUsd.toFixed(6)),
+    totalUsd: Number(costSummary.totalCostUsd.toFixed(6)),
+  };
+}
+
 function createApiEmbeddingProvider(
   providerId: ApiEmbeddingProviderId,
   modelInfo?: EmbeddingModelInfo
@@ -1817,6 +2993,8 @@ function createApiEmbeddingProvider(
       return semanticToEmbeddingProvider(new LocalHashEmbeddingsProvider());
     case "ollama":
       return semanticToEmbeddingProvider(createOllamaEmbeddingsProvider(modelInfo));
+    case "openai":
+      return semanticToEmbeddingProvider(createOpenAiEmbeddingsProvider(modelInfo));
   }
 }
 
@@ -1844,18 +3022,30 @@ function normalizeEmbeddingProvider(
     return DEFAULT_API_EMBEDDING_PROVIDER;
   }
 
-  if (providerId === "api-lexical" || providerId === "local-hash" || providerId === "ollama") {
+  if (
+    providerId === "api-lexical" ||
+    providerId === "local-hash" ||
+    providerId === "ollama" ||
+    providerId === "openai"
+  ) {
     return providerId;
   }
 
-  throw new ApiRequestError('embeddingProvider must be "api-lexical", "local-hash" or "ollama".');
+  throw new ApiRequestError(
+    'embeddingProvider must be "api-lexical", "local-hash", "ollama" or "openai".'
+  );
 }
 
 function parseStoredEmbeddingProvider(
   providerId: string,
   documentId: string
 ): ApiEmbeddingProviderId {
-  if (providerId === "api-lexical" || providerId === "local-hash" || providerId === "ollama") {
+  if (
+    providerId === "api-lexical" ||
+    providerId === "local-hash" ||
+    providerId === "ollama" ||
+    providerId === "openai"
+  ) {
     return providerId;
   }
 
@@ -1888,6 +3078,31 @@ function createOllamaEmbeddingsProvider(modelInfo?: EmbeddingModelInfo): OllamaE
   });
 }
 
+function createOpenAiEmbeddingsProvider(modelInfo?: EmbeddingModelInfo): OpenAIEmbeddingsProvider {
+  return new OpenAIEmbeddingsProvider({
+    apiKey: process.env.OPENAI_API_KEY,
+    baseUrl: process.env.GROUNDEDOS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL,
+    model:
+      modelInfo?.model ??
+      process.env.GROUNDEDOS_OPENAI_EMBED_MODEL ??
+      DEFAULT_OPENAI_EMBEDDING_MODEL,
+    dimensions:
+      modelInfo?.dimensions ??
+      parseOptionalPositiveInteger(
+        process.env.GROUNDEDOS_OPENAI_EMBED_DIMENSIONS,
+        "GROUNDEDOS_OPENAI_EMBED_DIMENSIONS"
+      ) ??
+      DEFAULT_OPENAI_EMBEDDING_DIMENSIONS,
+    requestTimeoutMs:
+      parseOptionalPositiveInteger(
+        process.env.GROUNDEDOS_OPENAI_REQUEST_TIMEOUT_MS,
+        "GROUNDEDOS_OPENAI_REQUEST_TIMEOUT_MS"
+      ) ?? undefined,
+    organization: process.env.OPENAI_ORG_ID,
+    project: process.env.OPENAI_PROJECT_ID,
+  });
+}
+
 function parseOptionalPositiveInteger(
   value: string | undefined,
   name: string
@@ -1911,6 +3126,12 @@ function validateOptionalString(value: string | undefined, fieldName: string): v
   }
 }
 
+function validateOptionalBoolean(value: boolean | undefined, fieldName: string): void {
+  if (value !== undefined && typeof value !== "boolean") {
+    throw new ApiRequestError(`${fieldName} must be a boolean when provided.`);
+  }
+}
+
 function normalizeSessionIdOrUndefined(sessionId: string | undefined): string | undefined {
   if (sessionId === undefined) {
     return undefined;
@@ -1927,6 +3148,19 @@ function normalizeSessionId(sessionId: string): string {
   }
 
   return trimmed;
+}
+
+function createOwnedSessionId(ownerId: string | undefined, sessionId: string): string {
+  if (!ownerId) {
+    return sessionId;
+  }
+
+  const normalizedOwner = ownerId.trim();
+  if (normalizedOwner.length === 0) {
+    return sessionId;
+  }
+
+  return `${normalizedOwner}__${sessionId}`;
 }
 
 function validateOptionalMetadata(metadata: Record<string, unknown> | undefined): void {

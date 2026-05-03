@@ -11,6 +11,9 @@ import { AppModule } from "./app.module";
 import { ApiExceptionFilter } from "./common/api-exception.filter";
 import { MULTIPART_LIMITS } from "./common/multipart";
 import type { ApiConfig } from "./config/api-config";
+import { AuthService } from "./auth/auth.service";
+import { createUserRateLimiter } from "./auth/rate-limit-store";
+import { AuditService } from "./audit/audit.service";
 
 const DEFAULT_PORT = 3001;
 
@@ -45,6 +48,134 @@ export async function createApiServer(
   });
 
   const fastify = app.getHttpAdapter().getInstance();
+  const authService = app.get(AuthService);
+  const auditService = app.get(AuditService);
+  const userRateLimiter = createUserRateLimiter();
+  const requestsPerHour = parsePositiveInteger(
+    process.env.RATE_LIMIT_REQUESTS_PER_HOUR,
+    1000
+  );
+  const rateLimitWindowMs = 60 * 60 * 1000;
+
+  fastify.addHook("preHandler", async (request, reply) => {
+    const authEnforcementEnabled =
+      String(process.env.AUTH_ENFORCEMENT ?? "false").toLowerCase() !== "false";
+
+    if (!authEnforcementEnabled) {
+      return;
+    }
+
+    const path = request.url.split("?")[0] ?? "/";
+    const isPublicEndpoint =
+      path === "/health" ||
+      path === "/status" ||
+      path === "/auth/login" ||
+      path === "/auth/refresh";
+
+    if (isPublicEndpoint || request.method === "OPTIONS") {
+      return;
+    }
+
+    const bearerToken = extractBearerToken(request.headers.authorization);
+    const cookieToken = extractCookieValue(request.headers.cookie, "groundedos-session");
+    const token = bearerToken ?? cookieToken;
+    const apiKey = extractApiKey(request.headers["x-api-key"]);
+
+    let user = null;
+
+    if (token) {
+      user = await authService.verifyAccessToken(token);
+      if (!user) {
+        reply.status(401).send({
+          error: {
+            message: "Invalid or expired token.",
+          },
+        });
+        return;
+      }
+    } else if (apiKey) {
+      user = await authService.verifyApiKey(apiKey);
+      if (!user) {
+        reply.status(401).send({
+          error: {
+            message: "Invalid API key.",
+          },
+        });
+        return;
+      }
+    } else {
+      reply.status(401).send({
+        error: {
+          message: "Authentication required.",
+        },
+      });
+      return;
+    }
+
+    if (requestsPerHour > 0) {
+      const rateLimitResult = await userRateLimiter.consume(
+        user.userId,
+        requestsPerHour,
+        rateLimitWindowMs
+      );
+
+      if (!rateLimitResult.allowed) {
+        await auditService.record({
+          userId: user.userId,
+          username: user.username,
+          action: "security.rate_limit.exceeded",
+          resource: path,
+          metadata: {
+            method: request.method,
+            limit: requestsPerHour,
+            retryAfterSeconds: rateLimitResult.retryAfterSeconds,
+          },
+        });
+
+        reply
+          .header("Retry-After", String(rateLimitResult.retryAfterSeconds))
+          .header("X-RateLimit-Limit", String(requestsPerHour))
+          .header("X-RateLimit-Remaining", String(rateLimitResult.remaining))
+          .status(429)
+          .send({
+            error: {
+              message: "Rate limit exceeded.",
+            },
+          });
+        return;
+      }
+
+      reply
+        .header("X-RateLimit-Limit", String(requestsPerHour))
+        .header("X-RateLimit-Remaining", String(rateLimitResult.remaining));
+    }
+
+    if (path.startsWith("/admin") && !user.roles.includes("admin")) {
+      reply.status(403).send({
+        error: {
+          message: "Admin role required.",
+        },
+      });
+      return;
+    }
+
+    if (path.startsWith("/lab")) {
+      const allowedLabRoles = parseAllowedLabRoles(process.env.ALLOWED_LAB_ROLES);
+      const hasLabRole = user.roles.some((role) => allowedLabRoles.includes(role));
+
+      if (!hasLabRole) {
+        reply.status(403).send({
+          error: {
+            message: `Lab Mode features require one of: ${allowedLabRoles.join(", ")}.`,
+          },
+        });
+        return;
+      }
+    }
+
+    (request as unknown as { user?: unknown }).user = user;
+  });
+
   fastify.addHook("onSend", (request, reply, payload, done) => {
     const shouldValidate =
       request.url.startsWith("/rag/ask") && reply.statusCode >= 200 && reply.statusCode < 300;
@@ -69,6 +200,74 @@ export async function createApiServer(
   await app.init();
 
   return app;
+}
+
+function extractBearerToken(header?: string | string[]): string | null {
+  if (!header) {
+    return null;
+  }
+
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) {
+    return null;
+  }
+
+  const [scheme, token] = value.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return null;
+  }
+
+  return token.trim();
+}
+
+function extractCookieValue(cookieHeader: string | string[] | undefined, key: string): string | null {
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const raw = Array.isArray(cookieHeader) ? cookieHeader.join("; ") : cookieHeader;
+  const cookies = raw.split(";").map((item) => item.trim());
+  for (const cookie of cookies) {
+    const [name, ...rest] = cookie.split("=");
+    if (name === key) {
+      return rest.join("=") || null;
+    }
+  }
+
+  return null;
+}
+
+function extractApiKey(header: string | string[] | undefined): string | null {
+  if (!header) {
+    return null;
+  }
+
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function parseAllowedLabRoles(value: string | undefined): string[] {
+  const parsed = (value ?? "user,admin,power-user")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+  return parsed.length > 0 ? parsed : ["admin"];
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
 }
 
 if (process.argv[1]?.endsWith("server.ts")) {

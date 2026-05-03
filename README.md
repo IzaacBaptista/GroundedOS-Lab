@@ -185,10 +185,17 @@ Planned / target integrations:
 * Inspect:
 
   * retrieved chunks
-  * token usage
   * latency
   * model routing decisions
+   * orchestration steps and reasoning summaries
+   * semantic cache hit/quality diagnostics
+   * per-request eval scores and cost breakdown
   * grounding sources
+* Toggle adaptive behavior per request:
+
+   * multi-model orchestration
+   * reasoning summary mode
+   * shadow retrieval checks
 
 ### 🧪 Lab Mode
 

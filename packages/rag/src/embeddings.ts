@@ -12,6 +12,11 @@ const DEFAULT_OLLAMA_EMBEDDING_MODEL = "embeddinggemma";
 const DEFAULT_OLLAMA_EMBEDDING_DIMENSIONS = 768;
 const DEFAULT_OLLAMA_MAX_INPUT_CHARS = 12_000;
 const DEFAULT_OLLAMA_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+const DEFAULT_OPENAI_EMBEDDING_DIMENSIONS = 1536;
+const DEFAULT_OPENAI_MAX_INPUT_CHARS = 12_000;
+const DEFAULT_OPENAI_REQUEST_TIMEOUT_MS = 30_000;
 
 export type EmbeddingVector = number[];
 
@@ -19,6 +24,7 @@ export type EmbeddingProviderId =
   | "local-hash"
   | "api-lexical"
   | "ollama"
+  | "openai"
   | "semantic-placeholder";
 
 export interface EmbeddingModelInfo {
@@ -87,6 +93,18 @@ export interface OllamaEmbeddingsProviderOptions {
   truncate?: boolean;
   keepAlive?: string;
   requestTimeoutMs?: number;
+  fetchFn?: typeof fetch;
+}
+
+export interface OpenAIEmbeddingsProviderOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  dimensions?: number;
+  maxInputChars?: number;
+  requestTimeoutMs?: number;
+  organization?: string;
+  project?: string;
   fetchFn?: typeof fetch;
 }
 
@@ -305,6 +323,161 @@ export class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvider {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`${ERROR_PREFIX} ollama embed request timed out.`);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+export class OpenAIEmbeddingsProvider implements SemanticEmbeddingsProvider {
+  readonly id = "openai" as const;
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
+  private readonly model: string;
+  private readonly dimensions: number;
+  private readonly maxInputChars: number;
+  private readonly requestTimeoutMs: number;
+  private readonly organization: string | undefined;
+  private readonly project: string | undefined;
+  private readonly fetchFn: typeof fetch;
+
+  constructor(options: OpenAIEmbeddingsProviderOptions = {}) {
+    this.apiKey = (options.apiKey ?? "").trim();
+    this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_OPENAI_BASE_URL);
+    this.model = options.model ?? DEFAULT_OPENAI_EMBEDDING_MODEL;
+    this.dimensions = options.dimensions ?? DEFAULT_OPENAI_EMBEDDING_DIMENSIONS;
+    this.maxInputChars = options.maxInputChars ?? DEFAULT_OPENAI_MAX_INPUT_CHARS;
+    this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_OPENAI_REQUEST_TIMEOUT_MS;
+    this.organization = normalizeOptionalHeaderValue(options.organization);
+    this.project = normalizeOptionalHeaderValue(options.project);
+    this.fetchFn = options.fetchFn ?? fetch;
+
+    if (this.apiKey.length === 0) {
+      throw new Error(`${ERROR_PREFIX} openai apiKey is required.`);
+    }
+
+    if (this.model.trim().length === 0) {
+      throw new Error(`${ERROR_PREFIX} model name must not be empty.`);
+    }
+
+    validateDimensions(this.dimensions);
+
+    if (!Number.isInteger(this.maxInputChars) || this.maxInputChars <= 0) {
+      throw new Error(`${ERROR_PREFIX} maxInputChars must be a positive integer.`);
+    }
+
+    if (!Number.isInteger(this.requestTimeoutMs) || this.requestTimeoutMs <= 0) {
+      throw new Error(`${ERROR_PREFIX} requestTimeoutMs must be a positive integer.`);
+    }
+
+    if (typeof this.fetchFn !== "function") {
+      throw new Error(`${ERROR_PREFIX} fetchFn must be a function.`);
+    }
+  }
+
+  getModelInfo(): EmbeddingModelInfo {
+    return {
+      provider: this.id,
+      model: this.model,
+      dimensions: this.dimensions,
+      normalized: true,
+      maxInputChars: this.maxInputChars,
+    };
+  }
+
+  async embedOne(input: EmbedTextInput): Promise<EmbedTextResult> {
+    const [result] = await this.embedMany([input]);
+
+    if (!result) {
+      throw new Error(`${ERROR_PREFIX} openai returned no embedding.`);
+    }
+
+    return result;
+  }
+
+  async embedMany(inputs: EmbedTextInput[]): Promise<EmbedTextResult[]> {
+    if (!Array.isArray(inputs)) {
+      throw new Error(`${ERROR_PREFIX} embedMany inputs must be an array.`);
+    }
+
+    if (inputs.length === 0) {
+      return [];
+    }
+
+    const texts = inputs.map((input) => {
+      if (!input || typeof input.text !== "string") {
+        throw new Error(`${ERROR_PREFIX} embed input text must be a string.`);
+      }
+
+      return input.text.slice(0, this.maxInputChars);
+    });
+
+    const response = await this.requestEmbeddings(texts);
+    const embeddings = validateOpenAiEmbeddingResponse(response, inputs.length, this.dimensions);
+    const modelInfo = this.getModelInfo();
+    const promptTokens =
+      typeof (response as { usage?: { prompt_tokens?: unknown } })?.usage?.prompt_tokens ===
+      "number"
+        ? Number((response as { usage: { prompt_tokens: number } }).usage.prompt_tokens)
+        : undefined;
+
+    return embeddings.map((vector, index) => ({
+      vector,
+      model: modelInfo,
+      usage: {
+        inputTokens: promptTokens,
+        estimatedChars: inputs[index]?.text.length ?? 0,
+      },
+    }));
+  }
+
+  private async requestEmbeddings(texts: string[]): Promise<unknown> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, this.requestTimeoutMs);
+
+    try {
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+        authorization: `Bearer ${this.apiKey}`,
+      };
+
+      if (this.organization) {
+        headers["OpenAI-Organization"] = this.organization;
+      }
+
+      if (this.project) {
+        headers["OpenAI-Project"] = this.project;
+      }
+
+      const response = await this.fetchFn(`${this.baseUrl}/embeddings`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: this.model,
+          input: texts,
+          dimensions: this.dimensions,
+          encoding_format: "float",
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const message = await readResponseText(response);
+
+        throw new Error(
+          `${ERROR_PREFIX} openai embed request failed with status ${response.status}${message ? `: ${message}` : "."}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`${ERROR_PREFIX} openai embed request timed out.`);
       }
 
       throw error;
@@ -586,6 +759,82 @@ function validateOllamaEmbeddingResponse(
   });
 }
 
+function validateOpenAiEmbeddingResponse(
+  response: unknown,
+  expectedCount: number,
+  expectedDimensions: number
+): EmbeddingVector[] {
+  if (!response || typeof response !== "object") {
+    throw new Error(`${ERROR_PREFIX} openai embed response must be an object.`);
+  }
+
+  const items = (response as { data?: unknown }).data;
+
+  if (!Array.isArray(items)) {
+    throw new Error(`${ERROR_PREFIX} openai embed response must include data.`);
+  }
+
+  if (items.length !== expectedCount) {
+    throw new Error(
+      `${ERROR_PREFIX} openai returned ${items.length} embeddings for ${expectedCount} inputs.`
+    );
+  }
+
+  const byIndex = new Map<number, EmbeddingVector>();
+
+  for (const [position, item] of items.entries()) {
+    if (!item || typeof item !== "object") {
+      throw new Error(`${ERROR_PREFIX} openai embedding at index ${position} must be an object.`);
+    }
+
+    const index = (item as { index?: unknown }).index as unknown;
+    const embedding = (item as { embedding?: unknown }).embedding;
+
+    if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= expectedCount) {
+      throw new Error(`${ERROR_PREFIX} openai embedding index ${String(index)} is invalid.`);
+    }
+
+    if (!Array.isArray(embedding)) {
+      throw new Error(`${ERROR_PREFIX} openai embedding at index ${index} must be an array.`);
+    }
+
+    if (embedding.length !== expectedDimensions) {
+      throw new Error(
+        `${ERROR_PREFIX} openai embedding at index ${index} has ${embedding.length} dimensions; expected ${expectedDimensions}.`
+      );
+    }
+
+    if (embedding.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
+      throw new Error(
+        `${ERROR_PREFIX} openai embedding at index ${index} contains a non-finite value.`
+      );
+    }
+
+    byIndex.set(index as number, embedding as EmbeddingVector);
+  }
+
+  const ordered: EmbeddingVector[] = [];
+  for (let index = 0; index < expectedCount; index += 1) {
+    const embedding = byIndex.get(index);
+    if (!embedding) {
+      throw new Error(`${ERROR_PREFIX} openai embedding at index ${index} is missing.`);
+    }
+
+    ordered.push(embedding);
+  }
+
+  return ordered;
+}
+
+function normalizeOptionalHeaderValue(value: string | undefined): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function createDeterministicEmbedding(text: string, dimensions: number): EmbeddingVector {
   const vector = Array.from({ length: dimensions }, () => 0);
   const normalizedText = text.normalize("NFKC").toLowerCase();
@@ -723,6 +972,7 @@ function isEmbeddingProviderId(value: string): value is EmbeddingProviderId {
     value === "local-hash" ||
     value === "api-lexical" ||
     value === "ollama" ||
+    value === "openai" ||
     value === "semantic-placeholder"
   );
 }

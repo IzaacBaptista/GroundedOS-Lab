@@ -1,9 +1,11 @@
-import { Controller, Delete, Get, Inject, Param } from "@nestjs/common";
+import { Controller, Delete, Get, Inject, Param, Req } from "@nestjs/common";
+import type { FastifyRequest } from "fastify";
 import type {
   RagEmbeddingMapResponse,
   RagIndexDeleteResponse,
   RagIndexListResponse,
 } from "../../rag-service";
+import { getRequestUserId } from "../../common/auth-context";
 import { RagIndexService } from "./rag-index.service";
 
 @Controller("rag/indexes")
@@ -11,17 +13,23 @@ export class RagIndexController {
   constructor(@Inject(RagIndexService) private readonly ragIndex: RagIndexService) {}
 
   @Get()
-  list(): Promise<RagIndexListResponse> {
-    return this.ragIndex.list();
+  list(@Req() request: FastifyRequest): Promise<RagIndexListResponse> {
+    return this.ragIndex.list(getRequestUserId(request));
   }
 
   @Get(":documentId/embedding-map")
-  embeddingMap(@Param("documentId") documentId: string): Promise<RagEmbeddingMapResponse> {
-    return this.ragIndex.embeddingMap(documentId ?? "");
+  embeddingMap(
+    @Req() request: FastifyRequest,
+    @Param("documentId") documentId: string
+  ): Promise<RagEmbeddingMapResponse> {
+    return this.ragIndex.embeddingMap(documentId ?? "", getRequestUserId(request));
   }
 
   @Delete(":documentId")
-  delete(@Param("documentId") documentId: string): Promise<RagIndexDeleteResponse> {
-    return this.ragIndex.delete(documentId ?? "");
+  delete(
+    @Req() request: FastifyRequest,
+    @Param("documentId") documentId: string
+  ): Promise<RagIndexDeleteResponse> {
+    return this.ragIndex.delete(documentId ?? "", getRequestUserId(request));
   }
 }
