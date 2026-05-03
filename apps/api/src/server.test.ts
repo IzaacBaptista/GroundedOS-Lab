@@ -1380,6 +1380,176 @@ describe("api server", () => {
       status: "sanitized",
     });
   });
+
+  describe("jobs api", () => {
+    it("returns 400 from POST /jobs/phase5 when track is missing", async () => {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/jobs/phase5",
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: {
+          message: "track is required and must be one of: quantization, lora, fine-tuning, distillation.",
+        },
+      });
+    });
+
+    it("returns 400 from POST /jobs/phase5 when track is not in the allowlist", async () => {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/jobs/phase5",
+        payload: { track: "invalid-track" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: {
+          message: "track must be one of: quantization, lora, fine-tuning, distillation.",
+        },
+      });
+    });
+
+    it("returns 503 from POST /jobs/phase5 when Redis is not configured", async () => {
+      const previousRedisUrl = process.env.REDIS_URL;
+      const previousRedisHost = process.env.REDIS_HOST;
+      delete process.env.REDIS_URL;
+      delete process.env.REDIS_HOST;
+
+      try {
+        const app = await createTestServer();
+        const response = await app.inject({
+          method: "POST",
+          url: "/jobs/phase5",
+          payload: { track: "quantization" },
+        });
+
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({
+          error: {
+            message: "Async job queue is not configured. Set REDIS_URL or REDIS_HOST/PORT.",
+          },
+        });
+      } finally {
+        if (previousRedisUrl !== undefined) process.env.REDIS_URL = previousRedisUrl;
+        if (previousRedisHost !== undefined) process.env.REDIS_HOST = previousRedisHost;
+      }
+    });
+
+    it("returns 400 from POST /jobs/model-benchmark when providers is not an array", async () => {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/jobs/model-benchmark",
+        payload: { providers: "ollama" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: {
+          message: "providers must be an array of strings.",
+        },
+      });
+    });
+
+    it("returns 400 from POST /jobs/model-benchmark when providers array is empty", async () => {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/jobs/model-benchmark",
+        payload: { providers: [] },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: {
+          message: "providers must include at least one provider.",
+        },
+      });
+    });
+
+    it("returns 400 from POST /jobs/model-benchmark when providers contains unknown values", async () => {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/jobs/model-benchmark",
+        payload: { providers: ["unknown-provider"] },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.message).toContain("Unknown providers: unknown-provider");
+    });
+
+    it("returns 503 from POST /jobs/model-benchmark when Redis is not configured", async () => {
+      const previousRedisUrl = process.env.REDIS_URL;
+      const previousRedisHost = process.env.REDIS_HOST;
+      delete process.env.REDIS_URL;
+      delete process.env.REDIS_HOST;
+
+      try {
+        const app = await createTestServer();
+        const response = await app.inject({
+          method: "POST",
+          url: "/jobs/model-benchmark",
+          payload: { providers: ["ollama"] },
+        });
+
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({
+          error: {
+            message: "Async job queue is not configured. Set REDIS_URL or REDIS_HOST/PORT.",
+          },
+        });
+      } finally {
+        if (previousRedisUrl !== undefined) process.env.REDIS_URL = previousRedisUrl;
+        if (previousRedisHost !== undefined) process.env.REDIS_HOST = previousRedisHost;
+      }
+    });
+
+    it("returns 503 from GET /jobs/:jobId when Redis is not configured", async () => {
+      const previousRedisUrl = process.env.REDIS_URL;
+      const previousRedisHost = process.env.REDIS_HOST;
+      delete process.env.REDIS_URL;
+      delete process.env.REDIS_HOST;
+
+      try {
+        const app = await createTestServer();
+        const response = await app.inject({
+          method: "GET",
+          url: "/jobs/some-job-id",
+        });
+
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({
+          error: {
+            message: "Async job queue is not configured. Set REDIS_URL or REDIS_HOST/PORT.",
+          },
+        });
+      } finally {
+        if (previousRedisUrl !== undefined) process.env.REDIS_URL = previousRedisUrl;
+        if (previousRedisHost !== undefined) process.env.REDIS_HOST = previousRedisHost;
+      }
+    });
+
+    it("returns 400 from GET /jobs/:jobId when jobId is whitespace", async () => {
+      const app = await createTestServer();
+      const response = await app.inject({
+        method: "GET",
+        url: "/jobs/%20",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: {
+          message: "jobId is required.",
+        },
+      });
+    });
+  });
 });
 
 async function createTestServer(indexDir?: string): Promise<NestFastifyApplication> {

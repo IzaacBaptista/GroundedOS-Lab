@@ -9,8 +9,9 @@
 ## Problem
 
 GroundedOS Lab now has an authentication and authorization baseline in code,
-but local development still defaults to open access until
-`AUTH_ENFORCEMENT=true` is enabled. Before multi-user deployment or any public
+and local development still defaults to open access unless
+`AUTH_ENFORCEMENT=true` is explicitly enabled. In non-dev environments,
+enforcement now defaults to enabled when unset. Before multi-user deployment or any public
 exposure:
 
 1. **API endpoints must be protected** — all endpoints except health/status should require either:
@@ -53,13 +54,14 @@ protected endpoints run.
 
 - `POST /auth/login`, `POST /auth/refresh` and `POST /auth/logout` are implemented.
 - Fastify `preHandler` middleware validates bearer tokens, session cookies or
-  API keys when `AUTH_ENFORCEMENT=true`.
+   API keys when auth enforcement is active (`AUTH_ENFORCEMENT=true`, or unset in non-dev/non-test environments).
 - `/admin/*` routes are admin-only and `/lab/*` routes are gated by
   `ALLOWED_LAB_ROLES`.
 - RAG index listing/deletion, persisted-index loading and session memory use
   request `ownerId` scoping.
 - Rate limiting, audit logging and API-key issuance/rotation are implemented.
-- Database-backed users, OAuth and persistent auth storage remain future work.
+- Database-backed users and refresh-session persistence are available via optional PostgreSQL backends (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`) with memory fallback.
+- OAuth and external identity providers remain future work.
 
 ### Multiuser Boundary (Phase 6 Target)
 
@@ -105,11 +107,11 @@ Persisted Index / Memory / Cost Data (user-scoped)
   ```
 - **Usage**: `Authorization: Bearer <accessToken>`
 - **Refresh**: `POST /auth/refresh` → new `accessToken` when within refresh window
-- **Expiry**: 24 hours access token, 30 days refresh token (configurable via `JWT_EXPIRY` env var)
+- **Expiry**: 24 hours access token, 30 days refresh token (configurable via `JWT_EXPIRY` and `JWT_REFRESH_EXPIRY`)
 
 #### Session Cookies (for web UI)
 
-- **Endpoint**: `POST /auth/login` (same as bearer, returns `Set-Cookie` if `Accept: text/html`)
+- **Endpoint**: `POST /auth/login` (same endpoint, returns JSON plus `Set-Cookie` for `groundedos-session`)
 - **Cookie name**: `groundedos-session`
 - **Attributes**:
   - `HttpOnly` — prevent JavaScript XSS attacks from stealing session
@@ -170,6 +172,9 @@ DELETE /rag/indexes/:indexId   ← Delete index
 POST   /rag/ask                ← Query document
 GET    /rag/memory/:sessionId  ← Retrieve session memory
 POST   /agents/execute         ← Run agent
+POST   /jobs/phase5            ← Enqueue Phase 5 async experiment
+POST   /jobs/model-benchmark   ← Enqueue async benchmark run
+GET    /jobs/:jobId            ← Check async job status
 GET    /lab/*                  ← Lab features (A/B, benchmarks, evals)
 POST   /auth/logout            ← Logout
 ```
@@ -261,6 +266,7 @@ ALTER TABLE indexes ADD CONSTRAINT check_owner CHECK (resource_owner IS NOT NULL
 
 ### Phase 6.2 (Follow-up)
 
+- [x] Optional PostgreSQL-backed auth users and refresh-session persistence (with memory fallback)
 - [ ] OAuth2 integration (GitHub, Google) for easier signup
 - [x] Rate limiting per user (configurable requests/hour)
 - [x] API key generation for programmatic access
@@ -278,7 +284,7 @@ ALTER TABLE indexes ADD CONSTRAINT check_owner CHECK (resource_owner IS NOT NULL
 
 | Trade-off | Decision | Rationale |
 |---|---|---|
-| **Hardcoded credentials** (Phase 6.1) vs **database-backed users** | Start hardcoded for local dev; move to DB in Phase 6.2 | Simpler for initial rollout; no dependency on user creation API |
+| **Hardcoded credentials only** vs **optional DB-backed users/sessions** | Keep memory defaults for local dev, with opt-in PostgreSQL backends for users and refresh sessions | Preserves local simplicity while enabling persistent auth state in deployment environments |
 | **Memory-backed rate limiting now** vs **durable/shared limiter later** | Start with in-memory or Redis-backed local limits; expand only if deployment needs it | Keeps the current local stack simple while still enforcing per-user limits when auth is enabled |
 | **JWT stored in localStorage** (web) vs **session-only** (cookies) | Use both: session cookie for web UI (safer), JWT for CLI | Balances security (HttpOnly cookie) with developer ergonomics (JWT for tools) |
 | **HTTPS required** (production) vs **HTTP ok** (local dev) | Enforce HTTPS in production; allow `FORCE_HTTPS=false` locally | Standards-compliant; unblocks local development |
@@ -288,11 +294,12 @@ ALTER TABLE indexes ADD CONSTRAINT check_owner CHECK (resource_owner IS NOT NULL
 ## Current Rollout Status
 
 1. **Completed in code**: JWT login/refresh/logout, session cookie issuance,
-   API keys, admin routes, audit logging, owner scoping, and rate limiting.
-2. **Enabled selectively**: auth enforcement remains opt-in in local dev via
-   `AUTH_ENFORCEMENT=true` while the web login flow catches up.
-3. **Still pending**: database-backed users/sessions, OAuth, and broader
-   deployment hardening.
+   API keys, admin routes, audit logging, owner scoping, rate limiting,
+   web login/refresh UX integration, and async queue worker + `/jobs/*` endpoints.
+2. **Enabled by environment**: auth enforcement is opt-in in local dev,
+   and defaults to enabled in non-dev/non-test environments when unset.
+3. **Still pending**: OAuth, external IdP integrations, and broader
+   deployment hardening/enterprise auth features.
 
 ---
 

@@ -58,8 +58,7 @@ export async function createApiServer(
   const rateLimitWindowMs = 60 * 60 * 1000;
 
   fastify.addHook("preHandler", async (request, reply) => {
-    const authEnforcementEnabled =
-      String(process.env.AUTH_ENFORCEMENT ?? "false").toLowerCase() !== "false";
+    const authEnforcementEnabled = resolveAuthEnforcementEnabled();
 
     if (!authEnforcementEnabled) {
       return;
@@ -200,6 +199,19 @@ export async function createApiServer(
   await app.init();
 
   return app;
+}
+
+function resolveAuthEnforcementEnabled(): boolean {
+  const explicit = process.env.AUTH_ENFORCEMENT;
+  if (typeof explicit === "string" && explicit.trim().length > 0) {
+    return explicit.trim().toLowerCase() !== "false";
+  }
+
+  // Default to production (fail-closed) when NODE_ENV is not explicitly set so
+  // that environments without a NODE_ENV variable don't accidentally run with
+  // auth disabled.
+  const nodeEnv = (process.env.NODE_ENV ?? "production").trim().toLowerCase();
+  return nodeEnv !== "development" && nodeEnv !== "test";
 }
 
 function extractBearerToken(header?: string | string[]): string | null {

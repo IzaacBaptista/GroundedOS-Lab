@@ -23,6 +23,7 @@
 | **Learn AI concepts behind the code** | [📖 Concepts](./docs/concepts/README.md) |
 | **Follow a guided learning path** | [📘 Study Tracks](./docs/study-tracks/README.md) |
 | **Understand key design decisions** | [📐 ADRs](./docs/adr/README.md) |
+| **Operate auth/jobs locally** | [🛠 Operational Runbook](./docs/operational-runbook.md) |
 | **Contribute** | [🤝 Contributing](#-contributing) |
 
 ---
@@ -86,14 +87,39 @@
 - `GET /lab/experiments` exposes Phase 5 experiment summaries through the API
    and the web lab surface
 
+### Phase 6 — Infra/Auth Baseline ✅ In Progress
+
+- JWT login/refresh/logout, API keys, admin-gated routes, audit logging and
+   per-user rate limiting are implemented in API.
+- Auth enforcement is opt-in in local dev and defaults to enabled in
+   non-dev/non-test environments when `AUTH_ENFORCEMENT` is unset.
+- Optional PostgreSQL-backed auth users/sessions are available with memory
+   fallback (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`).
+- Async jobs are exposed via `/jobs/*` and processed by a BullMQ worker
+   (`npm run api:jobs:worker`) when Redis is configured.
+
+Quick async jobs flow:
+
+Canonical operational guide: [docs/operational-runbook.md](./docs/operational-runbook.md).
+
+```bash
+# 1) Start API and worker in separate terminals
+npm run api:dev
+npm run api:jobs:worker
+```
+
+Then use `POST /jobs/phase5` (or `POST /jobs/model-benchmark`) and poll with
+`GET /jobs/:jobId`. Full request examples (bearer token + API key), `jobId`
+capture, and troubleshooting are documented in
+[docs/operational-runbook.md](./docs/operational-runbook.md).
+
 ### What is NOT yet implemented
 
 | Feature | Planned phase |
 |---|---|
-| Python workers / queue-backed async execution | Phase 3+ / Phase 6 infra |
-| Database-backed user/session persistence | Phase 6 |
+| OAuth / external identity providers | Phase 6+ |
 | Production vector database and external observability stack | Phase 6 |
-| Web login UX and default-on auth enforcement | Phase 6 |
+| Queue observability, retries and multi-worker orchestration | Phase 6+ |
 
 ---
 
@@ -792,12 +818,12 @@ implementation focus is Phase 6 Infrastructure & Deploy.
    `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`,
    API-key management, admin endpoints, owner scoping for indexes and memory,
    and rate limiting / audit hooks.
-- Auth enforcement remains opt-in in local development through
-   `AUTH_ENFORCEMENT=false` by default while the web login flow is still being
-   finalized.
+- Auth enforcement now follows environment defaults:
+   opt-in in local development, and enabled by default in non-dev/non-test
+   environments when `AUTH_ENFORCEMENT` is unset.
 - Next technical priorities:
-   DB-backed auth/session persistence, queue-backed worker jobs, production
-   observability and deployment hardening.
+   OAuth/provider-based identity, production observability and deployment
+   hardening.
 - Keep roadmap checkboxes and package READMEs synchronized with implementation
    status.
 

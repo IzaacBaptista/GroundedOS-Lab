@@ -15,6 +15,7 @@ describe("api client", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+    sessionStorage.clear();
   });
 
   it("preserves HTTP status on API errors", async () => {

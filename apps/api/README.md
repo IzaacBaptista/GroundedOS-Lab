@@ -75,6 +75,43 @@ Admin endpoints are implemented for index clearing, cost summary, audit-log
 inspection and API-key management. They are accessible only when auth
 enforcement is enabled and the authenticated user has the `admin` role.
 
+#### Async jobs (`/jobs/*`)
+
+Async execution endpoints are available through a BullMQ queue when Redis is
+configured (`REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`).
+
+Canonical operational guide: [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
+
+- `POST /jobs/phase5` enqueues a Phase 5 experiment run.
+- `POST /jobs/model-benchmark` enqueues a model benchmark run.
+- `GET /jobs/:jobId` returns queue job status/result metadata.
+
+Start the API worker from repository root:
+
+```bash
+npm run api:jobs:worker
+```
+
+Or from API workspace:
+
+```bash
+npm --workspace @groundedos/api run jobs:worker
+```
+
+These endpoints are protected when auth enforcement is active. Provide a
+bearer token or API key in requests.
+
+Recommended flow:
+
+- enqueue via `POST /jobs/phase5` or `POST /jobs/model-benchmark`
+- poll via `GET /jobs/:jobId`
+
+If Redis is not configured, `/jobs/*` returns `503` and worker startup fails
+with a queue configuration error.
+
+For full request examples (bearer/API key), `jobId` capture and troubleshooting,
+use [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
+
 #### `POST /rag/ask`
 
 Runs the local RAG pipeline against inline text content or an uploaded
@@ -290,9 +327,12 @@ pairs and timestamps.
 - `"openai"` embeddings are wired for indexing and ask flows; Hugging Face
   provider integration is still not implemented.
 - Auth, owner scoping, rate limiting, admin routes and audit logging are
-  implemented, but middleware enforcement is disabled by default in local dev
-  until `AUTH_ENFORCEMENT=true` is set.
-- User storage remains environment-backed for local development; database-backed
-  users and sessions are still pending.
+  implemented. Middleware enforcement is opt-in in local dev and defaults to
+  enabled in non-dev/non-test environments when `AUTH_ENFORCEMENT` is unset.
+- User/session storage supports memory (default) and optional PostgreSQL
+  backends (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`) with
+  memory fallback on DB unavailability.
+- Async jobs require a Redis connection and currently run with single-worker,
+  in-order processing (`concurrency: 1`) without advanced retry policies.
 - Production observability stack and production vector database are still
   pending.

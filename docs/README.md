@@ -18,6 +18,7 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 | [`study-tracks/`](./study-tracks/README.md) | Guided learning routes by topic across concepts, packages and roadmap phases. |
 | [`adr/`](./adr/README.md) | Architecture Decision Records — why the system is built the way it is. |
 | [`evaluation-strategy.md`](./evaluation-strategy.md) | How quality is measured: golden dataset, metrics, baselines, eval process. |
+| [`operational-runbook.md`](./operational-runbook.md) | Runtime operations for auth, jobs queue, worker startup, and troubleshooting. |
 | [`phase-0-mvp-plan.md`](./phase-0-mvp-plan.md) | Phase 0 implementation plan and milestone definitions. |
 | [`phase-1-handoff.md`](./phase-1-handoff.md) | Phase 1 baseline, verified commands and open implementation issues. |
 | [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md) | Stable Dev Mode output contract (retrieval baseline + adaptive extensions: cache/routing/orchestration/evals/cost). |
@@ -28,5 +29,5 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 ## Status
 
 Actively maintained — aligned with the runnable implementation through Phase 5,
-with Phase 6 partially implemented in code (auth, admin, rate-limit and audit
-baselines) and still undergoing rollout/hardening.
+with Phase 6 in active rollout (auth/admin/rate-limit/audit baseline,
+optional DB-backed auth persistence, and Redis-backed async jobs).

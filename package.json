@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "api:dev": "tsx apps/api/src/server.ts",
+    "api:jobs:worker": "npm --workspace @groundedos/api run jobs:worker",
     "benchmark:hybrid": "tsx scripts/benchmark-hybrid-retrieval.ts",
     "benchmark:models": "tsx scripts/benchmark-model-providers.ts",
     "benchmark:models:precheck": "tsx scripts/benchmark-models-precheck.ts",

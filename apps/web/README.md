@@ -18,9 +18,9 @@ grounded retrieval workflows.
 
 Implemented baseline through Phase 5 with ongoing Phase 6 integration work: the
 web app exposes local RAG upload/index/ask flows, provider selection, optional
-session-aware asks, concept and lab surfaces, and the Trade-offs dashboard. The
-backend auth baseline exists, but the full interactive login UX is still being
-finished.
+session-aware asks, concept and lab surfaces, and the Trade-offs dashboard.
+Phase 6 auth UX is implemented with login/logout plus session restore/refresh
+behavior for protected API usage.
 
 ## Local usage
 
@@ -44,6 +44,8 @@ repository-root `.env`/`.env.local` files before app-specific env files.
 
 ### Auth-enabled local usage
 
+Canonical operational guide: [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
+
 To run the web app against protected API routes:
 
 ```bash
@@ -57,18 +59,19 @@ Open the web app and sign in from the top bar. Local development defaults are:
 - password: `admin-password`
 
 The browser authenticates API requests with the HttpOnly
-`groundedos-session` cookie issued by `/auth/login`. The web app stores only
-the refresh token and lightweight user metadata in `localStorage` so it can
-restore the session after reload. Logout calls `/auth/logout`, revokes the
-active token when available, clears the cookie, and removes the local session
-metadata.
+`groundedos-session` cookie issued by `/auth/login`. The web app also keeps
+the current access token, refresh token, expiry metadata and user summary in
+`localStorage` so it can restore and rotate sessions after reload. Logout calls
+`/auth/logout`, revokes the active token when available, clears the cookie, and
+removes the local session metadata.
 
 ## Current limits
 
 - Local-development UI is primary; production deployment hardening is tracked in
   Phase 6.
-- The backend can enforce JWT/session auth, but the default local web flow still
-  remains usable in anonymous local mode when `AUTH_ENFORCEMENT=false`.
+- The backend enforces JWT/session auth when enabled. In local dev it remains
+  opt-in; in non-dev/non-test environments it defaults to enabled when
+  `AUTH_ENFORCEMENT` is unset.
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Session memory is managed by the API under `.groundedos/memory/` when
