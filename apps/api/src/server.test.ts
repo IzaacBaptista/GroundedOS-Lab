@@ -162,6 +162,7 @@ describe("api server", () => {
       expect(refreshBody.refreshToken).not.toBe(loginBody.refreshToken);
       expect(refreshBody.expiresIn).toBeGreaterThan(0);
       expect(refreshBody.user.username).toBe(process.env.ADMIN_USERNAME ?? "admin");
+      expect(refreshResponse.headers["set-cookie"]).toContain("groundedos-session=");
 
       const usingRefreshedAccess = await app.inject({
         method: "GET",

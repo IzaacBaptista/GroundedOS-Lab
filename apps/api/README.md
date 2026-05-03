@@ -50,6 +50,25 @@ Rotates a refresh token and returns a new access token pair.
 Clears the session cookie and revokes the presented bearer token or cookie token
 when available.
 
+### Auth-enabled local web flow
+
+Local development starts open unless auth enforcement is enabled:
+
+```bash
+AUTH_ENFORCEMENT=true npm run api:dev
+```
+
+Then start the web app with `npm run web:dev` and log in from the top bar.
+Default local credentials are:
+
+- username: `admin`
+- password: `admin-password`
+
+`POST /auth/login` issues the HttpOnly `groundedos-session` cookie used by the
+browser. `POST /auth/refresh` rotates refresh tokens and also refreshes that
+cookie. `POST /auth/logout` clears the cookie and revokes the active token when
+the request includes one.
+
 #### `GET /admin/*`, `POST /admin/*`, `DELETE /admin/*`
 
 Admin endpoints are implemented for index clearing, cost summary, audit-log

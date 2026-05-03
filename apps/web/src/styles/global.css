@@ -148,6 +148,60 @@ h3 {
   gap: 8px;
 }
 
+.auth-box {
+  display: grid;
+  max-width: min(100%, 520px);
+  gap: 6px;
+  justify-items: end;
+}
+
+.auth-form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.auth-form input {
+  width: 136px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.auth-user {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid rgba(21, 109, 97, 0.28);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.auth-button {
+  min-width: 88px;
+  min-height: 40px;
+}
+
+.auth-message {
+  max-width: 520px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.auth-message.is-error {
+  color: var(--danger);
+}
+
 .tag,
 .health,
 .count {
@@ -1326,6 +1380,18 @@ textarea:focus {
     justify-content: flex-start;
   }
 
+  .auth-box {
+    justify-items: start;
+  }
+
+  .auth-form {
+    justify-content: flex-start;
+  }
+
+  .auth-message {
+    text-align: left;
+  }
+
   .app-body {
     grid-template-columns: 1fr;
   }
@@ -1379,6 +1445,14 @@ textarea:focus {
   .action-buttons,
   .primary-button,
   .secondary-button {
+    width: 100%;
+  }
+
+  .auth-box,
+  .auth-form,
+  .auth-form input,
+  .auth-user,
+  .auth-button {
     width: 100%;
   }
 

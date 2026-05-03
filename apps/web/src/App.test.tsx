@@ -14,6 +14,7 @@ describe("App", () => {
   let indexListResponse: unknown;
 
   beforeEach(() => {
+    window.localStorage.clear();
     indexListResponse = { count: 0, indexes: [] };
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
@@ -21,6 +22,32 @@ describe("App", () => {
 
       if (url.endsWith("/api/health")) {
         return new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/api/auth/login")) {
+        return new Response(JSON.stringify({
+          accessToken: "access-token",
+          refreshToken: "refresh-token",
+          expiresIn: 86400,
+          user: {
+            userId: "user-admin",
+            username: "admin",
+            roles: ["admin", "user"],
+          },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/api/auth/logout")) {
+        return new Response(JSON.stringify({
+          loggedOut: true,
+          tokenRevoked: true,
+        }), {
           status: 200,
           headers: { "content-type": "application/json" },
         });
@@ -372,6 +399,7 @@ describe("App", () => {
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -383,6 +411,7 @@ describe("App", () => {
       screen.getByRole("heading", { name: /local rag console/i })
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: /ask/i })).toBeTruthy();
+    expect(screen.getByText(/local anonymous mode/i)).toBeTruthy();
 
     // Empty index list means the select shows "No indexed documents".
     await waitFor(() => {
@@ -397,7 +426,7 @@ describe("App", () => {
 
   it("shows a validation error when submitting without a query", async () => {
     const { container } = render(<App />);
-    const form = container.querySelector("form");
+    const form = container.querySelector("form.input-panel");
 
     if (!form) {
       throw new Error("form not rendered");
@@ -410,6 +439,142 @@ describe("App", () => {
     await waitFor(() => {
       const matches = screen.getAllByText(/question is required/i);
       expect(matches.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("logs in, stores only the refresh token, and refreshes indexes", async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/username/i), {
+      target: { value: "admin" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "admin-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /login/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/signed in as admin/i)).toBeTruthy();
+    });
+
+    expect(screen.getByText(/admin · admin, user/i)).toBeTruthy();
+    const stored = JSON.parse(
+      window.localStorage.getItem("groundedos-auth-session") ?? "{}"
+    ) as Record<string, unknown>;
+    expect(stored.refreshToken).toBe("refresh-token");
+    expect(stored.accessToken).toBeUndefined();
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/auth/login",
+      expect.objectContaining({
+        credentials: "same-origin",
+        method: "POST",
+      })
+    );
+  });
+
+  it("logs out and returns to local anonymous mode", async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/username/i), {
+      target: { value: "admin" },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: "admin-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /login/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /logout/i })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /logout/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /login/i })).toBeTruthy();
+    });
+
+    expect(window.localStorage.getItem("groundedos-auth-session")).toBeNull();
+    expect(screen.getByText(/signed out/i)).toBeTruthy();
+  });
+
+  it("shows login required when index listing returns 401", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.endsWith("/api/health")) {
+        return new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/api/rag/indexes")) {
+        return new Response(JSON.stringify({
+          error: { message: "Authentication required." },
+        }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: { message: "unhandled" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/login required/i)).toBeTruthy();
+    });
+  });
+
+  it("shows missing permission when Lab returns 403", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.endsWith("/api/health")) {
+        return new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/api/rag/indexes")) {
+        return new Response(JSON.stringify(indexListResponse), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url.endsWith("/api/lab/guardrails/check")) {
+        return new Response(JSON.stringify({
+          error: { message: "Lab Mode features require one of: admin." },
+        }), {
+          status: 403,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: { message: "unhandled" } }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Guardrails/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/guardrails playground/i)).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /run safety check/i }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/lab mode features require/i).length).toBeGreaterThan(0);
     });
   });
 

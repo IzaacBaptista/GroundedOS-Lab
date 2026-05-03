@@ -42,12 +42,33 @@ Reference environment values live in
 [`apps/web/.env.example`](./.env.example). The Vite config also loads
 repository-root `.env`/`.env.local` files before app-specific env files.
 
+### Auth-enabled local usage
+
+To run the web app against protected API routes:
+
+```bash
+AUTH_ENFORCEMENT=true npm run api:dev
+npm run web:dev
+```
+
+Open the web app and sign in from the top bar. Local development defaults are:
+
+- username: `admin`
+- password: `admin-password`
+
+The browser authenticates API requests with the HttpOnly
+`groundedos-session` cookie issued by `/auth/login`. The web app stores only
+the refresh token and lightweight user metadata in `localStorage` so it can
+restore the session after reload. Logout calls `/auth/logout`, revokes the
+active token when available, clears the cookie, and removes the local session
+metadata.
+
 ## Current limits
 
 - Local-development UI is primary; production deployment hardening is tracked in
   Phase 6.
 - The backend can enforce JWT/session auth, but the default local web flow still
-  assumes `AUTH_ENFORCEMENT=false` unless you wire tokens/cookies manually.
+  remains usable in anonymous local mode when `AUTH_ENFORCEMENT=false`.
 - Persisted indexes are local JSON files managed by the API under
   `.groundedos/indexes/`.
 - Session memory is managed by the API under `.groundedos/memory/` when

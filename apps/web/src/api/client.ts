@@ -1,5 +1,8 @@
 import type {
   ApiErrorBody,
+  AuthSession,
+  LoginRequest,
+  LogoutResponse,
   EmbeddingMapResponse,
   EmbeddingProviderId,
   FileType,
@@ -14,8 +17,12 @@ import type {
   RagIndexResponse,
   TradeoffMetricsResponse,
 } from "./types";
+import { ApiHttpError } from "./types";
 
 const API_PREFIX = "/api";
+const FETCH_DEFAULTS = {
+  credentials: "same-origin" as RequestCredentials,
+};
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const body = (await response.json().catch(() => undefined)) as
@@ -25,7 +32,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const message =
       body?.error?.message ?? `Request failed with status ${response.status}.`;
-    throw new Error(message);
+    throw new ApiHttpError(message, response.status);
   }
 
   if (body === undefined) {
@@ -36,15 +43,46 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function checkHealth(): Promise<void> {
-  const response = await fetch(`${API_PREFIX}/health`);
+  const response = await fetch(`${API_PREFIX}/health`, FETCH_DEFAULTS);
 
   if (!response.ok) {
-    throw new Error(`Health check failed with status ${response.status}.`);
+    throw new ApiHttpError(
+      `Health check failed with status ${response.status}.`,
+      response.status
+    );
   }
 }
 
+export async function login(params: LoginRequest): Promise<AuthSession> {
+  const response = await fetch(`${API_PREFIX}/auth/login`, {
+    ...FETCH_DEFAULTS,
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return parseResponse<AuthSession>(response);
+}
+
+export async function refreshSession(refreshToken: string): Promise<AuthSession> {
+  const response = await fetch(`${API_PREFIX}/auth/refresh`, {
+    ...FETCH_DEFAULTS,
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+  return parseResponse<AuthSession>(response);
+}
+
+export async function logout(): Promise<LogoutResponse> {
+  const response = await fetch(`${API_PREFIX}/auth/logout`, {
+    ...FETCH_DEFAULTS,
+    method: "POST",
+  });
+  return parseResponse<LogoutResponse>(response);
+}
+
 export async function listIndexes(): Promise<RagIndexListResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/indexes`);
+  const response = await fetch(`${API_PREFIX}/rag/indexes`, FETCH_DEFAULTS);
   return parseResponse<RagIndexListResponse>(response);
 }
 
@@ -53,7 +91,7 @@ export async function deleteIndex(
 ): Promise<RagIndexDeleteResponse> {
   const response = await fetch(
     `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}`,
-    { method: "DELETE" }
+    { ...FETCH_DEFAULTS, method: "DELETE" }
   );
   return parseResponse<RagIndexDeleteResponse>(response);
 }
@@ -62,18 +100,19 @@ export async function getEmbeddingMap(
   documentId: string
 ): Promise<EmbeddingMapResponse> {
   const response = await fetch(
-    `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}/embedding-map`
+    `${API_PREFIX}/rag/indexes/${encodeURIComponent(documentId)}/embedding-map`,
+    FETCH_DEFAULTS
   );
   return parseResponse<EmbeddingMapResponse>(response);
 }
 
 export async function getTradeoffMetrics(): Promise<TradeoffMetricsResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/metrics/tradeoffs`);
+  const response = await fetch(`${API_PREFIX}/rag/metrics/tradeoffs`, FETCH_DEFAULTS);
   return parseResponse<TradeoffMetricsResponse>(response);
 }
 
 export async function getModelBenchmark(): Promise<ModelBenchmarkResponse> {
-  const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark`);
+  const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark`, FETCH_DEFAULTS);
   return parseResponse<ModelBenchmarkResponse>(response);
 }
 
@@ -82,7 +121,8 @@ export async function getModelBenchmarkPrecheck(
 ): Promise<ModelBenchmarkPrecheckResponse> {
   const qs = providers.join(",");
   const response = await fetch(
-    `${API_PREFIX}/rag/metrics/model-benchmark/precheck?providers=${encodeURIComponent(qs)}`
+    `${API_PREFIX}/rag/metrics/model-benchmark/precheck?providers=${encodeURIComponent(qs)}`,
+    FETCH_DEFAULTS
   );
 
   if (response.status === 404) {
@@ -121,6 +161,7 @@ export async function runModelBenchmark(
   providers: string[] = ["local-extractive", "ollama", "groq"],
 ): Promise<ModelBenchmarkRunResponse> {
   const response = await fetch(`${API_PREFIX}/rag/metrics/model-benchmark/run`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ providers }),
@@ -130,7 +171,7 @@ export async function runModelBenchmark(
 }
 
 export async function getLabExperiments(): Promise<LabExperimentsResponse> {
-  const response = await fetch(`${API_PREFIX}/lab/experiments`);
+  const response = await fetch(`${API_PREFIX}/lab/experiments`, FETCH_DEFAULTS);
   return parseResponse<LabExperimentsResponse>(response);
 }
 
@@ -141,6 +182,7 @@ export async function runGuardrailCheck(params: {
   context?: string;
 }): Promise<GuardrailCheckResponse> {
   const response = await fetch(`${API_PREFIX}/lab/guardrails/check`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(params),
@@ -165,6 +207,7 @@ export async function askWithText(
   params: AskTextParams
 ): Promise<RagAskResponse> {
   const response = await fetch(`${API_PREFIX}/rag/ask`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -223,6 +266,7 @@ export async function askWithFile(
   form.append("enableShadowRetrieval", String(params.enableShadowRetrieval ?? true));
 
   const response = await fetch(`${API_PREFIX}/rag/ask`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     body: form,
   });
@@ -243,6 +287,7 @@ export async function askWithPersisted(
   params: AskPersistedParams
 ): Promise<RagAskResponse> {
   const response = await fetch(`${API_PREFIX}/rag/ask`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(params),
@@ -260,6 +305,7 @@ export async function indexText(
   params: IndexTextParams
 ): Promise<RagIndexResponse> {
   const response = await fetch(`${API_PREFIX}/rag/index`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -293,6 +339,7 @@ export async function indexFile(
   }
 
   const response = await fetch(`${API_PREFIX}/rag/index`, {
+    ...FETCH_DEFAULTS,
     method: "POST",
     body: form,
   });

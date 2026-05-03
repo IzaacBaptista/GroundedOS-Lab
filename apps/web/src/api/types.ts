@@ -8,6 +8,45 @@
 
 export type EmbeddingProviderId = "api-lexical" | "local-hash" | "ollama" | "openai";
 
+export interface ApiErrorBody {
+  error?: {
+    message?: string;
+  };
+}
+
+export class ApiHttpError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiHttpError";
+    this.status = status;
+  }
+}
+
+export interface AuthUser {
+  userId: string;
+  username: string;
+  roles: string[];
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthSession {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user: AuthUser;
+}
+
+export interface LogoutResponse {
+  loggedOut: true;
+  tokenRevoked: boolean;
+}
+
 export interface EmbeddingModelInfo {
   provider: string;
   model: string;

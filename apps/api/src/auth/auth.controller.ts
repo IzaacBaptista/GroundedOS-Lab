@@ -70,7 +70,10 @@ export class AuthController {
 
   @Post("refresh")
   @HttpCode(200)
-  async refresh(@Body() body: RefreshRequest): Promise<{
+  async refresh(
+    @Body() body: RefreshRequest,
+    @Res({ passthrough: true }) reply: FastifyReply
+  ): Promise<{
     accessToken: string;
     refreshToken: string;
     expiresIn: number;
@@ -88,6 +91,16 @@ export class AuthController {
       });
       throw new ApiRequestError("invalid refresh token.", 401);
     }
+
+    const secureCookie = String(process.env.FORCE_HTTPS ?? "false").toLowerCase() === "true";
+    const maxAgeMs = Number(process.env.SESSION_MAX_AGE ?? 604800000);
+
+    reply.header(
+      "Set-Cookie",
+      `groundedos-session=${refreshed.accessToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(
+        maxAgeMs / 1000
+      )}${secureCookie ? "; Secure" : ""}`
+    );
 
     await this.audit.record({
       userId: refreshed.user.userId,

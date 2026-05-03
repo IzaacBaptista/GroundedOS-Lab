@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { deleteIndex, listIndexes } from "../api/client";
+import { ApiHttpError } from "../api/types";
 import type { PersistedRagIndexListItem } from "../api/types";
 
-export function useIndexList(): {
+export function useIndexList(onAuthError?: (error: ApiHttpError) => void): {
   indexes: PersistedRagIndexListItem[];
   refresh: () => Promise<void>;
   remove: (documentId: string) => Promise<void>;
@@ -18,13 +19,19 @@ export function useIndexList(): {
       setError(undefined);
     } catch (caughtError) {
       setIndexes([]);
+      if (
+        caughtError instanceof ApiHttpError &&
+        (caughtError.status === 401 || caughtError.status === 403)
+      ) {
+        onAuthError?.(caughtError);
+      }
       setError(
         caughtError instanceof Error
           ? caughtError.message
           : "Failed to load indexes."
       );
     }
-  }, []);
+  }, [onAuthError]);
 
   const remove = useCallback(
     async (documentId: string) => {
