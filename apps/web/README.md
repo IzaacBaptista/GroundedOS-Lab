@@ -18,9 +18,9 @@ grounded retrieval workflows.
 
 Implemented baseline through Phase 5 with ongoing Phase 6 integration work: the
 web app exposes local RAG upload/index/ask flows, provider selection, optional
-session-aware asks, concept and lab surfaces, and the Trade-offs dashboard. The
-backend auth baseline exists, but the full interactive login UX is still being
-finished.
+session-aware asks, concept and lab surfaces, and the Trade-offs dashboard.
+Phase 6 auth UX is implemented with login/logout plus session restore/refresh
+behavior for protected API usage.
 
 ## Local usage
 
@@ -43,6 +43,8 @@ Reference environment values live in
 repository-root `.env`/`.env.local` files before app-specific env files.
 
 ### Auth-enabled local usage
+
+Canonical operational guide: [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
 
 To run the web app against protected API routes:
 
