@@ -72,44 +72,37 @@ export class AuthService {
       return null;
     }
 
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    const expiresIn = Math.floor(this.tokenExpiryMs / 1000);
-    const refreshExpiresIn = Math.floor(this.refreshTokenExpiryMs / 1000);
     const roles = user.roles.length > 0 ? user.roles : ["user"];
-    const accessClaims: TokenClaims = {
-      sub: user.id,
-      username: user.username,
-      roles,
-      tokenType: "access",
-      jti: randomUUID(),
-      iat: nowSeconds,
-      exp: nowSeconds + expiresIn,
-    };
-    const refreshClaims: TokenClaims = {
-      ...accessClaims,
-      tokenType: "refresh",
-      jti: randomUUID(),
-      exp: nowSeconds + refreshExpiresIn,
-    };
-
-    await this.sessionStore.createRefreshSession({
-      refreshJti: refreshClaims.jti,
+    return this.issueTokenPair({
       userId: user.id,
       username: user.username,
       roles,
-      expiresAt: new Date(refreshClaims.exp * 1000).toISOString(),
     });
+  }
 
-    return {
-      accessToken: this.signToken(accessClaims),
-      refreshToken: this.signToken(refreshClaims),
-      expiresIn,
-      user: {
-        userId: accessClaims.sub,
-        username: accessClaims.username,
-        roles: accessClaims.roles,
-      },
-    };
+  async loginOrRegisterExternalUser(input: {
+    externalId: string;
+    provider: string;
+    email: string;
+    name?: string;
+  }): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser }> {
+    const provider = input.provider.trim().toLowerCase();
+    const externalId = input.externalId.trim();
+    const email = input.email.trim().toLowerCase();
+
+    if (!provider || !externalId || !email) {
+      throw new Error("external identity fields provider, externalId, and email are required");
+    }
+
+    // Username mapping for external identities:
+    // - Stable across logins
+    // - Human-readable in audit trails
+    // - Compatible with existing local user contract
+    const username = `oidc:${provider}:${email}`;
+    const roles = ["user"];
+    const userId = `ext-${shortHash(`${provider}:${externalId}`)}`;
+
+    return this.issueTokenPair({ userId, username, roles });
   }
 
   async refreshAccessToken(
@@ -354,10 +347,60 @@ export class AuthService {
   private async isTokenRevoked(token: string): Promise<boolean> {
     return this.revocationStore.isRevoked(hashToken(token));
   }
+
+  private async issueTokenPair(input: {
+    userId: string;
+    username: string;
+    roles: string[];
+  }): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser }> {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const expiresIn = Math.floor(this.tokenExpiryMs / 1000);
+    const refreshExpiresIn = Math.floor(this.refreshTokenExpiryMs / 1000);
+    const roles = input.roles.length > 0 ? input.roles : ["user"];
+
+    const accessClaims: TokenClaims = {
+      sub: input.userId,
+      username: input.username,
+      roles,
+      tokenType: "access",
+      jti: randomUUID(),
+      iat: nowSeconds,
+      exp: nowSeconds + expiresIn,
+    };
+    const refreshClaims: TokenClaims = {
+      ...accessClaims,
+      tokenType: "refresh",
+      jti: randomUUID(),
+      exp: nowSeconds + refreshExpiresIn,
+    };
+
+    await this.sessionStore.createRefreshSession({
+      refreshJti: refreshClaims.jti,
+      userId: input.userId,
+      username: input.username,
+      roles,
+      expiresAt: new Date(refreshClaims.exp * 1000).toISOString(),
+    });
+
+    return {
+      accessToken: this.signToken(accessClaims),
+      refreshToken: this.signToken(refreshClaims),
+      expiresIn,
+      user: {
+        userId: accessClaims.sub,
+        username: accessClaims.username,
+        roles: accessClaims.roles,
+      },
+    };
+  }
 }
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
 function parseDurationToMs(value: string, fallbackMs: number): number {

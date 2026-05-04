@@ -1,2 +1,11 @@
 redis==5.2.1
 psycopg[binary]==3.2.10
+pydantic>=2.7,<3
+
+# BullMQ Python consumer (preferred path; falls back to polling loop if absent)
+bullmq>=2.5,<3
+
+# OpenTelemetry (optional — SDK runs in no-op mode when packages are absent)
+opentelemetry-api>=1.25,<2
+opentelemetry-sdk>=1.25,<2
+opentelemetry-exporter-otlp-proto-http>=1.25,<2

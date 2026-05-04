@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { Job, Queue } from "bullmq";
 import { ApiRequestError } from "../errors";
+import { getActiveTraceparent } from "../otel";
 import {
+  PHASE6_DLQ_NAME,
   PHASE6_QUEUE_NAME,
   type Phase5ExperimentTrack,
   type Phase6JobPayload,
@@ -37,11 +39,13 @@ export interface JobStatusResponse {
 @Injectable()
 export class JobsService {
   private readonly queue = this.createQueue();
+  private readonly dlq = this.createDlq();
 
   async enqueuePhase5Experiment(track: Phase5ExperimentTrack): Promise<EnqueuedJobResponse> {
     const job = await this.enqueue("phase5-experiment", {
       type: "phase5-experiment",
       track,
+      _otel_context: getActiveTraceparent(),
     });
 
     return toEnqueuedJobResponse(job);
@@ -59,6 +63,7 @@ export class JobsService {
     const job = await this.enqueue("model-benchmark", {
       type: "model-benchmark",
       providers: normalizedProviders,
+      _otel_context: getActiveTraceparent(),
     });
 
     return toEnqueuedJobResponse(job);
@@ -92,7 +97,11 @@ export class JobsService {
     return queue.add(name, payload, {
       removeOnComplete: 100,
       removeOnFail: 100,
-      attempts: 1,
+      attempts: 5,
+      backoff: {
+        type: "exponential",
+        delay: 2000,
+      },
     });
   }
 
@@ -118,6 +127,20 @@ export class JobsService {
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail: 100,
+      },
+    });
+  }
+
+  private createDlq(): Queue<Phase6JobPayload> | null {
+    const connection = resolveQueueConnection();
+    if (!connection) {
+      return null;
+    }
+    return new Queue<Phase6JobPayload>(PHASE6_DLQ_NAME, {
+      connection,
+      defaultJobOptions: {
+        removeOnComplete: false,
+        removeOnFail: false,
       },
     });
   }

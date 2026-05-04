@@ -1,5 +1,7 @@
 import "reflect-metadata";
 import "./config/register-env";
+import { configureOtel } from "./otel";
+configureOtel();
 import multipart from "@fastify/multipart";
 import { validateRagAskResponse } from "@groundedos/core";
 import { NestFactory } from "@nestjs/core";

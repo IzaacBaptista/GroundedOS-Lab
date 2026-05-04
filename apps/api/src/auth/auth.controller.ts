@@ -1,9 +1,10 @@
 import { Body, Controller, HttpCode, Post, Req, Res } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { ApiRequestError } from "../errors";
 import { AuditService } from "../audit/audit.service";
 import { getRequestUser } from "../common/auth-context";
+import { ApiRequestError } from "../errors";
 import { AuthService } from "./auth.service";
+import { OidcService } from "./oidc.service";
 
 export type LoginRequest = {
   username: string;
@@ -18,6 +19,7 @@ export type RefreshRequest = {
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly oidcService: OidcService,
     private readonly audit: AuditService
   ) {}
 
@@ -48,15 +50,7 @@ export class AuthController {
       throw new ApiRequestError("invalid credentials.", 401);
     }
 
-    const secureCookie = String(process.env.FORCE_HTTPS ?? "false").toLowerCase() === "true";
-    const maxAgeMs = Number(process.env.SESSION_MAX_AGE ?? 604800000);
-
-    reply.header(
-      "Set-Cookie",
-      `groundedos-session=${session.accessToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(
-        maxAgeMs / 1000
-      )}${secureCookie ? "; Secure" : ""}`
-    );
+    setSessionCookie(reply, session.accessToken);
 
     await this.audit.record({
       userId: session.user.userId,
@@ -92,15 +86,7 @@ export class AuthController {
       throw new ApiRequestError("invalid refresh token.", 401);
     }
 
-    const secureCookie = String(process.env.FORCE_HTTPS ?? "false").toLowerCase() === "true";
-    const maxAgeMs = Number(process.env.SESSION_MAX_AGE ?? 604800000);
-
-    reply.header(
-      "Set-Cookie",
-      `groundedos-session=${refreshed.accessToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(
-        maxAgeMs / 1000
-      )}${secureCookie ? "; Secure" : ""}`
-    );
+    setSessionCookie(reply, refreshed.accessToken);
 
     await this.audit.record({
       userId: refreshed.user.userId,
@@ -146,6 +132,62 @@ export class AuthController {
       tokenRevoked,
     };
   }
+
+  @Post("oauth/start")
+  @HttpCode(200)
+  async oauthStart(): Promise<{ authorizationUrl: string; state: string }> {
+    if (!this.oidcService.isEnabled()) {
+      throw new ApiRequestError("OIDC provider is not configured.", 503);
+    }
+
+    const { url, state } = await this.oidcService.buildAuthorizationUrl();
+    return {
+      authorizationUrl: url,
+      state,
+    };
+  }
+
+  @Post("oauth/callback")
+  @HttpCode(200)
+  async oauthCallback(
+    @Body() body: { code: string; state: string },
+    @Res({ passthrough: true }) reply: FastifyReply
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    user: { userId: string; username: string; roles: string[] };
+  }> {
+    if (!body || typeof body.code !== "string" || typeof body.state !== "string") {
+      throw new ApiRequestError("code and state are required.", 400);
+    }
+
+    const session = await this.oidcService.handleCallback(body.code, body.state);
+    setSessionCookie(reply, session.accessToken);
+
+    await this.audit.record({
+      action: "auth.oauth.success",
+      resource: "/auth/oauth/callback",
+      metadata: {
+        userId: session.user.userId,
+        username: session.user.username,
+      },
+    });
+
+    return session;
+  }
+}
+
+function setSessionCookie(reply: FastifyReply, accessToken: string): void {
+  const secureCookie = String(process.env.FORCE_HTTPS ?? "false").toLowerCase() === "true";
+  const maxAgeMs = Number(process.env.SESSION_MAX_AGE ?? 604800000);
+
+  reply.header(
+    "Set-Cookie",
+    `groundedos-session=${accessToken}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(
+      maxAgeMs / 1000
+    )}${secureCookie ? "; Secure" : ""}`
+  );
 }
 
 function extractBearerToken(header?: string | string[]): string | null {

@@ -1,6 +1,7 @@
 import type { ConnectionOptions } from "bullmq";
 
 export const PHASE6_QUEUE_NAME = "groundedos-phase6-jobs";
+export const PHASE6_DLQ_NAME = "groundedos-phase6-jobs-dlq";
 
 export type Phase6JobType = "phase5-experiment" | "model-benchmark";
 
@@ -10,10 +11,14 @@ export type Phase6JobPayload =
   | {
       type: "phase5-experiment";
       track: Phase5ExperimentTrack;
+      /** W3C traceparent for OTel context propagation (see ADR-012). */
+      _otel_context?: string;
     }
   | {
       type: "model-benchmark";
       providers: string[];
+      /** W3C traceparent for OTel context propagation (see ADR-012). */
+      _otel_context?: string;
     };
 
 export function resolveQueueConnection(): ConnectionOptions | null {

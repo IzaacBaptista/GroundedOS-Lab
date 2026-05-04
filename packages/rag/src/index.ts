@@ -46,6 +46,14 @@ export {
 } from "./vector-store";
 
 export {
+  PgvectorVectorStore,
+  createVectorStore,
+  resolveVectorBackend,
+  type PgClient,
+  type PgvectorStoreOptions,
+} from "./pgvector-store";
+
+export {
   buildRetrievalIndex,
   createRetrievalDevOutput,
   retrieveForDevMode,
