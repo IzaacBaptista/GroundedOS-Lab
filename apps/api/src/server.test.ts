@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "fs/promises";
 import { createHmac, randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 
 import { createApiServer } from "./server";
@@ -197,6 +197,221 @@ describe("api server", () => {
       expect(rotatedRefresh.statusCode).toBe(200);
     } finally {
       process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
+  it("supports OAuth login flow while preserving local auth flow", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    const previousOidcFeature = process.env.FEATURE_OIDC_PROVIDER;
+    const previousProviderUrl = process.env.OIDC_PROVIDER_URL;
+    const previousClientId = process.env.OIDC_CLIENT_ID;
+    const previousClientSecret = process.env.OIDC_CLIENT_SECRET;
+    const previousCallbackUrl = process.env.OIDC_CALLBACK_URL;
+    const previousFetch = globalThis.fetch;
+
+    process.env.AUTH_ENFORCEMENT = "true";
+    process.env.FEATURE_OIDC_PROVIDER = "true";
+    process.env.OIDC_PROVIDER_URL = "https://oidc.example.com";
+    process.env.OIDC_CLIENT_ID = "test-client-id";
+    process.env.OIDC_CLIENT_SECRET = "test-client-secret";
+    process.env.OIDC_CALLBACK_URL = "http://localhost:3001/auth/oauth/callback";
+
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return new Response(
+          JSON.stringify({
+            authorization_endpoint: "https://oidc.example.com/oauth/authorize",
+            token_endpoint: "https://oidc.example.com/oauth/token",
+            userinfo_endpoint: "https://oidc.example.com/oauth/userinfo",
+            jwks_uri: "https://oidc.example.com/oauth/jwks",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url === "https://oidc.example.com/oauth/token") {
+        expect(init?.method).toBe("POST");
+        return new Response(
+          JSON.stringify({
+            access_token: "provider-access-token",
+            token_type: "Bearer",
+            expires_in: 3600,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (url === "https://oidc.example.com/oauth/userinfo") {
+        return new Response(
+          JSON.stringify({
+            sub: "oidc-user-123",
+            email: "oidc-user@example.com",
+            name: "OIDC User",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const app = await createTestServer();
+
+      const bootstrapLoginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const bootstrapLoginBody = bootstrapLoginResponse.json() as { accessToken: string };
+
+      expect(bootstrapLoginResponse.statusCode).toBe(200);
+      expect(bootstrapLoginBody.accessToken).toBeTruthy();
+
+      const oauthStartResponse = await app.inject({
+        method: "POST",
+        url: "/auth/oauth/start",
+        headers: {
+          authorization: `Bearer ${bootstrapLoginBody.accessToken}`,
+        },
+      });
+      const oauthStartBody = oauthStartResponse.json() as {
+        authorizationUrl: string;
+        state: string;
+      };
+
+      expect(oauthStartResponse.statusCode).toBe(200);
+      expect(oauthStartBody.state).toBeTruthy();
+      expect(oauthStartBody.authorizationUrl).toContain("https://oidc.example.com/oauth/authorize");
+      expect(oauthStartBody.authorizationUrl).toContain("code_challenge=");
+
+      const oauthCallbackResponse = await app.inject({
+        method: "POST",
+        url: "/auth/oauth/callback",
+        headers: {
+          authorization: `Bearer ${bootstrapLoginBody.accessToken}`,
+        },
+        payload: {
+          code: "auth-code-123",
+          state: oauthStartBody.state,
+        },
+      });
+      const oauthCallbackBody = oauthCallbackResponse.json() as {
+        accessToken: string;
+        refreshToken: string;
+        user: { username: string; roles: string[] };
+      };
+
+      expect(oauthCallbackResponse.statusCode).toBe(200);
+      expect(oauthCallbackBody.accessToken).toBeTruthy();
+      expect(oauthCallbackBody.refreshToken).toBeTruthy();
+      expect(oauthCallbackBody.user.username).toContain("oidc:");
+      expect(oauthCallbackBody.user.roles).toContain("user");
+
+      // Local auth continues to work in the same runtime.
+      const localLoginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const localLoginBody = localLoginResponse.json() as {
+        accessToken: string;
+        refreshToken: string;
+      };
+
+      expect(localLoginResponse.statusCode).toBe(200);
+      expect(localLoginBody.accessToken).toBeTruthy();
+
+      const localRefreshResponse = await app.inject({
+        method: "POST",
+        url: "/auth/refresh",
+        payload: {
+          refreshToken: localLoginBody.refreshToken,
+        },
+      });
+
+      expect(localRefreshResponse.statusCode).toBe(200);
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = previousFetch;
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+      process.env.FEATURE_OIDC_PROVIDER = previousOidcFeature;
+      process.env.OIDC_PROVIDER_URL = previousProviderUrl;
+      process.env.OIDC_CLIENT_ID = previousClientId;
+      process.env.OIDC_CLIENT_SECRET = previousClientSecret;
+      process.env.OIDC_CALLBACK_URL = previousCallbackUrl;
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("rejects OAuth callback with invalid state", async () => {
+    const previousOidcFeature = process.env.FEATURE_OIDC_PROVIDER;
+    const previousProviderUrl = process.env.OIDC_PROVIDER_URL;
+    const previousClientId = process.env.OIDC_CLIENT_ID;
+    const previousClientSecret = process.env.OIDC_CLIENT_SECRET;
+    const previousCallbackUrl = process.env.OIDC_CALLBACK_URL;
+    const previousFetch = globalThis.fetch;
+
+    process.env.FEATURE_OIDC_PROVIDER = "true";
+    process.env.OIDC_PROVIDER_URL = "https://oidc.example.com";
+    process.env.OIDC_CLIENT_ID = "test-client-id";
+    process.env.OIDC_CLIENT_SECRET = "test-client-secret";
+    process.env.OIDC_CALLBACK_URL = "http://localhost:3001/auth/oauth/callback";
+
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith("/.well-known/openid-configuration")) {
+        return new Response(
+          JSON.stringify({
+            authorization_endpoint: "https://oidc.example.com/oauth/authorize",
+            token_endpoint: "https://oidc.example.com/oauth/token",
+            userinfo_endpoint: "https://oidc.example.com/oauth/userinfo",
+            jwks_uri: "https://oidc.example.com/oauth/jwks",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const app = await createTestServer();
+
+      const callbackResponse = await app.inject({
+        method: "POST",
+        url: "/auth/oauth/callback",
+        payload: {
+          code: "auth-code-123",
+          state: "invalid-state",
+        },
+      });
+
+      expect(callbackResponse.statusCode).toBe(400);
+      expect(callbackResponse.json()).toEqual({
+        error: {
+          message: "Invalid or expired OAuth state.",
+        },
+      });
+    } finally {
+      globalThis.fetch = previousFetch;
+      process.env.FEATURE_OIDC_PROVIDER = previousOidcFeature;
+      process.env.OIDC_PROVIDER_URL = previousProviderUrl;
+      process.env.OIDC_CLIENT_ID = previousClientId;
+      process.env.OIDC_CLIENT_SECRET = previousClientSecret;
+      process.env.OIDC_CALLBACK_URL = previousCallbackUrl;
+      vi.restoreAllMocks();
     }
   });
 

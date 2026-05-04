@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-05-04T13:07:31.459Z",
+  "version": 1,
+  "description": "Retrieval backend benchmark comparing in-memory VectorStore versus pgvector on Phase 5 golden queries, including persistence behavior after restart.",
+  "dataset": "phase-5-retrieval-text",
+  "topK": 3,
+  "goldenSize": 6,
+  "pgvectorTable": "rag_chunks_benchmark",
+  "postgresConnectionConfigured": false,
+  "results": {
+    "memory": {
+      "backend": "memory",
+      "available": true,
+      "totalQueries": 6,
+      "successfulRetrievals": 6,
+      "recallAtK": 1,
+      "top1Recall": 1,
+      "meanReciprocalRank": 1,
+      "avgExpectedChunkScore": 0.477657,
+      "avgLatencyMs": 1.096495,
+      "p95LatencyMs": 6.136681,
+      "persistenceAfterRestart": {
+        "supported": false,
+        "retainedRecallAtK": 0,
+        "passed": true,
+        "note": "In-memory backend is expected to lose data on restart."
+      }
+    },
+    "pgvector": {
+      "backend": "pgvector",
+      "available": false,
+      "reasonUnavailable": "DATABASE_URL (or POSTGRES_* vars) is not configured.",
+      "totalQueries": 0,
+      "successfulRetrievals": 0,
+      "recallAtK": 0,
+      "top1Recall": 0,
+      "meanReciprocalRank": 0,
+      "avgExpectedChunkScore": 0,
+      "avgLatencyMs": 0,
+      "p95LatencyMs": 0,
+      "persistenceAfterRestart": {
+        "supported": true,
+        "retainedRecallAtK": 0,
+        "passed": false,
+        "note": "Skipped because pgvector was unavailable."
+      }
+    },
+    "comparison": {
+      "latencyDeltaMs": -1.096495,
+      "recallAtKDelta": -1,
+      "mrrDelta": -1,
+      "expectedChunkScoreDelta": -0.477657,
+      "persistenceAdvantage": "tie"
+    }
+  }
+}

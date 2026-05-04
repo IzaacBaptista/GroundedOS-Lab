@@ -122,9 +122,13 @@ export class PgvectorVectorStore implements VectorStore {
   insert(chunks: EmbeddedChunk[]): void {
     // Kick off async upsert; caller does not await inserts synchronously to
     // match the synchronous VectorStore interface.
-    this._upsertAsync(chunks).catch((err) => {
+    this.insertAsync(chunks).catch((err) => {
       console.error(`${ERROR_PREFIX} background upsert failed:`, err);
     });
+  }
+
+  async insertAsync(chunks: EmbeddedChunk[]): Promise<void> {
+    await this._upsertAsync(chunks);
     this._size += chunks.length;
   }
 
