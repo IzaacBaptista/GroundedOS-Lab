@@ -837,6 +837,45 @@ Reference environment files live in [`.env.example`](./.env.example),
 local `.env` files from the repository root, and app-specific files when
 applicable; shell-exported variables keep priority.
 
+### Observability Stack (Phase 6)
+
+A complete observability stack is available for local development and debugging of distributed traces and metrics across the API and worker services.
+
+**Start the observability stack:**
+```bash
+# Start core services
+docker-compose up -d
+
+# Start with observability services (Jaeger, Prometheus, Grafana)
+docker-compose --profile observability up -d
+```
+
+**Access the services:**
+- **Jaeger UI** (distributed traces): http://localhost:16686
+- **Prometheus UI** (metrics): http://localhost:9090
+- **Grafana UI** (dashboards): http://localhost:3002 (default: admin/admin)
+
+**View traces in Jaeger:**
+1. Open http://localhost:16686
+2. Select a service from the dropdown (e.g., "groundedos-api")
+3. Click "Find Traces" to view recent requests
+4. Click a trace to inspect the span hierarchy, timing and attributes
+
+**Query metrics in Prometheus:**
+- View active services: `up{job=~"groundedos-.*"}`
+- Request rate: `rate(http_requests_total[5m])`
+- Error rate: `rate(http_requests_total{status=~"5.."}[5m])`
+- Job queue depth: `job_queue_depth`
+
+**Enable trace export from API and worker:**
+```bash
+export OTEL_EXPORT_ENABLED=true
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+See [docs/observability-stack-guide.md](./docs/observability-stack-guide.md) for detailed configuration, troubleshooting and dashboard setup.
+
+
 ### Local RAG commands
 
 Run a registered dataset through ETL, chunking, embeddings, in-memory vector

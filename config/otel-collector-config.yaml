@@ -1,0 +1,73 @@
+# OpenTelemetry Collector Configuration
+# See: https://opentelemetry.io/docs/reference/specification/protocol/exporter/
+
+receivers:
+  # OTLP gRPC receiver - receives traces from gRPC exporters
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
+  # Prometheus receiver for scraping metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'groundedos-api'
+          static_configs:
+            - targets: ['api:9090']
+          scrape_interval: 15s
+
+        - job_name: 'groundedos-worker'
+          static_configs:
+            - targets: ['worker:8000']
+          scrape_interval: 15s
+
+processors:
+  # Batch processor for efficient trace processing
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+
+  # Attributes processor for adding resource attributes
+  attributes:
+    actions:
+      - key: environment
+        value: development
+        action: upsert
+
+  # Resource detection processor
+  resource_detection:
+    detectors: [docker, env]
+
+exporters:
+  # Jaeger exporter for distributed trace visualization
+  jaeger/grpc:
+    endpoint: "jaeger:14317"
+    tls:
+      insecure: true
+
+  # Prometheus remote write exporter
+  prometheusremotewrite:
+    endpoint: "http://prometheus:9090/api/v1/write"
+    tls:
+      insecure: true
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: debug
+
+service:
+  pipelines:
+    # Traces pipeline: OTLP -> batch -> Jaeger exporter
+    traces:
+      receivers: [otlp]
+      processors: [attributes, resource_detection, batch]
+      exporters: [jaeger/grpc, logging]
+
+    # Metrics pipeline: Prometheus scraper -> batch -> Prometheus remote write
+    metrics:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [prometheusremotewrite]

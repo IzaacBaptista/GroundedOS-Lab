@@ -1,0 +1,144 @@
+# Prometheus Alert Rules for GroundedOS Lab
+# See: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+
+groups:
+  - name: groundedos_api
+    interval: 30s
+    rules:
+      # Alert if API is down
+      - alert: APIDown
+        expr: up{job="groundedos-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "GroundedOS API is down"
+          description: "The API service has been unavailable for more than 1 minute"
+
+      # Alert if API error rate is high
+      - alert: APIHighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="groundedos-api", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="groundedos-api"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "API error rate is high (>5%)"
+          description: "API has {{ $value | humanizePercentage }} error rate over the last 5 minutes"
+
+      # Alert if API response time is slow
+      - alert: APIHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="groundedos-api"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "API p99 latency is high (>1s)"
+          description: "API p99 response time is {{ $value | humanizeDuration }}"
+
+  - name: groundedos_worker
+    interval: 30s
+    rules:
+      # Alert if worker is down
+      - alert: WorkerDown
+        expr: up{job="groundedos-worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: worker
+        annotations:
+          summary: "GroundedOS Worker is down"
+          description: "The worker service has been unavailable for more than 1 minute"
+
+      # Alert if job queue depth is high
+      - alert: HighJobQueueDepth
+        expr: job_queue_depth{job="groundedos-worker"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "Job queue depth is high ({{ $value }})"
+          description: "Job queue has accumulated {{ $value }} jobs waiting for processing"
+
+      # Alert if job failure rate is high
+      - alert: HighJobFailureRate
+        expr: |
+          (
+            sum(rate(jobs_failed_total[5m]))
+            /
+            sum(rate(jobs_total[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "Job failure rate is high (>10%)"
+          description: "Worker has {{ $value | humanizePercentage }} job failure rate"
+
+  - name: groundedos_infrastructure
+    interval: 30s
+    rules:
+      # Alert if PostgreSQL is down
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL has been unavailable for more than 1 minute"
+
+      # Alert if Redis is down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been unavailable for more than 1 minute"
+
+      # Alert if memory usage is high
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{name=~"groundedos-.*"}
+            /
+            container_spec_memory_limit_bytes{name=~"groundedos-.*"}
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: "{{ $labels.name }}"
+        annotations:
+          summary: "Memory usage is high for {{ $labels.name }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} of limit"
+
+      # Alert if disk usage is high
+      - alert: HighDiskUsage
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype=~"ext4|btrfs"}
+            /
+            node_filesystem_size_bytes{fstype=~"ext4|btrfs"}
+          ) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space is running low on {{ $labels.device }}"
+          description: "Available disk space is {{ $value | humanizePercentage }} of total"
