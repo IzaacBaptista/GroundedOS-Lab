@@ -28,12 +28,15 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint 2>/dev/null || echo "No lint script; skipping"
+        
+      - name: Report instruction layer deprecations
+        run: npm run instructions:deprecations || true
 
-      - name: Validate instruction layer (warning mode)
-        run: npm run instructions:validate || echo "Instruction layer check reported warnings"
-
-      - name: Check instruction layer schema and resolution (warning mode)
-        run: npm run instructions:check || echo "Instruction layer schema/resolution check reported warnings"
+      - name: Validate instruction layer (strict mode)
+        run: npm run instructions:validate
+        
+      - name: Check instruction layer schema and resolution (strict mode)
+        run: npm run instructions:check
 
       - name: Check TypeScript compilation
         run: npm run typecheck
