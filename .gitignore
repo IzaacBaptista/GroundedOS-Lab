@@ -10,3 +10,4 @@ coverage/
 *.log
 __pycache__/
 *.py[cod]
+instructions/generated/

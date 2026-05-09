@@ -34,6 +34,24 @@ npm run instructions:validate
 
 The validator checks required files for the instruction layer MVP.
 
+## Resolution and Consumer Bundles
+
+Generate per-consumer instruction bundles:
+
+```bash
+npm run instructions:resolve
+```
+
+Generated outputs:
+
+- `instructions/generated/resolution-report.json`
+- `instructions/generated/codex.bundle.json`
+- `instructions/generated/codex.bundle.md`
+- `instructions/generated/copilot_chat_vscode.bundle.json`
+- `instructions/generated/copilot_chat_vscode.bundle.md`
+- `instructions/generated/github_copilot.bundle.json`
+- `instructions/generated/github_copilot.bundle.md`
+
 ## Rollout Mode
 
 Current rollout mode is moderate:

@@ -9,6 +9,7 @@
 - Initial skills registry created
 - Prompt templates created
 - Adherence eval rubrics created
+- Consumer bundle resolver implemented (`npm run instructions:resolve`)
 
 ## Phase B - Integration
 

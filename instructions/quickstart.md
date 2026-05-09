@@ -7,6 +7,12 @@
 5. Apply context facts from `context/*.yaml`.
 6. Evaluate output quality with `evals/*.yaml` rubrics.
 
+Generate consumer bundles:
+
+```bash
+npm run instructions:resolve
+```
+
 For contribution policy and docs sync, use:
 
 - `docs/documentation-governance.md`

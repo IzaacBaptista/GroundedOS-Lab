@@ -686,6 +686,7 @@ Local validation:
 
 ```bash
 npm run instructions:validate
+npm run instructions:resolve
 ```
 
 This check is also wired into CI in warning mode during the current rollout.
