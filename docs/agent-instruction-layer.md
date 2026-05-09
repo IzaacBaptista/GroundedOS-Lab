@@ -32,6 +32,7 @@ Run locally:
 ```bash
 npm run instructions:validate
 npm run instructions:check
+npm run instructions:migrate:plan -- --from 1.0 --to 1.0
 ```
 
 The validator checks required files for the instruction layer MVP.
@@ -66,4 +67,9 @@ Current rollout mode is moderate:
 
 - All instruction-layer YAML files declare `schema_version`.
 - `npm run instructions:check` validates schema-version compliance using the
-	registry in `instructions/schema/schema-registry.yaml`.
+  registry in `instructions/schema/schema-registry.yaml`.
+- Transition policy is defined in `instructions/schema/migration-policy.yaml`.
+
+## Ownership
+
+- Review ownership for instruction-layer assets is defined in `.github/CODEOWNERS`.

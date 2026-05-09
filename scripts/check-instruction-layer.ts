@@ -12,6 +12,7 @@ const requiredPaths = [
   "instructions/manifest.yaml",
   "instructions/index.yaml",
   "instructions/schema/schema-registry.yaml",
+  "instructions/schema/migration-policy.yaml",
   "configs/default-profile.yaml",
   "configs/adapters.yaml",
   "agents/planner.yaml",
@@ -122,6 +123,36 @@ async function validateSchemaVersions(entries: SchemaRegistryEntry[]): Promise<v
   }
 }
 
+function validateMigrationPolicy(policyDoc: unknown, entries: SchemaRegistryEntry[]): void {
+  assertCondition(isRecord(policyDoc), "instructions/schema/migration-policy.yaml must be a YAML object.");
+  assertCondition(typeof policyDoc.current_version === "string", "migration policy missing current_version.");
+  assertCondition(Array.isArray(policyDoc.supported_versions), "migration policy must define supported_versions array.");
+  assertCondition(Array.isArray(policyDoc.allowed_transitions), "migration policy must define allowed_transitions array.");
+
+  const supportedVersions = new Set<string>();
+  for (const item of policyDoc.supported_versions as unknown[]) {
+    assertCondition(typeof item === "string", "supported_versions items must be strings.");
+    supportedVersions.add(item);
+  }
+
+  const currentVersion = policyDoc.current_version;
+  assertCondition(supportedVersions.has(currentVersion), "current_version must be listed in supported_versions.");
+
+  for (const transition of policyDoc.allowed_transitions as unknown[]) {
+    assertCondition(isRecord(transition), "allowed transition must be an object.");
+    assertCondition(typeof transition.from === "string", "transition missing from.");
+    assertCondition(typeof transition.to === "string", "transition missing to.");
+    assertCondition(typeof transition.mode === "string", "transition missing mode.");
+  }
+
+  for (const entry of entries) {
+    assertCondition(
+      supportedVersions.has(entry.schema_version),
+      `schema version ${entry.schema_version} from ${entry.file} is not listed in supported_versions.`
+    );
+  }
+}
+
 function validateIndex(indexDoc: unknown): void {
   assertCondition(isRecord(indexDoc), "instructions/index.yaml must be a YAML object.");
   assertCondition(isRecord(indexDoc.entrypoints), "instructions/index.yaml requires entrypoints map.");
@@ -225,9 +256,12 @@ async function main(): Promise<void> {
     readYaml("configs/adapters.yaml"),
   ]);
 
+  const migrationPolicyDoc = await readYaml("instructions/schema/migration-policy.yaml");
+
   const schemaRegistryDoc = await readYaml("instructions/schema/schema-registry.yaml");
   const schemaEntries = validateSchemaRegistry(schemaRegistryDoc);
   await validateSchemaVersions(schemaEntries);
+  validateMigrationPolicy(migrationPolicyDoc, schemaEntries);
 
   validateManifest(manifestDoc);
   validateIndex(indexDoc);

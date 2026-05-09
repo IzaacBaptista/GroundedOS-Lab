@@ -1,0 +1,16 @@
+# Default owner for the repository
+* @IzaacBaptista
+
+# Instruction layer ownership
+/instructions/ @IzaacBaptista
+/agents/ @IzaacBaptista
+/skills/ @IzaacBaptista
+/context/ @IzaacBaptista
+/prompts/ @IzaacBaptista
+/evals/ @IzaacBaptista
+/configs/ @IzaacBaptista
+/docs/agent-instruction-layer.md @IzaacBaptista
+/docs/documentation-governance.md @IzaacBaptista
+/scripts/check-instruction-layer.ts @IzaacBaptista
+/scripts/resolve-instruction-layer.ts @IzaacBaptista
+/scripts/validate-instruction-layer.ts @IzaacBaptista
