@@ -30,9 +30,11 @@ Run locally:
 
 ```bash
 npm run instructions:validate
+npm run instructions:check
 ```
 
 The validator checks required files for the instruction layer MVP.
+The check command validates schema/references and generates consumer bundles.
 
 ## Resolution and Consumer Bundles
 

@@ -10,6 +10,7 @@
 Generate consumer bundles:
 
 ```bash
+npm run instructions:check
 npm run instructions:resolve
 ```
 

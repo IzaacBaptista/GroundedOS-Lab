@@ -686,6 +686,7 @@ Local validation:
 
 ```bash
 npm run instructions:validate
+npm run instructions:check
 npm run instructions:resolve
 ```
 

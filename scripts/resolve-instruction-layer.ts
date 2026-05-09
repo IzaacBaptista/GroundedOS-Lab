@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from "fs/promises";
-import { dirname, resolve } from "path";
+import { resolve } from "path";
+import { pathToFileURL } from "url";
 
 type AdapterSources = Record<string, string[]>;
 
@@ -13,6 +14,16 @@ type ConsumerBundle = {
   consumer: string;
   patterns: string[];
   files: ResolvedFile[];
+};
+
+export type ResolutionReport = {
+  generatedAt: string;
+  outputDir: string;
+  consumers: Array<{
+    consumer: string;
+    fileCount: number;
+    patterns: string[];
+  }>;
 };
 
 const REPO_ROOT = process.cwd();
@@ -187,7 +198,7 @@ function toMarkdownBundle(bundle: ConsumerBundle): string {
   return [...header, ...sections].join("\n");
 }
 
-async function main(): Promise<void> {
+export async function resolveInstructionLayer(): Promise<ResolutionReport> {
   const manifestPath = resolve(REPO_ROOT, "instructions/manifest.yaml");
   const adaptersPath = resolve(REPO_ROOT, "configs/adapters.yaml");
 
@@ -242,31 +253,35 @@ async function main(): Promise<void> {
   }
 
   const reportPath = resolve(OUTPUT_DIR, "resolution-report.json");
+  const report: ResolutionReport = {
+    generatedAt: new Date().toISOString(),
+    outputDir: toRepoRelative(OUTPUT_DIR),
+    consumers: bundles.map((bundle) => ({
+      consumer: bundle.consumer,
+      fileCount: bundle.files.length,
+      patterns: bundle.patterns,
+    })),
+  };
+
   await writeFile(
     reportPath,
-    JSON.stringify(
-      {
-        generatedAt: new Date().toISOString(),
-        outputDir: toRepoRelative(OUTPUT_DIR),
-        consumers: bundles.map((bundle) => ({
-          consumer: bundle.consumer,
-          fileCount: bundle.files.length,
-          patterns: bundle.patterns,
-        })),
-      },
-      null,
-      2
-    ) + "\n",
+    JSON.stringify(report, null, 2) + "\n",
     "utf8"
   );
 
-  console.log(`Instruction bundles generated at ${toRepoRelative(OUTPUT_DIR)}.`);
-  for (const bundle of bundles) {
-    console.log(`- ${bundle.consumer}: ${bundle.files.length} files`);
-  }
+  return report;
 }
 
-main().catch((error) => {
-  console.error("Failed to resolve instruction layer:", error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  resolveInstructionLayer()
+    .then((report) => {
+      console.log(`Instruction bundles generated at ${report.outputDir}.`);
+      for (const consumer of report.consumers) {
+        console.log(`- ${consumer.consumer}: ${consumer.fileCount} files`);
+      }
+    })
+    .catch((error) => {
+      console.error("Failed to resolve instruction layer:", error);
+      process.exit(1);
+    });
+}
