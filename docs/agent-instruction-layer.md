@@ -22,6 +22,7 @@ architecture, standards, roadmap context, and PR expectations in every prompt.
 
 - Global policy starts at `instructions/manifest.yaml`.
 - Folder entrypoints are listed in `instructions/index.yaml`.
+- Schema registry lives in `instructions/schema/schema-registry.yaml`.
 - Documentation sync policy is in `docs/documentation-governance.md`.
 
 ## Validation
@@ -60,3 +61,9 @@ Current rollout mode is moderate:
 
 - CI check runs in warning style (non-blocking)
 - Teams can harden to blocking mode after stable adoption
+
+## Schema Versioning
+
+- All instruction-layer YAML files declare `schema_version`.
+- `npm run instructions:check` validates schema-version compliance using the
+	registry in `instructions/schema/schema-registry.yaml`.

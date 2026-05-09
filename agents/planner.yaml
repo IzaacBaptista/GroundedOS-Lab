@@ -1,3 +1,4 @@
+schema_version: "1.0"
 id: planner
 name: Planner Agent
 purpose_en: Turn user intent into executable plans with clear acceptance criteria.

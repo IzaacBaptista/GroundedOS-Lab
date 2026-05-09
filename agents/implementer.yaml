@@ -1,3 +1,4 @@
+schema_version: "1.0"
 id: implementer
 name: Implementer Agent
 purpose_en: Execute approved plan with minimal, safe, and verifiable code changes.

@@ -1,3 +1,4 @@
+schema_version: "1.0"
 entrypoints:
   manifest: instructions/manifest.yaml
   config_profile: configs/default-profile.yaml

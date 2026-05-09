@@ -1,0 +1,49 @@
+version: 1
+schemas:
+  - id: instruction-manifest
+    file: instructions/manifest.yaml
+    schema_version: "1.0"
+
+  - id: instruction-index
+    file: instructions/index.yaml
+    schema_version: "1.0"
+
+  - id: config-default-profile
+    file: configs/default-profile.yaml
+    schema_version: "1.0"
+
+  - id: config-adapters
+    file: configs/adapters.yaml
+    schema_version: "1.0"
+
+  - id: context-project
+    file: context/project-context.yaml
+    schema_version: "1.0"
+
+  - id: context-contribution
+    file: context/contribution-context.yaml
+    schema_version: "1.0"
+
+  - id: agent-planner
+    file: agents/planner.yaml
+    schema_version: "1.0"
+
+  - id: agent-implementer
+    file: agents/implementer.yaml
+    schema_version: "1.0"
+
+  - id: agent-reviewer
+    file: agents/reviewer.yaml
+    schema_version: "1.0"
+
+  - id: skills-registry
+    file: skills/registry.yaml
+    schema_version: "1.0"
+
+  - id: eval-adherence-rubric
+    file: evals/adherence-rubric.yaml
+    schema_version: "1.0"
+
+  - id: eval-review-rubric
+    file: evals/review-rubric.yaml
+    schema_version: "1.0"

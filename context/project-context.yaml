@@ -1,3 +1,4 @@
+schema_version: "1.0"
 project:
   name: GroundedOS Lab
   mission_en: Build, evaluate, and understand grounded AI systems.

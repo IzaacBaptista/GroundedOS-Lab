@@ -11,6 +11,7 @@ const REPO_ROOT = process.cwd();
 const requiredPaths = [
   "instructions/manifest.yaml",
   "instructions/index.yaml",
+  "instructions/schema/schema-registry.yaml",
   "configs/default-profile.yaml",
   "configs/adapters.yaml",
   "agents/planner.yaml",
@@ -26,6 +27,12 @@ const requiredPaths = [
   "evals/adherence-rubric.yaml",
   "evals/review-rubric.yaml",
 ] as const;
+
+type SchemaRegistryEntry = {
+  id: string;
+  file: string;
+  schema_version: string;
+};
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -66,6 +73,53 @@ function validateManifest(manifest: unknown): void {
   const resolutionOrder = manifest.resolution_order;
   assertCondition(Array.isArray(resolutionOrder), "manifest.resolution_order must be an array.");
   assertCondition(resolutionOrder.includes("user-request"), "manifest.resolution_order must include user-request.");
+}
+
+function validateSchemaRegistry(registryDoc: unknown): SchemaRegistryEntry[] {
+  assertCondition(isRecord(registryDoc), "instructions/schema/schema-registry.yaml must be a YAML object.");
+  assertCondition(typeof registryDoc.version === "number", "schema registry must define numeric version.");
+  assertCondition(Array.isArray(registryDoc.schemas), "schema registry must define schemas array.");
+
+  const entries: SchemaRegistryEntry[] = [];
+  const seenIds = new Set<string>();
+  const seenFiles = new Set<string>();
+
+  for (const schema of registryDoc.schemas as unknown[]) {
+    assertCondition(isRecord(schema), "schema entry must be an object.");
+    assertCondition(typeof schema.id === "string", "schema entry missing id.");
+    assertCondition(typeof schema.file === "string", `schema ${String(schema.id)} missing file.`);
+    assertCondition(typeof schema.schema_version === "string", `schema ${String(schema.id)} missing schema_version.`);
+
+    assertCondition(!seenIds.has(schema.id), `duplicate schema id in registry: ${schema.id}`);
+    assertCondition(!seenFiles.has(schema.file), `duplicate schema file in registry: ${schema.file}`);
+
+    seenIds.add(schema.id);
+    seenFiles.add(schema.file);
+
+    entries.push({
+      id: schema.id,
+      file: schema.file,
+      schema_version: schema.schema_version,
+    });
+  }
+
+  assertCondition(entries.length > 0, "schema registry must contain at least one schema entry.");
+  return entries;
+}
+
+async function validateSchemaVersions(entries: SchemaRegistryEntry[]): Promise<void> {
+  for (const entry of entries) {
+    const exists = await pathExists(entry.file);
+    assertCondition(exists, `schema target file not found: ${entry.file}`);
+
+    const fileDoc = await readYaml(entry.file);
+    assertCondition(isRecord(fileDoc), `schema target must be YAML object: ${entry.file}`);
+    assertCondition(typeof fileDoc.schema_version === "string", `schema target missing schema_version: ${entry.file}`);
+    assertCondition(
+      fileDoc.schema_version === entry.schema_version,
+      `schema version mismatch for ${entry.file}: expected ${entry.schema_version}, got ${String(fileDoc.schema_version)}`
+    );
+  }
 }
 
 function validateIndex(indexDoc: unknown): void {
@@ -170,6 +224,10 @@ async function main(): Promise<void> {
     readYaml("instructions/index.yaml"),
     readYaml("configs/adapters.yaml"),
   ]);
+
+  const schemaRegistryDoc = await readYaml("instructions/schema/schema-registry.yaml");
+  const schemaEntries = validateSchemaRegistry(schemaRegistryDoc);
+  await validateSchemaVersions(schemaEntries);
 
   validateManifest(manifestDoc);
   validateIndex(indexDoc);

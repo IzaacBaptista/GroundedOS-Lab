@@ -15,6 +15,7 @@
 
 - Add CI warning checks for instruction adherence
 - Add lightweight validator for YAML schema consistency
+- Add schema registry and `schema_version` enforcement across YAML files
 - Add owner mapping and review policy per folder
 
 ## Phase C - Hardening
