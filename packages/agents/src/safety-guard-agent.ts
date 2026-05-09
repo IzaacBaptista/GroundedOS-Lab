@@ -78,6 +78,10 @@ export class SafetyGuardAgent extends BaseAgent {
       this.state.reasoning.push(r);
     }
 
+    const lastReasoning = result.reasoning.length > 0
+      ? result.reasoning[result.reasoning.length - 1]!
+      : 'Safety check complete.';
+
     const answer = JSON.stringify({
       passed: out.passed,
       riskLevel: out.riskLevel,
@@ -88,7 +92,7 @@ export class SafetyGuardAgent extends BaseAgent {
     });
 
     return {
-      reasoning: result.reasoning[result.reasoning.length - 1] ?? 'Safety check complete.',
+      reasoning: lastReasoning,
       toolName: null,
       toolInput: null,
       directAnswer: answer,

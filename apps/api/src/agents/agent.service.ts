@@ -69,14 +69,7 @@ export class AgentService {
     let memoryEntries: AgentExecutionContext['memoryEntries'] = [];
     try {
       const memResults = await this.memoryStore.search(sessionId, request.query, 3);
-      memoryEntries = memResults.map((r) => ({
-        id: r.entry.id,
-        sessionId: r.entry.sessionId,
-        query: r.entry.query,
-        answer: r.entry.answer,
-        createdAt: r.entry.createdAt,
-        metadata: r.entry.metadata,
-      }));
+      memoryEntries = memResults.map((r) => ({ ...r.entry }));
     } catch {
       // Memory retrieval is best-effort; never block agent execution
     }
