@@ -1,0 +1,31 @@
+adapters:
+  codex:
+    source_of_truth:
+      - instructions/manifest.yaml
+      - agents/*.yaml
+      - skills/registry.yaml
+      - context/*.yaml
+      - prompts/*.md
+      - evals/*.yaml
+
+  copilot_chat_vscode:
+    source_of_truth:
+      - instructions/manifest.yaml
+      - agents/*.yaml
+      - skills/registry.yaml
+      - context/*.yaml
+      - prompts/*.md
+      - evals/*.yaml
+
+  github_copilot:
+    source_of_truth:
+      - instructions/manifest.yaml
+      - agents/*.yaml
+      - skills/registry.yaml
+      - context/*.yaml
+      - prompts/*.md
+      - evals/*.yaml
+
+notes:
+  en: Adapters must translate format, never change policy semantics.
+  pt-BR: Adaptadores devem traduzir formato, nunca alterar a semantica das politicas.

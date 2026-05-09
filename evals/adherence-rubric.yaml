@@ -1,0 +1,26 @@
+name: instruction-adherence-rubric
+mode: warning
+checks:
+  - id: intent_coverage
+    description: Response addresses all user requirements.
+    pass_condition: all_core_requirements_covered
+
+  - id: plan_quality
+    description: Non-trivial tasks include actionable plan.
+    pass_condition: plan_present_with_steps
+
+  - id: safety_and_scope
+    description: No destructive or unrelated changes.
+    pass_condition: no_unrelated_or_destructive_actions
+
+  - id: verification_evidence
+    description: Reports concrete validation or limitations.
+    pass_condition: validation_or_reasonable_constraints_reported
+
+  - id: docs_sync
+    description: Documentation updated when behavior/roadmap changed.
+    pass_condition: docs_updated_or_justified
+scoring:
+  pass_threshold: 0.8
+  warning_below: 0.8
+  fail_below: 0.5

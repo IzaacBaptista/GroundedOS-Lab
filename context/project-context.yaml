@@ -1,0 +1,19 @@
+project:
+  name: GroundedOS Lab
+  mission_en: Build, evaluate, and understand grounded AI systems.
+  mission_ptbr: Construir, avaliar e entender sistemas de IA com grounding.
+roadmap:
+  phase_status:
+    phase_0: complete
+    phase_1: complete
+    phase_2: complete
+    phase_2b: complete
+    phase_3: complete
+    phase_4: complete
+    phase_5: complete
+    phase_6: in-progress
+references:
+  root_readme: README.md
+  docs_index: docs/README.md
+  roadmap_source: README.md
+  governance: docs/documentation-governance.md

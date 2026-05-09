@@ -1,0 +1,37 @@
+version: 1
+skills:
+  - id: feature-delivery
+    intent_patterns:
+      - implement feature
+      - add capability
+      - build module
+    agent: implementer
+    prompt_template: prompts/feature-request.md
+    eval_profile: evals/adherence-rubric.yaml
+
+  - id: bugfix
+    intent_patterns:
+      - fix bug
+      - resolve error
+      - failing test
+    agent: implementer
+    prompt_template: prompts/bugfix-request.md
+    eval_profile: evals/adherence-rubric.yaml
+
+  - id: code-review
+    intent_patterns:
+      - review
+      - audit changes
+      - identify risks
+    agent: reviewer
+    prompt_template: prompts/review-request.md
+    eval_profile: evals/review-rubric.yaml
+
+  - id: docs-sync
+    intent_patterns:
+      - update readme
+      - sync docs
+      - align roadmap docs
+    agent: planner
+    prompt_template: prompts/docs-request.md
+    eval_profile: evals/adherence-rubric.yaml

@@ -1,0 +1,15 @@
+contribution:
+  commit_style:
+    en: Prefer focused commits with explicit scope in message subject.
+    pt-BR: Preferir commits focados com escopo explicito no assunto.
+  pr_requirements:
+    - tests_or_validation_evidence
+    - roadmap_scope_description
+    - docs_update_or_justification
+  mandatory_docs_sync:
+    - README.md when roadmap phase/scope changes
+    - impacted module README
+    - relevant docs contract/runbook/phase document
+references:
+  pr_template: .github/pull_request_template.md
+  governance: docs/documentation-governance.md

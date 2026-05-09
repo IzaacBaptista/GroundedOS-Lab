@@ -1,0 +1,15 @@
+profile: default
+strictness: moderate
+output:
+  style: direct
+  verbosity: balanced
+  include_risks: true
+  include_next_steps: true
+workflow:
+  require_context_scan: true
+  require_plan_before_major_edits: true
+  require_validation_after_edits: true
+policies:
+  no_destructive_git_ops: true
+  respect_existing_worktree_changes: true
+  docs_sync_required_for_roadmap_changes: true

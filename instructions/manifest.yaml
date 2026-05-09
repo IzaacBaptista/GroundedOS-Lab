@@ -1,0 +1,33 @@
+version: 1.0.0
+name: groundedos-agent-instruction-layer
+owner: groundedos-core
+status: in-progress
+strictness: moderate
+language:
+  canonical: en
+  supported:
+    - en
+    - pt-BR
+consumers:
+  - codex
+  - copilot-chat-vscode
+  - github-copilot
+resolution_order:
+  - instructions/manifest.yaml
+  - configs/*.yaml
+  - context/*.yaml
+  - agents/*.yaml
+  - skills/*.yaml
+  - prompts/*.md
+  - user-request
+defaults:
+  response:
+    match_user_language: true
+    include_file_references: true
+  delivery:
+    require_plan_for_non_trivial_work: true
+    require_verification_summary: true
+    avoid_unrelated_changes: true
+governance:
+  docs_policy: docs/documentation-governance.md
+  pr_template: .github/pull_request_template.md

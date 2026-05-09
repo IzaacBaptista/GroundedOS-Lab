@@ -1,0 +1,10 @@
+entrypoints:
+  manifest: instructions/manifest.yaml
+  config_profile: configs/default-profile.yaml
+  adapters: configs/adapters.yaml
+  project_context: context/project-context.yaml
+  contribution_context: context/contribution-context.yaml
+  skills_registry: skills/registry.yaml
+  eval_adherence: evals/adherence-rubric.yaml
+  eval_review: evals/review-rubric.yaml
+  roadmap: instructions/implementation-roadmap.md

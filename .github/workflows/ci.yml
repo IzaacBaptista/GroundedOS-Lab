@@ -29,6 +29,9 @@ jobs:
       - name: Run ESLint
         run: npm run lint 2>/dev/null || echo "No lint script; skipping"
 
+      - name: Validate instruction layer (warning mode)
+        run: npm run instructions:validate || echo "Instruction layer check reported warnings"
+
       - name: Check TypeScript compilation
         run: npm run typecheck
 

@@ -659,7 +659,36 @@ groundedos-lab/
   
   datasets/   ← Raw, processed and synthetic datasets registry
   infra/      ← Docker, Compose, K8s, environment configs
+   instructions/ ← Agent instruction layer entrypoint and global manifest
+   agents/     ← Agent behavior profiles (planner, implementer, reviewer)
+   skills/     ← Skill routing registry
+   context/    ← Reusable project and contribution context
+   prompts/    ← Prompt templates by intent
+   evals/      ← Instruction adherence rubrics
+   configs/    ← Instruction profile and adapter configuration
 ```
+
+---
+
+## 🧭 Agent Instruction Layer
+
+The repository includes a reusable instruction layer for Codex, Copilot Chat
+(VS Code), and GitHub Copilot so contributors do not need to restate project
+standards in every prompt.
+
+Primary entrypoints:
+
+- [`instructions/manifest.yaml`](./instructions/manifest.yaml)
+- [`instructions/index.yaml`](./instructions/index.yaml)
+- [`docs/agent-instruction-layer.md`](./docs/agent-instruction-layer.md)
+
+Local validation:
+
+```bash
+npm run instructions:validate
+```
+
+This check is also wired into CI in warning mode during the current rollout.
 
 ---
 

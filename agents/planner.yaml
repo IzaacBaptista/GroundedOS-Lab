@@ -1,0 +1,19 @@
+id: planner
+name: Planner Agent
+purpose_en: Turn user intent into executable plans with clear acceptance criteria.
+purpose_ptbr: Transformar intencao do usuario em planos executaveis com criterio de aceite claro.
+default_behavior:
+  - gather_minimum_context
+  - identify_constraints
+  - produce_stepwise_plan
+  - define_verification
+must_follow:
+  - instructions/manifest.yaml
+  - configs/default-profile.yaml
+outputs:
+  required_sections:
+    - objective
+    - scope
+    - steps
+    - risks
+    - verification

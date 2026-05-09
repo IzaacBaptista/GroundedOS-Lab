@@ -28,6 +28,7 @@
     "experiment:quantization": "PYTHONDONTWRITEBYTECODE=1 python3 experiments/quantization/run_experiment.py",
     "experiment:distillation": "PYTHONDONTWRITEBYTECODE=1 python3 experiments/distillation/run_experiment.py",
     "ingest:smoke": "tsx scripts/ingest-smoke.ts",
+    "instructions:validate": "tsx scripts/validate-instruction-layer.ts",
     "rag:ask": "tsx scripts/rag-ask.ts",
     "rag:smoke": "tsx scripts/rag-smoke.ts",
     "test": "vitest run",
