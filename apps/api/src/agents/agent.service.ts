@@ -1,25 +1,38 @@
 /**
- * Agent Controller
+ * Agent Service
  *
- * Exposes agent execution as API endpoints.
- * Integrates DocumentQAAgent with RAG service for document retrieval.
+ * Orchestrates agent execution with rich context injection:
+ *   1. Fetches relevant session memory entries (MemoryStore.search)
+ *   2. Runs model routing to pick the best model (routeModel)
+ *   3. Builds a fully-populated AgentExecutionContext
+ *   4. Selects and runs the requested agent type
+ *
+ * Supported agent types: document-qa | research | safety-guard
  */
 
 import { Injectable } from '@nestjs/common';
 import {
   DocumentQAAgent,
+  ResearchAgent,
+  SafetyGuardAgent,
   type AgentResult,
   type AgentExecutionContext,
 } from '@groundedos/agents';
+import { FileSessionMemoryStore } from '@groundedos/memory';
+import { routeModel } from '@groundedos/model-routing';
+
+export type AgentType = 'document-qa' | 'research' | 'safety-guard';
 
 export type AgentExecuteRequest = {
-  agentType: 'document-qa';
+  agentType: AgentType;
   indexId?: string;
   indexDir?: string;
   query: string;
   sessionId?: string;
   maxSteps?: number;
   devMode?: boolean;
+  /** Language for the agent response. Defaults to 'en-US'. */
+  language?: string;
 };
 
 export type AgentExecuteResponse = {
@@ -27,6 +40,8 @@ export type AgentExecuteResponse = {
   answer?: string;
   sources: string[];
   reasoning: string[];
+  /** Model selected by the router for this request. */
+  selectedModel?: string;
   devMode?: {
     toolCalls: Array<{
       id: string;
@@ -45,28 +60,65 @@ export type AgentExecuteResponse = {
 
 @Injectable()
 export class AgentService {
+  private readonly memoryStore = new FileSessionMemoryStore();
+
   async executeAgent(request: AgentExecuteRequest): Promise<AgentExecuteResponse> {
-    if (request.agentType !== 'document-qa') {
-      throw new Error(`Unsupported agent type: ${request.agentType}`);
+    const sessionId = request.sessionId ?? `session-${Date.now()}`;
+
+    // 1. Fetch relevant memory entries for this session
+    let memoryEntries: AgentExecutionContext['memoryEntries'] = [];
+    try {
+      const memResults = await this.memoryStore.search(sessionId, request.query, 3);
+      memoryEntries = memResults.map((r) => ({
+        id: r.entry.id,
+        sessionId: r.entry.sessionId,
+        query: r.entry.query,
+        answer: r.entry.answer,
+        createdAt: r.entry.createdAt,
+        metadata: r.entry.metadata,
+      }));
+    } catch {
+      // Memory retrieval is best-effort; never block agent execution
     }
 
-    const agent = new DocumentQAAgent();
+    // 2. Run model routing based on query intent
+    const routingDecision = routeModel(request.query);
 
+    // 3. Build the rich execution context
     const context: AgentExecutionContext = {
-      sessionId: request.sessionId || `session-${Date.now()}`,
+      sessionId,
       indexId: request.indexId,
       maxSteps: request.maxSteps ?? 5,
-      timeout: 30000, // 30s timeout
+      timeout: 30000,
       devMode: request.devMode ?? true,
+      language: request.language ?? 'en-US',
+      memoryEntries,
+      routingDecision,
     };
 
+    // 4. Select and execute agent
+    const agent = this.createAgent(request.agentType);
     const result: AgentResult = await agent.execute(context, request.query);
+
+    // 5. Persist the turn in session memory
+    try {
+      if (result.success && result.answer) {
+        await this.memoryStore.append({
+          sessionId,
+          query: request.query,
+          answer: result.answer,
+        });
+      }
+    } catch {
+      // Persistence failure is non-fatal
+    }
 
     return {
       success: result.success,
       answer: result.answer,
       sources: result.sources,
       reasoning: result.reasoning,
+      selectedModel: routingDecision.selectedModel,
       ...(request.devMode
         ? {
             devMode: {
@@ -86,5 +138,20 @@ export class AgentService {
         : {}),
       error: result.error,
     };
+  }
+
+  private createAgent(agentType: AgentType) {
+    switch (agentType) {
+      case 'document-qa':
+        return new DocumentQAAgent();
+      case 'research':
+        return new ResearchAgent();
+      case 'safety-guard':
+        return new SafetyGuardAgent();
+      default: {
+        const exhaustive: never = agentType;
+        throw new Error(`Unsupported agent type: ${exhaustive}`);
+      }
+    }
   }
 }

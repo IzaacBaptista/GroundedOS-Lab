@@ -2,10 +2,11 @@
  * Base Agent Implementation
  *
  * Abstract base class that all agents extend.
- * Provides lifecycle management, reasoning step tracking, and tool invocation.
+ * Provides lifecycle management, reasoning step tracking, tool invocation,
+ * skill composition, and instruction-aware system prompt building.
  */
 
-import type { Agent, AgentExecutionContext, AgentResult, AgentState, Tool, ToolCall } from './types.js';
+import type { Agent, AgentExecutionContext, AgentResult, AgentState, Skill, Tool, ToolCall } from './types.js';
 import {
   DefaultToolRegistry,
   ToolCallingError,
@@ -13,29 +14,8 @@ import {
   executeTool,
   type ToolRegistry,
 } from './tools.js';
-
-const DEEP_REASONING_PROMPT_TEMPLATE = `You are an AI agent with specific goal and available tools.
-
-Goal: {goal}
-
-Task: {input}
-
-{availableTools}
-
-Think through this step by step:
-1. What is the user asking for?
-2. Do I need to call any tools to answer?
-3. If yes, which tool and with what input?
-4. Once I have the result, how do I answer based on the retrieved context?
-
-Respond in this exact JSON format:
-{
-  "reasoning": "Your step-by-step reasoning",
-  "shouldCallTool": boolean,
-  "toolName": "tool_name_if_applicable" or null,
-  "toolInput": { extracted input } or null,
-  "answer": "Your final answer if no tool needed" or null
-}`;
+import { buildSystemPrompt, getPresetInstructions, type InstructionSet } from './instructions.js';
+import { PROMPT_TEMPLATES } from './prompts.js';
 
 export abstract class BaseAgent implements Agent {
   id: string;
@@ -43,8 +23,10 @@ export abstract class BaseAgent implements Agent {
   description: string;
   goal: string;
   tools: Map<string, Tool>;
+  skills: Map<string, Skill>;
   protected state: AgentState;
   protected toolRegistry: ToolRegistry;
+  protected instructions?: InstructionSet;
 
   constructor(id: string, name: string, description: string, goal: string) {
     this.id = id;
@@ -52,8 +34,11 @@ export abstract class BaseAgent implements Agent {
     this.description = description;
     this.goal = goal;
     this.tools = new Map();
+    this.skills = new Map();
     this.toolRegistry = new DefaultToolRegistry();
     this.state = this.createInitialState();
+    // Load preset instructions if available for this agent ID
+    this.instructions = getPresetInstructions(id);
   }
 
   private createInitialState(): AgentState {
@@ -80,6 +65,32 @@ export abstract class BaseAgent implements Agent {
 
   deregisterTool(toolName: string): void {
     this.tools.delete(toolName);
+  }
+
+  addSkill(skill: Skill): void {
+    this.skills.set(skill.id, skill);
+  }
+
+  removeSkill(skillId: string): void {
+    this.skills.delete(skillId);
+  }
+
+  /**
+   * Set or override the instruction set for this agent.
+   * Useful when injecting context-specific instructions at request time.
+   */
+  setInstructions(instructions: InstructionSet): void {
+    this.instructions = instructions;
+  }
+
+  /**
+   * Build the full system prompt string from the active instructions.
+   * Returns an empty string when no instructions are configured.
+   */
+  getSystemPrompt(context?: AgentExecutionContext): string {
+    const active = context?.instructions ?? this.instructions;
+    if (!active) return '';
+    return buildSystemPrompt(active);
   }
 
   getState(): AgentState {

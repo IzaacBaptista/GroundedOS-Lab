@@ -22,8 +22,11 @@
   },
   "dependencies": {
     "@groundedos/core": "*",
+    "@groundedos/memory": "*",
+    "@groundedos/model-routing": "*",
+    "@groundedos/observability": "*",
     "@groundedos/rag": "*",
-    "@groundedos/observability": "*"
+    "@groundedos/safety": "*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
