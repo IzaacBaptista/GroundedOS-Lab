@@ -32,8 +32,8 @@ Run locally:
 ```bash
 npm run instructions:validate
 npm run instructions:check
-npm run instructions:migrate:plan -- --from 1.1 --to 1.1
-npm run instructions:migrate:apply -- --from 1.0 --to 1.1
+npm run instructions:migrate:plan -- --from 1.2 --to 1.2
+npm run instructions:migrate:apply -- --from 1.1 --to 1.2
 ```
 
 The validator checks required files for the instruction layer MVP.

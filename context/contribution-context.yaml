@@ -1,4 +1,4 @@
-schema_version: "1.1"
+schema_version: "1.2"
 contribution:
   commit_style:
     en: Prefer focused commits with explicit scope in message subject.

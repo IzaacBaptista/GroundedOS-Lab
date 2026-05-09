@@ -1,5 +1,7 @@
 import { execFileSync } from "child_process";
+import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 function runTsxScript(scriptPath: string, args: string[] = []): string {
   return execFileSync(
@@ -21,6 +23,9 @@ describe("instruction layer scripts", () => {
 
   it("migration planner defaults to current version", () => {
     const output = runTsxScript("scripts/plan-instruction-schema-migration.ts");
+    const policy = parse(
+      readFileSync("instructions/schema/migration-policy.yaml", "utf8")
+    ) as { current_version: string };
 
     const plan = JSON.parse(output) as {
       fromVersion: string;
@@ -29,8 +34,8 @@ describe("instruction layer scripts", () => {
       impactedFileCount: number;
     };
 
-    expect(plan.fromVersion).toBe("1.1");
-    expect(plan.toVersion).toBe("1.1");
+    expect(plan.fromVersion).toBe(policy.current_version);
+    expect(plan.toVersion).toBe(policy.current_version);
     expect(plan.transitionMode).toBe("noop");
     expect(plan.impactedFileCount).toBeGreaterThan(0);
   });

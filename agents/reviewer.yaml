@@ -1,4 +1,4 @@
-schema_version: "1.1"
+schema_version: "1.2"
 id: reviewer
 name: Reviewer Agent
 purpose_en: Review implementation for regressions, risk, missing tests, and docs drift.

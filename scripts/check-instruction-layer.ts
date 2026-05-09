@@ -47,6 +47,26 @@ function assertCondition(condition: unknown, message: string): asserts condition
   }
 }
 
+function parseSchemaVersion(version: string): [number, number] {
+  const [majorRaw, minorRaw = "0"] = version.split(".");
+  const major = Number.parseInt(majorRaw, 10);
+  const minor = Number.parseInt(minorRaw, 10);
+  assertCondition(Number.isFinite(major), `invalid schema major version: ${version}`);
+  assertCondition(Number.isFinite(minor), `invalid schema minor version: ${version}`);
+  return [major, minor];
+}
+
+function isSchemaAtLeast(version: string, targetMajor: number, targetMinor: number): boolean {
+  const [major, minor] = parseSchemaVersion(version);
+  if (major > targetMajor) {
+    return true;
+  }
+  if (major < targetMajor) {
+    return false;
+  }
+  return minor >= targetMinor;
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(resolve(REPO_ROOT, path), constants.R_OK);
@@ -223,6 +243,15 @@ function validateSchemaContentMinimum(entry: SchemaRegistryEntry, doc: unknown):
         assertCondition(typeof skill.agent === "string", `${entry.file} skill.agent must be string.`);
         assertCondition(typeof skill.prompt_template === "string", `${entry.file} skill.prompt_template must be string.`);
         assertCondition(typeof skill.eval_profile === "string", `${entry.file} skill.eval_profile must be string.`);
+
+        if (isSchemaAtLeast(entry.schema_version, 1, 2)) {
+          assertCondition(typeof skill.owner === "string", `${entry.file} skill.owner must be string for schema >= 1.2.`);
+          assertCondition(typeof skill.stability === "string", `${entry.file} skill.stability must be string for schema >= 1.2.`);
+          assertCondition(
+            Array.isArray(skill.examples) && skill.examples.length > 0,
+            `${entry.file} skill.examples must be non-empty array for schema >= 1.2.`
+          );
+        }
       }
       break;
     }
