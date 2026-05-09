@@ -1004,7 +1004,11 @@ Contributions at all levels are welcome: documentation, experiments, package imp
 - [ ] Branch is up to date with `main`
 - [ ] Code follows the style guide for the language (see Monorepo Tooling)
 - [ ] Tests pass locally
-- [ ] The relevant `README.md` is updated
+- [ ] Roadmap phase impact is documented in the PR description
+- [ ] `README.md` is updated when phase status/scope changed
+- [ ] The impacted module `README.md` is updated
+- [ ] The relevant `docs/*` contract/runbook/phase file is updated
+- [ ] Docs follow the policy in [`docs/documentation-governance.md`](./docs/documentation-governance.md)
 - [ ] The PR description explains *what* changed and *why*
 
 ### Need help?

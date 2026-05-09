@@ -18,6 +18,7 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 | [`study-tracks/`](./study-tracks/README.md) | Guided learning routes by topic across concepts, packages and roadmap phases. |
 | [`adr/`](./adr/README.md) | Architecture Decision Records — why the system is built the way it is. |
 | [`evaluation-strategy.md`](./evaluation-strategy.md) | How quality is measured: golden dataset, metrics, baselines, eval process. |
+| [`documentation-governance.md`](./documentation-governance.md) | Required doc updates per roadmap phase and PR review checklist for docs sync. |
 | [`operational-runbook.md`](./operational-runbook.md) | Runtime operations for auth, jobs queue, worker startup, and troubleshooting. |
 | [`phase-0-mvp-plan.md`](./phase-0-mvp-plan.md) | Phase 0 implementation plan and milestone definitions. |
 | [`phase-1-handoff.md`](./phase-1-handoff.md) | Phase 1 baseline, verified commands and open implementation issues. |
