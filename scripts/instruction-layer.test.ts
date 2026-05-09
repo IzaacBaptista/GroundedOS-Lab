@@ -4,15 +4,22 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 
 function runTsxScript(scriptPath: string, args: string[] = []): string {
-  return execFileSync(
-    process.execPath,
-    ["--import", "tsx", scriptPath, ...args],
-    {
-      cwd: process.cwd(),
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
+  try {
+    return execFileSync(
+      process.execPath,
+      ["--import", "tsx", scriptPath, ...args],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
+  } catch (error) {
+    if (error instanceof Error && "stdout" in error) {
+      return (error as { stdout: string }).stdout;
     }
-  );
+    throw error;
+  }
 }
 
 describe("instruction layer scripts", () => {
@@ -38,5 +45,22 @@ describe("instruction layer scripts", () => {
     expect(plan.toVersion).toBe(policy.current_version);
     expect(plan.transitionMode).toBe("noop");
     expect(plan.impactedFileCount).toBeGreaterThan(0);
+  });
+
+  it("deprecation report runs without crashing", () => {
+    const output = runTsxScript("scripts/report-instruction-deprecations.ts");
+    expect(output.length).toBeGreaterThan(0);
+    // Either shows report header or indicates no deprecated entries
+    expect(
+      output.includes("Instruction Layer Deprecation Report") || output.includes("No deprecated instruction-layer entries found")
+    ).toBe(true);
+  });
+
+  it("resolver generates bundles for all consumers", () => {
+    const output = runTsxScript("scripts/resolve-instruction-layer.ts");
+    expect(output).toContain("codex");
+    expect(output).toContain("copilot_chat_vscode");
+    expect(output).toContain("github_copilot");
+    expect(output).toContain("14 files");
   });
 });

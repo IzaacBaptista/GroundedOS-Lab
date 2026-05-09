@@ -33,6 +33,7 @@
     "instructions:migrate:plan": "tsx scripts/plan-instruction-schema-migration.ts",
     "instructions:resolve": "tsx scripts/resolve-instruction-layer.ts",
     "instructions:validate": "tsx scripts/validate-instruction-layer.ts",
+    "instructions:deprecations": "tsx scripts/report-instruction-deprecations.ts",
     "rag:ask": "tsx scripts/rag-ask.ts",
     "rag:smoke": "tsx scripts/rag-smoke.ts",
     "test": "vitest run",
