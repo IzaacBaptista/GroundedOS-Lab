@@ -1,19 +1,16 @@
-schema_version: "1.0"
+schema_version: "1.1"
 name: review-quality-rubric
 mode: warning
 checks:
   - id: findings_first
     description: Findings come before summary.
     pass_condition: findings_section_first
-
   - id: severity_order
     description: Findings ordered by severity.
     pass_condition: severity_descending
-
   - id: evidence_based
     description: Findings include concrete file evidence.
     pass_condition: file_evidence_present
-
   - id: actionability
     description: Suggested remediation is specific and feasible.
     pass_condition: concrete_fix_suggestions

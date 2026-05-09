@@ -1,4 +1,4 @@
-schema_version: "1.0"
+schema_version: "1.1"
 version: 1
 skills:
   - id: feature-delivery
@@ -9,7 +9,6 @@ skills:
     agent: implementer
     prompt_template: prompts/feature-request.md
     eval_profile: evals/adherence-rubric.yaml
-
   - id: bugfix
     intent_patterns:
       - fix bug
@@ -18,7 +17,6 @@ skills:
     agent: implementer
     prompt_template: prompts/bugfix-request.md
     eval_profile: evals/adherence-rubric.yaml
-
   - id: code-review
     intent_patterns:
       - review
@@ -27,7 +25,6 @@ skills:
     agent: reviewer
     prompt_template: prompts/review-request.md
     eval_profile: evals/review-rubric.yaml
-
   - id: docs-sync
     intent_patterns:
       - update readme

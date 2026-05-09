@@ -1,11 +1,20 @@
 schema_version: "1.0"
-current_version: "1.0"
+current_version: "1.1"
 supported_versions:
   - "1.0"
+  - "1.1"
 allowed_transitions:
   - from: "1.0"
     to: "1.0"
     mode: noop
+  - from: "1.0"
+    to: "1.1"
+    mode: apply
+  - from: "1.1"
+    to: "1.1"
+    mode: noop
 notes:
-  en: Migration starts with planning mode only; apply transitions when version 1.1 is introduced.
-  pt-BR: Migracao inicia apenas em modo de planejamento; aplicar transicoes quando a versao 1.1 for introduzida.
+  en: Schema migration can be planned and applied via npm instruction migration
+    commands.
+  pt-BR: A migracao de schema pode ser planejada e aplicada via comandos npm de
+    migracao.

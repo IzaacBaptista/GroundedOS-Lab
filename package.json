@@ -29,6 +29,7 @@
     "experiment:distillation": "PYTHONDONTWRITEBYTECODE=1 python3 experiments/distillation/run_experiment.py",
     "ingest:smoke": "tsx scripts/ingest-smoke.ts",
     "instructions:check": "tsx scripts/check-instruction-layer.ts",
+    "instructions:migrate:apply": "tsx scripts/apply-instruction-schema-migration.ts",
     "instructions:migrate:plan": "tsx scripts/plan-instruction-schema-migration.ts",
     "instructions:resolve": "tsx scripts/resolve-instruction-layer.ts",
     "instructions:validate": "tsx scripts/validate-instruction-layer.ts",

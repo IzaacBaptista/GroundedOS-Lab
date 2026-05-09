@@ -39,9 +39,6 @@ async function readYaml(path: string): Promise<unknown> {
 }
 
 async function main(): Promise<void> {
-  const fromVersion = getArg("--from") ?? "1.0";
-  const toVersion = getArg("--to") ?? "1.0";
-
   const [registryDoc, policyDoc] = await Promise.all([
     readYaml("instructions/schema/schema-registry.yaml"),
     readYaml("instructions/schema/migration-policy.yaml"),
@@ -51,7 +48,12 @@ async function main(): Promise<void> {
   assertCondition(Array.isArray(registryDoc.schemas), "Schema registry must define schemas array.");
 
   assertCondition(isRecord(policyDoc), "Invalid migration policy format.");
+  assertCondition(typeof policyDoc.current_version === "string", "Migration policy missing current_version.");
   assertCondition(Array.isArray(policyDoc.allowed_transitions), "Migration policy must define allowed_transitions.");
+
+  const currentVersion = String(policyDoc.current_version);
+  const fromVersion = getArg("--from") ?? currentVersion;
+  const toVersion = getArg("--to") ?? currentVersion;
 
   const entries: RegistryEntry[] = (registryDoc.schemas as unknown[]).map((entry) => {
     assertCondition(isRecord(entry), "Schema entry must be an object.");

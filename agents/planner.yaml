@@ -1,8 +1,9 @@
-schema_version: "1.0"
+schema_version: "1.1"
 id: planner
 name: Planner Agent
 purpose_en: Turn user intent into executable plans with clear acceptance criteria.
-purpose_ptbr: Transformar intencao do usuario em planos executaveis com criterio de aceite claro.
+purpose_ptbr: Transformar intencao do usuario em planos executaveis com criterio
+  de aceite claro.
 default_behavior:
   - gather_minimum_context
   - identify_constraints

@@ -244,6 +244,32 @@ async function validateEntrypointPaths(indexDoc: unknown): Promise<void> {
   }
 }
 
+async function validateCodeownersCoverage(): Promise<void> {
+  const codeownersPath = ".github/CODEOWNERS";
+  const exists = await pathExists(codeownersPath);
+  assertCondition(exists, "Missing .github/CODEOWNERS file.");
+
+  const content = await readFile(resolve(REPO_ROOT, codeownersPath), "utf8");
+  const requiredPatterns = [
+    "/instructions/",
+    "/agents/",
+    "/skills/",
+    "/context/",
+    "/prompts/",
+    "/evals/",
+    "/configs/",
+    "/scripts/check-instruction-layer.ts",
+    "/scripts/resolve-instruction-layer.ts",
+  ] as const;
+
+  for (const pattern of requiredPatterns) {
+    assertCondition(
+      content.includes(pattern),
+      `CODEOWNERS missing required instruction-layer ownership pattern: ${pattern}`
+    );
+  }
+}
+
 async function main(): Promise<void> {
   for (const path of requiredPaths) {
     const exists = await pathExists(path);
@@ -267,6 +293,7 @@ async function main(): Promise<void> {
   validateIndex(indexDoc);
   validateAdapters(adaptersDoc);
   await validateEntrypointPaths(indexDoc);
+  await validateCodeownersCoverage();
   await validateSkillsAndReferences();
 
   const report = await resolveInstructionLayer();

@@ -12,7 +12,8 @@ Generate consumer bundles:
 ```bash
 npm run instructions:check
 npm run instructions:resolve
-npm run instructions:migrate:plan -- --from 1.0 --to 1.0
+npm run instructions:migrate:plan -- --from 1.1 --to 1.1
+npm run instructions:migrate:apply -- --from 1.0 --to 1.1
 ```
 
 For contribution policy and docs sync, use:
