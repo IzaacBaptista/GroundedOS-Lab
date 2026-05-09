@@ -12,7 +12,7 @@ Benchmarking suite for comparing model performance across latency, cost and outp
 
 ## Status
 
-Implemented baseline (Phase 2 retrieval benchmark, Phase 4 model benchmark with
+Complete (Phases 2 and 4 baseline): retrieval and model benchmarks with
 local + Ollama execution)
 
 ## Current implementation

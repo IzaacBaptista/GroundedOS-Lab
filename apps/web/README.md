@@ -16,7 +16,7 @@ grounded retrieval workflows.
 
 ## Status
 
-Implemented baseline through Phase 5 with ongoing Phase 6 integration work: the
+In progress (Phase 6): baseline through Phase 5 is complete, and the
 web app exposes local RAG upload/index/ask flows, provider selection, optional
 session-aware asks, concept and lab surfaces, and the Trade-offs dashboard.
 Phase 6 auth UX is implemented with login/logout plus session restore/refresh

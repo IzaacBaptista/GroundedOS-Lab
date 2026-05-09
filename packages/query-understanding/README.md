@@ -11,4 +11,6 @@ First-class query understanding module for GroundedOS Lab.
 
 ## Status
 
-Implemented as a dedicated package, re-exporting the current deterministic Phase 2 query understanding logic while keeping a stable integration surface for future adaptive/LLM-assisted analyzers.
+Complete (Phase 2 baseline): dedicated package re-exporting deterministic query
+understanding logic with a stable integration surface for future
+adaptive/LLM-assisted analyzers.

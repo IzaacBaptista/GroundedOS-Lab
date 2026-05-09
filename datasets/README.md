@@ -11,7 +11,7 @@ Storage and registry for datasets used in experiments, fine-tuning, benchmarks a
 
 ## Status
 
-Implemented baseline through Phase 5: registry-backed smoke and retrieval
+In progress (Phase 6 hardening): baseline through Phase 5 is complete; registry-backed smoke and retrieval
 datasets plus experiment artifacts are active; Phase 6 focuses on infra/auth
 hardening around these assets.
 

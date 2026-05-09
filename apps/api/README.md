@@ -12,7 +12,7 @@ the local AI pipeline.
 
 ## Status
 
-Implemented baseline through Phase 5 with active Phase 6 rollout work: the API
+In progress (Phase 6): baseline through Phase 5 is complete, and the API
 supports local RAG flows, persisted indexes, session-scoped memory, Phase 4 lab
 benchmark endpoints, and a Phase 6 auth/admin baseline (JWT login, refresh,
 logout, API keys, admin routes, owner scoping, rate limiting and audit hooks).

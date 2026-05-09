@@ -12,7 +12,7 @@ Toolkit for designing and running structured AI experiments. Enables systematic 
 
 ## Status
 
-Implemented baseline (Phase 4 prompt A/B test)
+Complete (Phase 4 baseline): prompt A/B experimentation workflow is active.
 
 ## Current implementation
 

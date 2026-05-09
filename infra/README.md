@@ -34,4 +34,5 @@ Services:
 
 ## Status
 
-In progress (Phase 6 started)
+In progress (Phase 6): local stack, CI and auth baseline are active; deployment
+hardening and production operations are the next milestones.

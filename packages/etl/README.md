@@ -12,7 +12,7 @@ Extract, Transform, Load pipeline for ingesting multimodal documents into a unif
 
 ## Status
 
-Implemented baseline (Phase 0): text + PDF ingestion complete and runnable;
+Complete (Phase 0 baseline): text + PDF ingestion is complete and runnable;
 image/audio remain explicit stubs and additional modalities remain planned.
 
 ## Current plan

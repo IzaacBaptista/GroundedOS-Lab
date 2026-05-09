@@ -11,7 +11,7 @@ Memory management layer for persistent and session-scoped context across convers
 
 ## Status
 
-Implemented (Phase 2b baseline)
+Complete (Phase 2b baseline)
 
 ## Current implementation
 

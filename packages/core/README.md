@@ -11,7 +11,7 @@ Shared foundational types, utilities and abstractions used across all packages a
 
 ## Status
 
-Implemented baseline (Phases 0-3). Runtime validation, query contracts and
+Complete (Phases 0-3 baseline): runtime validation, query contracts and
 workflow primitives are active; Phase 6 focuses on infra/auth hardening.
 
 ## Contents

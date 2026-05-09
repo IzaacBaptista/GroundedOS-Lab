@@ -12,7 +12,7 @@ Retrieval-Augmented Generation pipeline. Implements the full retrieval stack fro
 
 ## Status
 
-Implemented baseline (Phases 1-2): chunking, embedding providers, in-memory
+Complete (Phases 1-2 baseline): chunking, embedding providers, in-memory
 vector store, hybrid retrieval, query understanding, semantic cache and Dev
 Mode retrieval output contract are active. Full LLM context-assembly/routing
 policies remain future work.

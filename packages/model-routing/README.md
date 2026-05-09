@@ -10,5 +10,6 @@ Intelligent model routing and selection layer.
 
 ## Status
 
-Implemented with deterministic heuristics suitable for local-first experimentation.
+Complete (local-first baseline): deterministic routing heuristics are active
+for experimentation.
 Decisions are exposed in API Dev Mode as `routing` metadata.
