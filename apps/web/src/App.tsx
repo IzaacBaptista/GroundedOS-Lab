@@ -1438,6 +1438,7 @@ function ResultPanel({
   onConceptClick,
 }: ResultPanelProps) {
   const [answerPanelTab, setAnswerPanelTab] = useState<PedagogicalAnswerTab>("chunks");
+  const [isResultModalOpen, setResultModalOpen] = useState(false);
   const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
   const resultMeta = result
@@ -1459,7 +1460,7 @@ function ResultPanel({
           ? `${modelBenchmark.providers.length} providers | ${modelBenchmark.dataset}`
           : "No benchmark loaded"
         : outputTab === "lab"
-          ? "Guardrails playground"
+          ? "Safety checks"
         : "No result";
   const showPanelHeader = outputTab === "embeddings" || outputTab === "models";
 
@@ -1485,6 +1486,39 @@ function ResultPanel({
         : outputTab === "lab"
           ? ["guardrails", "grounding"]
           : [];
+  const modalTitle =
+    outputTab === "answer"
+      ? answerPanelTab === "chunks"
+        ? "Busca e chunks"
+        : answerPanelTab === "citations"
+          ? "Fontes e grounding"
+          : answerPanelTab === "workflow"
+            ? "Etapas da pergunta"
+            : "Tempo, custo e cache"
+      : outputTab === "compare"
+        ? "Comparar retrieval"
+        : outputTab === "routing"
+          ? "Routing"
+          : outputTab === "context"
+            ? "Contexto"
+            : outputTab === "cache"
+              ? "Cache"
+              : outputTab === "evals"
+                ? "Evals"
+                : outputTab === "lab"
+                  ? "Guardrails"
+                  : "Visualização";
+
+  const openAnswerView = (tab: PedagogicalAnswerTab) => {
+    setAnswerPanelTab(tab);
+    setOutputTab("answer");
+    setResultModalOpen(true);
+  };
+
+  const openOutputView = (tab: ResultMode) => {
+    setOutputTab(tab);
+    setResultModalOpen(true);
+  };
 
   return (
     <section className="panel output-panel" aria-label="RAG output">
@@ -1501,10 +1535,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "answer" && answerPanelTab === "chunks"}
-          onClick={() => {
-            setAnswerPanelTab("chunks");
-            setOutputTab("answer");
-          }}
+          onClick={() => openAnswerView("chunks")}
         >
           Cache hit
         </button>
@@ -1513,10 +1544,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "answer" && answerPanelTab === "citations"}
-          onClick={() => {
-            setAnswerPanelTab("citations");
-            setOutputTab("answer");
-          }}
+          onClick={() => openAnswerView("citations")}
         >
           Citações
         </button>
@@ -1525,10 +1553,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "answer" && answerPanelTab === "workflow"}
-          onClick={() => {
-            setAnswerPanelTab("workflow");
-            setOutputTab("answer");
-          }}
+          onClick={() => openAnswerView("workflow")}
         >
           Workflow
         </button>
@@ -1537,10 +1562,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "answer" && answerPanelTab === "tradeoffs"}
-          onClick={() => {
-            setAnswerPanelTab("tradeoffs");
-            setOutputTab("answer");
-          }}
+          onClick={() => openAnswerView("tradeoffs")}
         >
           Trade-offs
         </button>
@@ -1549,7 +1571,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "compare"}
-          onClick={() => setOutputTab("compare")}
+          onClick={() => openOutputView("compare")}
         >
           Compare mode
         </button>
@@ -1558,7 +1580,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "routing"}
-          onClick={() => setOutputTab("routing")}
+          onClick={() => openOutputView("routing")}
         >
           Routing
         </button>
@@ -1567,7 +1589,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "context"}
-          onClick={() => setOutputTab("context")}
+          onClick={() => openOutputView("context")}
         >
           Context
         </button>
@@ -1576,7 +1598,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "cache"}
-          onClick={() => setOutputTab("cache")}
+          onClick={() => openOutputView("cache")}
         >
           Cache
         </button>
@@ -1585,7 +1607,7 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "evals"}
-          onClick={() => setOutputTab("evals")}
+          onClick={() => openOutputView("evals")}
         >
           Evals
         </button>
@@ -1594,19 +1616,30 @@ function ResultPanel({
           type="button"
           role="tab"
           aria-selected={outputTab === "lab"}
-          onClick={() => setOutputTab("lab")}
+          onClick={() => openOutputView("lab")}
         >
           Guardrails
         </button>
       </div>
 
-      {tabConcepts.length > 0 && (
+      {isResultModalOpen && tabConcepts.length > 0 && (
         <div className="concepts-tab-hints" aria-label="Referências de conceitos desta visualização">
           <span className="chunk-text">Conceitos nesta visualização:</span>
           <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={onConceptClick} />
         </div>
       )}
 
+      {!isResultModalOpen && (
+        <ResultPanelLanding
+          result={result}
+          hasResult={hasResult}
+          resultMeta={resultMeta}
+          onOpen={() => openAnswerView("citations")}
+        />
+      )}
+
+      {isResultModalOpen && (
+        <ResultModal title={modalTitle} meta={resultMeta} onClose={() => setResultModalOpen(false)}>
       {outputTab === "answer" && (
         <AnswerPanel
           response={result ?? null}
@@ -1767,8 +1800,89 @@ function ResultPanel({
       {outputTab === "lab" && (
         <LabExperimentsView reportApiError={reportApiError} />
       )}
+        </ResultModal>
+      )}
 
     </section>
+  );
+}
+
+function ResultPanelLanding({
+  result,
+  hasResult,
+  resultMeta,
+  onOpen,
+}: {
+  result: RagAskResponse | undefined;
+  hasResult: boolean;
+  resultMeta: string;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="result-launch">
+      <div>
+        <h3>{hasResult ? "Resumo da resposta" : "Escolha uma visualização"}</h3>
+        <p className="chunk-text">
+          {hasResult
+            ? "Use os botões acima para abrir cada camada em uma janela ampla: fontes, busca, etapas, custos, evals e guardrails."
+            : "Depois de executar Ask, cada botão abre uma visualização dedicada em modal para facilitar leitura e prints."}
+        </p>
+      </div>
+
+      <div className="result-launch__answer">
+        <Pill variant={hasResult ? "green" : "gray"}>{resultMeta}</Pill>
+        <p>
+          {result?.answer.text ??
+            "Indexe um documento e faça uma pergunta para ver o caminho completo da resposta."}
+        </p>
+        {hasResult && (
+          <button type="button" className="primary-button" onClick={onOpen}>
+            Abrir fontes
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultModal({
+  title,
+  meta,
+  onClose,
+  children,
+}: {
+  title: string;
+  meta: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="result-modal" role="dialog" aria-modal="true" aria-labelledby="result-modal-title">
+      <div className="result-modal__backdrop" onClick={onClose} />
+      <section className="result-modal__panel">
+        <header className="result-modal__header">
+          <div>
+            <h2 id="result-modal-title">{title}</h2>
+            <span>{meta}</span>
+          </div>
+          <button type="button" className="secondary-button" onClick={onClose}>
+            Fechar
+          </button>
+        </header>
+        <div className="result-modal__body">{children}</div>
+      </section>
+    </div>
   );
 }
 

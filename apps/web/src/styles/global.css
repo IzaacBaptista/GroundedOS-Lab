@@ -533,6 +533,99 @@ textarea:focus {
   margin: -8px 0 14px;
 }
 
+.result-launch {
+  display: grid;
+  gap: 14px;
+  min-height: 320px;
+  align-content: start;
+}
+
+.result-launch h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  text-transform: none;
+}
+
+.result-launch__answer {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--panel-strong);
+}
+
+.result-launch__answer p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.result-launch__answer .primary-button {
+  justify-self: start;
+}
+
+.result-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+
+.result-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 12, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.result-modal__panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1080px, calc(100vw - 56px));
+  max-height: calc(100vh - 56px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+}
+
+.result-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 18px;
+  background: var(--panel-strong);
+}
+
+.result-modal__header h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  line-height: 1.05;
+}
+
+.result-modal__header span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.result-modal__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
 .empty-state {
   display: grid;
   min-height: 350px;
@@ -1402,6 +1495,20 @@ textarea:focus {
 
   .output-panel {
     min-height: 440px;
+  }
+
+  .result-modal {
+    padding: 10px;
+  }
+
+  .result-modal__panel {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .result-modal__header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .empty-state {
