@@ -9,6 +9,11 @@ Guided Study Tracks are learning routes across the existing GroundedOS Lab archi
 3. Open the related package or experiment README to see where the concept belongs in the system.
 4. Use the roadmap phase as the implementation context for future work.
 
+## Status
+
+In progress (Phase 6 documentation rollout): tracks are aligned to implemented
+phases through Phase 5 and updated as new roadmap slices land.
+
 ## Track Index
 
 | Track | Focus | Roadmap alignment |

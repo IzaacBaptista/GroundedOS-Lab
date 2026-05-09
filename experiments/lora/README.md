@@ -11,7 +11,7 @@ Experiments using Low-Rank Adaptation (LoRA) for parameter-efficient fine-tuning
 
 ## Status
 
-First real training experiment implemented. Uses PyTorch + HuggingFace PEFT if
+Complete (Phase 5 baseline): first real LoRA training experiment is implemented. Uses PyTorch + HuggingFace PEFT if
 available; falls back to the deterministic scaffold otherwise.
 
 ## Environment

@@ -12,6 +12,11 @@ Write an ADR whenever a decision:
 
 You do **not** need an ADR for obvious or easily-reversible choices (e.g. adding a utility function, picking a package version that has no alternatives).
 
+## Status
+
+In progress (Phase 6 documentation rollout): ADR index is active and reflects
+accepted decisions through the current implementation baseline.
+
 ## ADR template
 
 ```markdown

@@ -11,7 +11,7 @@ Experiments in knowledge distillation, transferring capabilities from larger tea
 
 ## Status
 
-First real teacher-student distillation experiment implemented. Uses PyTorch +
+Complete (Phase 5 baseline): first real teacher-student distillation experiment is implemented. Uses PyTorch +
 Transformers if available; falls back to deterministic scaffold otherwise.
 
 ## Environment

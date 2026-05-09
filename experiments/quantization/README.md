@@ -11,8 +11,8 @@ Experiments with model quantization to reduce memory footprint and inference lat
 
 ## Status
 
-First local experiment implemented - lexical vector quantization benchmark is
-available.
+Complete (Phase 5 baseline): lexical vector quantization benchmark is
+implemented and available.
 
 ## Environment
 

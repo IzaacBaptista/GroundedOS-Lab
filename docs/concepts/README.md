@@ -54,8 +54,9 @@ Rules:
 
 ## Status
 
-Actively maintained — concept index covers implemented phases through Phase 5,
-with Phase 6 topics (infra/deploy/auth) referenced in roadmap-aligned docs.
+In progress (Phase 6 documentation rollout): concept index covers implemented
+phases through Phase 5, with Phase 6 topics (infra/deploy/auth) referenced in
+roadmap-aligned docs.
 
 ## Concept Index
 

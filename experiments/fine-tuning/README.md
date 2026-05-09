@@ -11,7 +11,7 @@ Experiments focused on supervised fine-tuning of language models on domain-speci
 
 ## Status
 
-First real SFT experiment implemented. Uses PyTorch + HuggingFace Transformers
+Complete (Phase 5 baseline): first real SFT experiment is implemented. Uses PyTorch + HuggingFace Transformers
 if available; falls back to the deterministic scaffold otherwise.
 
 ## Environment

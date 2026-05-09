@@ -11,8 +11,8 @@ Background worker responsible for asynchronous and compute-intensive AI tasks. R
 
 ## Status
 
-In progress (Phase 6 scaffold). Docker image, Python entrypoint and dependency
-baseline are in place; queue-backed job execution is the next step.
+In progress (Phase 6): Docker image, Python entrypoint and dependency baseline
+are in place; queue-backed job execution is the next step.
 
 ## Local usage
 

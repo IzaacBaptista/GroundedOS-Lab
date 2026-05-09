@@ -12,8 +12,8 @@ Visualization package for inspecting embeddings, similarity maps and retrieval r
 
 ## Status
 
-Scaffold placeholder. Phase 4 embedding visualization is currently delivered in
-`apps/web`; this package is reserved for future extraction and reuse.
+Placeholder (Phase 6+): Phase 4 embedding visualization is currently delivered
+in `apps/web`; this package is reserved for future extraction and reuse.
 
 ## Current source of truth
 
