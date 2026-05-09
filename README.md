@@ -537,11 +537,24 @@ Start here:
 
 ### Authentication & Authorization
 
-The project currently runs without authentication (local-first, development only). Before any public deployment or multi-user access, the following must be in place:
+Authentication and authorization have an implemented Phase 6 baseline for local and staged environments:
+
+* **JWT + refresh flow** via `POST /auth/login`, `POST /auth/refresh` and `POST /auth/logout`
+* **API key management** for scoped API access
+* **Owner scoping** for indexes and memory access boundaries
+* **Rate limiting and audit hooks** on protected paths
+
+Auth enforcement behavior:
+
+* **Local development**: opt-in (`AUTH_ENFORCEMENT=true`)
+* **Non-dev/non-test**: enabled by default when `AUTH_ENFORCEMENT` is unset
+
+Before public deployment or multi-tenant production usage, the following must still be completed:
 
 * **API authentication** — all API endpoints require a bearer token or session cookie. No anonymous access to indexes or agent state.
 * **Index ownership** — persisted indexes are scoped to a user or session identifier; one user cannot read or delete another user's indexes.
 * **Role boundaries** — Lab Mode features (Jailbreak Playground, prompt A/B tests) are restricted to authenticated users with explicit opt-in.
+* **External identity providers** — OAuth/OIDC provider integration and production-grade identity lifecycle.
 
 This strategy is tracked as a Phase 6 success criterion. Implementation decisions will be recorded in [`docs/adr/`](./docs/adr/).
 
@@ -615,7 +628,7 @@ groundedos-lab/
   apps/
     api/        ← Backend API server (REST, local RAG, agents and metrics)
     web/        ← Frontend application (React + Vite)
-    worker/     ← Placeholder for future async workers
+      worker/     ← Async jobs worker (Phase 6 in progress)
 
   packages/
     core/               ← Shared types, utilities, and base abstractions
