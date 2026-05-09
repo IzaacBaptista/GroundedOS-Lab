@@ -17,3 +17,7 @@ When changing the structure of a YAML file:
 2. Update `schema-registry.yaml`.
 3. Update check logic if new required fields are introduced.
 4. Update docs (`docs/agent-instruction-layer.md`) with migration notes.
+
+## Changelog
+
+- Version history and migration notes are tracked in `instructions/schema/CHANGELOG.md`.

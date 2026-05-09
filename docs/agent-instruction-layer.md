@@ -70,6 +70,8 @@ Current rollout mode is moderate:
 - `npm run instructions:check` validates schema-version compliance using the
   registry in `instructions/schema/schema-registry.yaml`.
 - Transition policy is defined in `instructions/schema/migration-policy.yaml`.
+- Schema changes and migration notes are tracked in
+  `instructions/schema/CHANGELOG.md`.
 
 ## Ownership
 

@@ -35,6 +35,8 @@ type SchemaRegistryEntry = {
   schema_version: string;
 };
 
+type SchemaDocMap = Record<string, unknown>;
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -120,6 +122,134 @@ async function validateSchemaVersions(entries: SchemaRegistryEntry[]): Promise<v
       fileDoc.schema_version === entry.schema_version,
       `schema version mismatch for ${entry.file}: expected ${entry.schema_version}, got ${String(fileDoc.schema_version)}`
     );
+  }
+}
+
+function validateSchemaContentMinimum(entry: SchemaRegistryEntry, doc: unknown): void {
+  assertCondition(isRecord(doc), `schema target must be YAML object: ${entry.file}`);
+
+  switch (entry.id) {
+    case "instruction-manifest": {
+      const required = ["version", "name", "owner", "status", "strictness"] as const;
+      for (const key of required) {
+        assertCondition(typeof doc[key] === "string", `${entry.file} missing required field '${key}'.`);
+      }
+      assertCondition(Array.isArray(doc.consumers) && doc.consumers.length > 0, `${entry.file} requires non-empty consumers.`);
+      assertCondition(
+        Array.isArray(doc.resolution_order) && doc.resolution_order.includes("user-request"),
+        `${entry.file} requires resolution_order including 'user-request'.`
+      );
+      assertCondition(isRecord(doc.governance), `${entry.file} requires governance object.`);
+      assertCondition(typeof doc.governance.docs_policy === "string", `${entry.file} governance.docs_policy must be string.`);
+      assertCondition(typeof doc.governance.pr_template === "string", `${entry.file} governance.pr_template must be string.`);
+      break;
+    }
+
+    case "instruction-index": {
+      assertCondition(isRecord(doc.entrypoints), `${entry.file} requires entrypoints object.`);
+      const requiredEntrypoints = [
+        "manifest",
+        "config_profile",
+        "adapters",
+        "project_context",
+        "contribution_context",
+        "skills_registry",
+        "eval_adherence",
+        "eval_review",
+      ] as const;
+      for (const key of requiredEntrypoints) {
+        assertCondition(typeof doc.entrypoints[key] === "string", `${entry.file} missing entrypoint '${key}'.`);
+      }
+      break;
+    }
+
+    case "config-default-profile": {
+      assertCondition(typeof doc.profile === "string", `${entry.file} requires profile string.`);
+      assertCondition(typeof doc.strictness === "string", `${entry.file} requires strictness string.`);
+      assertCondition(isRecord(doc.output), `${entry.file} requires output object.`);
+      assertCondition(isRecord(doc.workflow), `${entry.file} requires workflow object.`);
+      assertCondition(isRecord(doc.policies), `${entry.file} requires policies object.`);
+      break;
+    }
+
+    case "config-adapters": {
+      assertCondition(isRecord(doc.adapters), `${entry.file} requires adapters object.`);
+      const adapters = Object.entries(doc.adapters);
+      assertCondition(adapters.length > 0, `${entry.file} requires at least one adapter.`);
+      for (const [adapterName, adapterDef] of adapters) {
+        assertCondition(isRecord(adapterDef), `${entry.file} adapter '${adapterName}' must be an object.`);
+        assertCondition(
+          Array.isArray(adapterDef.source_of_truth) && adapterDef.source_of_truth.length > 0,
+          `${entry.file} adapter '${adapterName}' requires non-empty source_of_truth.`
+        );
+      }
+      break;
+    }
+
+    case "context-project": {
+      assertCondition(isRecord(doc.project), `${entry.file} requires project object.`);
+      assertCondition(typeof doc.project.name === "string", `${entry.file} project.name must be string.`);
+      assertCondition(typeof doc.project.mission_en === "string", `${entry.file} project.mission_en must be string.`);
+      assertCondition(typeof doc.project.mission_ptbr === "string", `${entry.file} project.mission_ptbr must be string.`);
+      assertCondition(isRecord(doc.roadmap) && isRecord(doc.roadmap.phase_status), `${entry.file} requires roadmap.phase_status object.`);
+      break;
+    }
+
+    case "context-contribution": {
+      assertCondition(isRecord(doc.contribution), `${entry.file} requires contribution object.`);
+      assertCondition(Array.isArray(doc.contribution.pr_requirements), `${entry.file} contribution.pr_requirements must be array.`);
+      assertCondition(Array.isArray(doc.contribution.mandatory_docs_sync), `${entry.file} contribution.mandatory_docs_sync must be array.`);
+      break;
+    }
+
+    case "agent-planner":
+    case "agent-implementer":
+    case "agent-reviewer": {
+      assertCondition(typeof doc.id === "string", `${entry.file} requires id string.`);
+      assertCondition(typeof doc.name === "string", `${entry.file} requires name string.`);
+      assertCondition(typeof doc.purpose_en === "string", `${entry.file} requires purpose_en string.`);
+      assertCondition(typeof doc.purpose_ptbr === "string", `${entry.file} requires purpose_ptbr string.`);
+      assertCondition(Array.isArray(doc.default_behavior) && doc.default_behavior.length > 0, `${entry.file} requires non-empty default_behavior.`);
+      break;
+    }
+
+    case "skills-registry": {
+      assertCondition(typeof doc.version === "number", `${entry.file} requires numeric version.`);
+      assertCondition(Array.isArray(doc.skills) && doc.skills.length > 0, `${entry.file} requires non-empty skills array.`);
+      for (const skill of doc.skills as unknown[]) {
+        assertCondition(isRecord(skill), `${entry.file} skill entry must be an object.`);
+        assertCondition(typeof skill.id === "string", `${entry.file} skill.id must be string.`);
+        assertCondition(Array.isArray(skill.intent_patterns) && skill.intent_patterns.length > 0, `${entry.file} skill.intent_patterns must be non-empty array.`);
+        assertCondition(typeof skill.agent === "string", `${entry.file} skill.agent must be string.`);
+        assertCondition(typeof skill.prompt_template === "string", `${entry.file} skill.prompt_template must be string.`);
+        assertCondition(typeof skill.eval_profile === "string", `${entry.file} skill.eval_profile must be string.`);
+      }
+      break;
+    }
+
+    case "eval-adherence-rubric":
+    case "eval-review-rubric": {
+      assertCondition(typeof doc.name === "string", `${entry.file} requires name string.`);
+      assertCondition(typeof doc.mode === "string", `${entry.file} requires mode string.`);
+      assertCondition(Array.isArray(doc.checks) && doc.checks.length > 0, `${entry.file} requires non-empty checks array.`);
+      assertCondition(isRecord(doc.scoring), `${entry.file} requires scoring object.`);
+      assertCondition(typeof doc.scoring.pass_threshold === "number", `${entry.file} scoring.pass_threshold must be number.`);
+      break;
+    }
+
+    default:
+      break;
+  }
+}
+
+async function validateSchemaContent(entries: SchemaRegistryEntry[]): Promise<void> {
+  const docs: SchemaDocMap = {};
+  for (const entry of entries) {
+    docs[entry.file] = await readYaml(entry.file);
+  }
+
+  for (const entry of entries) {
+    validateSchemaContentMinimum(entry, docs[entry.file]);
   }
 }
 
@@ -287,6 +417,7 @@ async function main(): Promise<void> {
   const schemaRegistryDoc = await readYaml("instructions/schema/schema-registry.yaml");
   const schemaEntries = validateSchemaRegistry(schemaRegistryDoc);
   await validateSchemaVersions(schemaEntries);
+  await validateSchemaContent(schemaEntries);
   validateMigrationPolicy(migrationPolicyDoc, schemaEntries);
 
   validateManifest(manifestDoc);
