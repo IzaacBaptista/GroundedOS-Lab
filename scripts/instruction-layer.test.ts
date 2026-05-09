@@ -63,4 +63,10 @@ describe("instruction layer scripts", () => {
     expect(output).toContain("github_copilot");
     expect(output).toContain("14 files");
   });
+
+  it("reference validator passes with valid graph", () => {
+    const output = runTsxScript("scripts/validate-instruction-references.ts");
+    expect(output).toContain("Reference Graph Summary");
+    expect(output).toContain("✅");
+  });
 });

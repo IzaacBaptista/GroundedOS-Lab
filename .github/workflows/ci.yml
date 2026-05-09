@@ -37,6 +37,9 @@ jobs:
         
       - name: Check instruction layer schema and resolution (strict mode)
         run: npm run instructions:check
+        
+      - name: Validate instruction layer references
+        run: npm run instructions:references
 
       - name: Check TypeScript compilation
         run: npm run typecheck
