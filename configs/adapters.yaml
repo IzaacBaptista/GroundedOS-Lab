@@ -1,4 +1,4 @@
-schema_version: "1.2"
+schema_version: "1.3"
 adapters:
   codex:
     source_of_truth:
@@ -8,6 +8,11 @@ adapters:
       - context/*.yaml
       - prompts/*.md
       - evals/*.yaml
+    output_format: bundle-json+markdown
+    merge_strategy: ordered-first-wins
+    context_window_policy:
+      max_files: 24
+      include_user_request: true
   copilot_chat_vscode:
     source_of_truth:
       - instructions/manifest.yaml
@@ -16,6 +21,11 @@ adapters:
       - context/*.yaml
       - prompts/*.md
       - evals/*.yaml
+    output_format: bundle-json+markdown
+    merge_strategy: ordered-first-wins
+    context_window_policy:
+      max_files: 24
+      include_user_request: true
   github_copilot:
     source_of_truth:
       - instructions/manifest.yaml
@@ -24,6 +34,11 @@ adapters:
       - context/*.yaml
       - prompts/*.md
       - evals/*.yaml
+    output_format: bundle-json+markdown
+    merge_strategy: ordered-first-wins
+    context_window_policy:
+      max_files: 24
+      include_user_request: true
 notes:
   en: Adapters must translate format, never change policy semantics.
   pt-BR: Adaptadores devem traduzir formato, nunca alterar a semantica das politicas.

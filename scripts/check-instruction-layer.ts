@@ -33,6 +33,9 @@ type SchemaRegistryEntry = {
   id: string;
   file: string;
   schema_version: string;
+  deprecated?: boolean;
+  deprecated_since?: string;
+  replacement_id?: string;
 };
 
 type SchemaDocMap = Record<string, unknown>;
@@ -113,6 +116,20 @@ function validateSchemaRegistry(registryDoc: unknown): SchemaRegistryEntry[] {
     assertCondition(typeof schema.file === "string", `schema ${String(schema.id)} missing file.`);
     assertCondition(typeof schema.schema_version === "string", `schema ${String(schema.id)} missing schema_version.`);
 
+    if (schema.deprecated !== undefined) {
+      assertCondition(typeof schema.deprecated === "boolean", `schema ${schema.id} deprecated must be boolean when provided.`);
+      if (schema.deprecated) {
+        assertCondition(
+          typeof schema.deprecated_since === "string",
+          `schema ${schema.id} deprecated_since must be string when deprecated is true.`
+        );
+        assertCondition(
+          typeof schema.replacement_id === "string",
+          `schema ${schema.id} replacement_id must be string when deprecated is true.`
+        );
+      }
+    }
+
     assertCondition(!seenIds.has(schema.id), `duplicate schema id in registry: ${schema.id}`);
     assertCondition(!seenFiles.has(schema.file), `duplicate schema file in registry: ${schema.file}`);
 
@@ -123,6 +140,9 @@ function validateSchemaRegistry(registryDoc: unknown): SchemaRegistryEntry[] {
       id: schema.id,
       file: schema.file,
       schema_version: schema.schema_version,
+      deprecated: typeof schema.deprecated === "boolean" ? schema.deprecated : undefined,
+      deprecated_since: typeof schema.deprecated_since === "string" ? schema.deprecated_since : undefined,
+      replacement_id: typeof schema.replacement_id === "string" ? schema.replacement_id : undefined,
     });
   }
 
@@ -202,6 +222,43 @@ function validateSchemaContentMinimum(entry: SchemaRegistryEntry, doc: unknown):
           Array.isArray(adapterDef.source_of_truth) && adapterDef.source_of_truth.length > 0,
           `${entry.file} adapter '${adapterName}' requires non-empty source_of_truth.`
         );
+
+        for (const source of adapterDef.source_of_truth as unknown[]) {
+          assertCondition(typeof source === "string", `${entry.file} adapter '${adapterName}' source_of_truth items must be strings.`);
+        }
+
+        if (isSchemaAtLeast(entry.schema_version, 1, 3)) {
+          assertCondition(
+            typeof adapterDef.output_format === "string",
+            `${entry.file} adapter '${adapterName}' output_format must be string for schema >= 1.3.`
+          );
+          assertCondition(
+            adapterDef.output_format === "bundle-json+markdown",
+            `${entry.file} adapter '${adapterName}' output_format must be 'bundle-json+markdown'.`
+          );
+
+          assertCondition(
+            typeof adapterDef.merge_strategy === "string",
+            `${entry.file} adapter '${adapterName}' merge_strategy must be string for schema >= 1.3.`
+          );
+          assertCondition(
+            adapterDef.merge_strategy === "ordered-first-wins",
+            `${entry.file} adapter '${adapterName}' merge_strategy must be 'ordered-first-wins'.`
+          );
+
+          assertCondition(
+            isRecord(adapterDef.context_window_policy),
+            `${entry.file} adapter '${adapterName}' context_window_policy must be object for schema >= 1.3.`
+          );
+          assertCondition(
+            typeof adapterDef.context_window_policy.max_files === "number" && adapterDef.context_window_policy.max_files > 0,
+            `${entry.file} adapter '${adapterName}' context_window_policy.max_files must be positive number.`
+          );
+          assertCondition(
+            typeof adapterDef.context_window_policy.include_user_request === "boolean",
+            `${entry.file} adapter '${adapterName}' context_window_policy.include_user_request must be boolean.`
+          );
+        }
       }
       break;
     }

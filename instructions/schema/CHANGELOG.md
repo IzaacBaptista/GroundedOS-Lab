@@ -36,9 +36,28 @@ Migration:
 - Apply with: `npm run instructions:migrate:apply -- --from 1.1 --to 1.2`
 - Plan with: `npm run instructions:migrate:plan -- --from 1.2 --to 1.2`
 
-## Planned 1.3
+## 1.3
+
+Date: 2026-05-09
+
+Changes:
+
+- Added stricter adapter typing for `configs/adapters.yaml` entries:
+	- `output_format` (must be `bundle-json+markdown`)
+	- `merge_strategy` (must be `ordered-first-wins`)
+	- `context_window_policy.max_files` (positive number)
+	- `context_window_policy.include_user_request` (boolean)
+- Extended schema registry validation to support optional deprecation metadata
+	(`deprecated`, `deprecated_since`, `replacement_id`) when declared.
+
+Migration:
+
+- Apply with: `npm run instructions:migrate:apply -- --from 1.2 --to 1.3`
+- Plan with: `npm run instructions:migrate:plan -- --from 1.3 --to 1.3`
+
+## Planned 1.4
 
 Planned focus:
 
-- Optional strict typing for adapter definitions.
-- Optional deprecation metadata per schema entry.
+- Optional deprecation workflow tooling (reports for deprecated schema entries).
+- Additional lint checks for adapter policy consistency across consumers.
