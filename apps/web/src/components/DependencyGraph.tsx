@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getConceptById } from "../concepts";
 import { CONCEPTS } from "../concepts/concepts-data";
 import type { Concept } from "../concepts/types";
@@ -24,12 +24,19 @@ interface DependencyGraphProps {
 
 export function DependencyGraph({ conceptId }: DependencyGraphProps) {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(conceptId);
   const [selectedPath, setSelectedPath] = useState<string[] | null>(null);
+  const [focusDirectRelations, setFocusDirectRelations] = useState(false);
 
   const concept = getConceptById(conceptId);
   if (!concept) {
     return <div className="dependency-graph__error">Conceito não encontrado</div>;
   }
+
+  useEffect(() => {
+    setSelectedNodeId(conceptId);
+    setSelectedPath(null);
+  }, [conceptId]);
 
   // Build graph of prerequisites and dependents
   const { nodes, edges } = useMemo(() => {
@@ -193,21 +200,137 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
     };
   }, [conceptId, concept]);
 
+  const renderedNodes = useMemo(() => {
+    if (!focusDirectRelations) {
+      return nodes;
+    }
+
+    return nodes.filter((node: Node) => node.type === "current" || node.depth === 1);
+  }, [focusDirectRelations, nodes]);
+
+  const renderedNodeIds = useMemo(() => {
+    return new Set(renderedNodes.map((node: Node) => node.id));
+  }, [renderedNodes]);
+
+  const renderedEdges = useMemo(() => {
+    return edges.filter((edge: Edge) => {
+      if (!renderedNodeIds.has(edge.from) || !renderedNodeIds.has(edge.to)) {
+        return false;
+      }
+
+      if (!focusDirectRelations) {
+        return true;
+      }
+
+      return edge.from === conceptId || edge.to === conceptId;
+    });
+  }, [conceptId, edges, focusDirectRelations, renderedNodeIds]);
+
   const nodesById = useMemo(() => {
-    return new Map<string, Node>(nodes.map((node: Node) => [node.id, node]));
-  }, [nodes]);
+    return new Map<string, Node>(renderedNodes.map((node: Node) => [node.id, node]));
+  }, [renderedNodes]);
+
+  const highlightedEdges = useMemo(() => {
+    if (!selectedPath || selectedPath.length < 2) {
+      return new Set<string>();
+    }
+
+    const result = new Set<string>();
+    for (let i = 0; i < selectedPath.length - 1; i += 1) {
+      result.add(`${selectedPath[i]}->${selectedPath[i + 1]}`);
+    }
+
+    return result;
+  }, [selectedPath]);
+
+  const selectedConcept = useMemo(() => {
+    if (!selectedNodeId) {
+      return concept;
+    }
+    return getConceptById(selectedNodeId) ?? concept;
+  }, [concept, selectedNodeId]);
+
+  const selectedNode = useMemo(() => {
+    if (!selectedNodeId) {
+      return nodes.find((node) => node.id === conceptId) ?? null;
+    }
+    return nodes.find((node) => node.id === selectedNodeId) ?? null;
+  }, [conceptId, nodes, selectedNodeId]);
+
+  const adjacency = useMemo(() => {
+    const map = new Map<string, string[]>();
+    edges.forEach((edge: Edge) => {
+      const current = map.get(edge.from);
+      if (current) {
+        current.push(edge.to);
+      } else {
+        map.set(edge.from, [edge.to]);
+      }
+    });
+    return map;
+  }, [edges]);
+
+  const findShortestPath = (startId: string, endId: string): string[] | null => {
+    if (startId === endId) {
+      return [startId];
+    }
+
+    const queue: string[][] = [[startId]];
+    const visited = new Set<string>([startId]);
+
+    while (queue.length > 0) {
+      const currentPath = queue.shift();
+      if (!currentPath) {
+        continue;
+      }
+
+      const currentNodeId = currentPath[currentPath.length - 1];
+      const nextNodes = adjacency.get(currentNodeId) ?? [];
+
+      for (const nextId of nextNodes) {
+        if (visited.has(nextId)) {
+          continue;
+        }
+
+        const nextPath = [...currentPath, nextId];
+        if (nextId === endId) {
+          return nextPath;
+        }
+
+        visited.add(nextId);
+        queue.push(nextPath);
+      }
+    }
+
+    return null;
+  };
+
+  const handleNodeClick = (node: Node) => {
+    setSelectedNodeId(node.id);
+
+    if (node.id === conceptId) {
+      setSelectedPath([conceptId]);
+      return;
+    }
+
+    const startId = node.type === "dependent" ? conceptId : node.id;
+    const endId = node.type === "dependent" ? node.id : conceptId;
+    const path = findShortestPath(startId, endId);
+
+    setSelectedPath(path ?? [startId, endId]);
+  };
 
   // Calculate viewport bounds
   const bounds = useMemo(() => {
-    if (nodes.length === 0) return { minX: -100, minY: -100, maxX: 100, maxY: 100 };
-    const xs = nodes.map((n) => n.x);
-    const ys = nodes.map((n) => n.y);
+    if (renderedNodes.length === 0) return { minX: -100, minY: -100, maxX: 100, maxY: 100 };
+    const xs = renderedNodes.map((n) => n.x);
+    const ys = renderedNodes.map((n) => n.y);
     const minX = Math.min(...xs) - 80;
     const maxX = Math.max(...xs) + 80;
     const minY = Math.min(...ys) - 80;
     const maxY = Math.max(...ys) + 80;
     return { minX, maxX, minY, maxY };
-  }, [nodes]);
+  }, [renderedNodes]);
 
   const viewBox = `${bounds.minX} ${bounds.minY} ${bounds.maxX - bounds.minX} ${bounds.maxY - bounds.minY}`;
 
@@ -215,7 +338,14 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
     <div className="dependency-graph">
       <div className="dependency-graph__controls">
         <button
-          className="dependency-graph__reset-btn"
+          className="dependency-graph__control-btn"
+          onClick={() => setFocusDirectRelations((current) => !current)}
+          aria-pressed={focusDirectRelations}
+        >
+          {focusDirectRelations ? "Mostrar todos os níveis" : "Focar relações diretas"}
+        </button>
+        <button
+          className="dependency-graph__control-btn"
           onClick={() => setSelectedPath(null)}
           disabled={!selectedPath}
         >
@@ -244,14 +374,13 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
 
         {/* Edges/lines */}
         <g className="dependency-graph__edges">
-          {edges.map((edge, idx) => {
+          {renderedEdges.map((edge, idx) => {
             const fromNode = nodesById.get(edge.from);
             const toNode = nodesById.get(edge.to);
             if (!fromNode || !toNode) return null;
 
-            const isHighlighted = selectedPath
-              ? selectedPath.includes(edge.from) && selectedPath.includes(edge.to)
-              : false;
+            const edgeId = `${edge.from}->${edge.to}`;
+            const isHighlighted = highlightedEdges.has(edgeId);
 
             return (
               <line
@@ -269,16 +398,18 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
 
         {/* Nodes */}
         <g className="dependency-graph__nodes">
-          {nodes.map((node) => {
+          {renderedNodes.map((node) => {
             const isHovered = hoveredNode === node.id;
             const isInPath = selectedPath?.includes(node.id);
+            const isSelected = selectedNodeId === node.id;
 
             return (
               <g
                 key={node.id}
-                className={`dependency-graph__node dependency-graph__node--${node.type} ${isHovered ? "dependency-graph__node--hovered" : ""} ${isInPath ? "dependency-graph__node--in-path" : ""}`}
+                className={`dependency-graph__node dependency-graph__node--${node.type} ${isHovered ? "dependency-graph__node--hovered" : ""} ${isInPath ? "dependency-graph__node--in-path" : ""} ${isSelected ? "dependency-graph__node--selected" : ""}`}
                 onMouseEnter={() => setHoveredNode(node.id)}
                 onMouseLeave={() => setHoveredNode(null)}
+                onClick={() => handleNodeClick(node)}
               >
                 <circle cx={node.x} cy={node.y} r={24} />
                 <text
@@ -301,6 +432,21 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
           })}
         </g>
       </svg>
+
+      <div className="dependency-graph__summary" aria-label="Resumo do conceito selecionado">
+        <h4>{selectedConcept.title}</h4>
+        {selectedNode && (
+          <p className="dependency-graph__summary-meta">
+            {selectedNode.type === "prerequisite"
+              ? "Pre-requisito"
+              : selectedNode.type === "dependent"
+                ? "Dependente"
+                : "Conceito atual"}
+          </p>
+        )}
+        <p>{selectedConcept.shortDefinition}</p>
+        <p>{selectedConcept.explanation}</p>
+      </div>
 
       {/* Legend */}
       <div className="dependency-graph__legend">
