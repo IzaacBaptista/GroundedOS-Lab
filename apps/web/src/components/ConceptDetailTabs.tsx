@@ -56,7 +56,7 @@ export function ConceptDetailTabs({
         )}
 
         {activeTab === "learning" && (
-          <LearningPathPanel />
+          <LearningPathPanel onSelectConcept={onSelectConcept} />
         )}
       </div>
     </div>
