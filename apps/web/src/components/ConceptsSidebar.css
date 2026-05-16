@@ -17,6 +17,7 @@
 .concepts-sidebar__header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 10px 14px;
   background: var(--accent);
   color: #fff;
@@ -25,6 +26,98 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   user-select: none;
+}
+
+.concepts-sidebar__filter-toggle {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: opacity 0.15s ease;
+}
+
+.concepts-sidebar__filter-toggle:hover {
+  opacity: 0.8;
+}
+
+/* ── Filter Panel ─────────────────────────────── */
+.concepts-sidebar__filters {
+  padding: 12px 14px;
+  background: var(--panel-strong);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.filter-group__input,
+.filter-group__select {
+  padding: 6px 8px;
+  font-size: 0.81rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.filter-group__input:focus,
+.filter-group__select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
+}
+
+.filter-group__input::placeholder {
+  color: var(--muted);
+}
+
+.concepts-sidebar__clear-btn {
+  padding: 6px 8px;
+  font-size: 0.81rem;
+  background: var(--line);
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s ease;
+}
+
+.concepts-sidebar__clear-btn:hover {
+  background: var(--line-strong);
+}
+
+.concepts-sidebar__filter-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Empty state ──────────────────────────────── */
+.concepts-sidebar__empty {
+  padding: 20px 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .concepts-sidebar__nav {
@@ -71,6 +164,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-category__count {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 .sidebar-category__chevron {

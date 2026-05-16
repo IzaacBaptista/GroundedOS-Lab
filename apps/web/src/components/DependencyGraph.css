@@ -1,0 +1,183 @@
+.dependency-graph {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* ── Controls ───────────────────────────────── */
+.dependency-graph__controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dependency-graph__reset-btn {
+  padding: 6px 12px;
+  font-size: 0.81rem;
+  background: var(--line);
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.dependency-graph__reset-btn:hover:not(:disabled) {
+  background: var(--line-strong);
+}
+
+.dependency-graph__reset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── SVG Graph ──────────────────────────────── */
+.dependency-graph__svg {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  background: var(--panel-strong);
+  border-radius: 6px;
+}
+
+.dependency-graph__edges {
+  stroke: var(--line);
+  stroke-width: 1.5;
+  fill: none;
+  opacity: 0.6;
+}
+
+.dependency-graph__edge--highlighted {
+  stroke: var(--accent);
+  opacity: 1;
+  stroke-width: 2.5;
+}
+
+/* ── Nodes ──────────────────────────────────── */
+.dependency-graph__nodes {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.dependency-graph__node circle {
+  transition: all 0.15s ease;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.dependency-graph__node--prerequisite circle {
+  fill: #3b82f6;
+}
+
+.dependency-graph__node--current circle {
+  fill: #10b981;
+}
+
+.dependency-graph__node--dependent circle {
+  fill: #f59e0b;
+}
+
+.dependency-graph__node--hovered circle {
+  r: 32;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.dependency-graph__node--in-path circle {
+  filter: drop-shadow(0 0 0 3px var(--accent));
+  opacity: 1;
+}
+
+.dependency-graph__node-text {
+  fill: white;
+  font-size: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Tooltip ────────────────────────────────── */
+.dependency-graph__tooltip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* ── Legend ────────────────────────────────── */
+.dependency-graph__legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.81rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.dependency-graph__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dependency-graph__legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.dependency-graph__legend-dot--prerequisite {
+  background: #3b82f6;
+}
+
+.dependency-graph__legend-dot--current {
+  background: #10b981;
+}
+
+.dependency-graph__legend-dot--dependent {
+  background: #f59e0b;
+}
+
+/* ── Error state ────────────────────────────── */
+.dependency-graph__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+/* ── Responsive ────────────────────────────── */
+@media (max-width: 640px) {
+  .dependency-graph {
+    min-height: 300px;
+  }
+
+  .dependency-graph__svg {
+    min-height: 250px;
+  }
+
+  .dependency-graph__legend {
+    font-size: 0.75rem;
+    gap: 12px;
+  }
+}
