@@ -407,15 +407,14 @@ describe("App", () => {
   it("renders the Local RAG Console header and empty state", async () => {
     render(<App />);
 
-    expect(
-      screen.getByRole("heading", { name: /local rag console/i })
-    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /groundedos/i })).toBeTruthy();
+    expect(screen.getByText(/local rag console/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: /ask/i })).toBeTruthy();
     expect(screen.getByText(/local anonymous mode/i)).toBeTruthy();
 
-    // Empty index list means the select shows "No indexed documents".
+    // Empty index list means the sources panel shows the empty-state message.
     await waitFor(() => {
-      expect(screen.getByText(/no indexed documents/i)).toBeTruthy();
+      expect(screen.getByText(/nenhum documento indexado/i)).toBeTruthy();
     });
 
     // Health check resolves "online" after the first successful fetch.
@@ -426,7 +425,7 @@ describe("App", () => {
 
   it("shows a validation error when submitting without a query", async () => {
     const { container } = render(<App />);
-    const form = container.querySelector("form.input-panel");
+    const form = container.querySelector("form.query-composer");
 
     if (!form) {
       throw new Error("form not rendered");
@@ -451,7 +450,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "admin-password" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /login/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/signed in as admin/i)).toBeTruthy();
@@ -482,16 +481,16 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText(/password/i), {
       target: { value: "admin-password" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /login/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /logout/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /sign out/i })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /logout/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /login/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /sign in/i })).toBeTruthy();
     });
 
     expect(window.localStorage.getItem("groundedos-auth-session")).toBeNull();

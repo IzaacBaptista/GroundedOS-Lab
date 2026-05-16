@@ -1,0 +1,212 @@
+.learning-path-panel {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  padding: 14px;
+}
+
+.learning-path-panel h3 {
+  margin: 0;
+}
+
+.learning-path-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.learning-path-stats span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.learning-path-recommendation {
+  margin-top: 10px;
+  border: 1px solid var(--accent-soft);
+  background: rgba(var(--accent-rgb), 0.09);
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+
+.learning-path-recommendation strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.learning-path-recommendation p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.learning-path-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.learning-path-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px;
+}
+
+.learning-path-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.learning-path-head h4 {
+  margin: 0;
+  font-size: 0.93rem;
+}
+
+.learning-path-item p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.learning-path-progress {
+  margin-top: 8px;
+}
+
+.learning-path-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.learning-path-progress__track {
+  position: relative;
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.learning-path-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+.learning-path-prerequisites {
+  margin-top: 8px;
+}
+
+.learning-path-prerequisites > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.learning-path-prerequisites__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.learning-path-prerequisite {
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.learning-path-prerequisite:hover {
+  border-color: var(--amber);
+  color: var(--text);
+}
+
+.learning-path-difficulty {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  text-transform: capitalize;
+}
+
+.difficulty-beginner {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.difficulty-intermediate {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.difficulty-advanced {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.learning-path-concepts {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.learning-path-concept-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.learning-path-concept {
+  flex: 1;
+  min-width: 180px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--panel-strong);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.learning-path-concept:hover {
+  border-color: var(--accent);
+}
+
+.learning-path-mark-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.learning-path-mark-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.learning-path-mark-btn--done {
+  border-color: rgba(21, 109, 97, 0.28);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+@media (max-width: 640px) {
+  .learning-path-concept-item {
+    flex-direction: column;
+  }
+
+  .learning-path-concept {
+    min-width: auto;
+  }
+}

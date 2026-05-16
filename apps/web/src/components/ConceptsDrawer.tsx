@@ -6,7 +6,7 @@ import {
 } from "../concepts";
 import { CONCEPTS } from "../concepts/concepts-data";
 import type { ConceptStatus } from "../concepts/types";
-import { ConceptDetailPanel } from "./ConceptDetailPanel";
+import { ConceptDetailTabs } from "./ConceptDetailTabs";
 import { LearningPathPanel } from "./LearningPathPanel";
 import "./ConceptsDrawer.css";
 
@@ -131,7 +131,7 @@ export function ConceptsDrawer({
           </section>
 
           <section className="concepts-drawer__right" aria-label="Detalhes do conceito">
-            <ConceptDetailPanel conceptId={selectedConceptId} onSelectConcept={onSelectConcept} />
+            <ConceptDetailTabs conceptId={selectedConceptId} onSelectConcept={onSelectConcept} />
             <LearningPathPanel onSelectConcept={onSelectConcept} />
           </section>
         </div>

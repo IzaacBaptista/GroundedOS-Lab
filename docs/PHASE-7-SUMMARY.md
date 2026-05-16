@@ -3,7 +3,7 @@
 ## 📊 Status Final
 
 **Tempo investido:** ~2 horas  
-**Tasks completadas:** 4/5 ✅ (Task 3 integração pendente)  
+**Tasks completadas:** 5/5 ✅  
 **Linhas de código:** ~1,000  
 **Componentes criados:** 6 novos  
 **Erros TypeScript:** 0
@@ -91,25 +91,12 @@ npm run dev
 # - Verificar filtros colapsáveis
 ```
 
-### PRÓXIMO (Integração em App.tsx)
-Substituir ConceptDetailPanel por ConceptDetailTabs em `App.tsx`:
-
-```typescript
-// Antes:
-import { ConceptDetailPanel } from "./components/ConceptDetailPanel";
-<ConceptDetailPanel {...props} />
-
-// Depois:
-import { ConceptDetailTabs } from "./components/ConceptDetailTabs";
-<ConceptDetailTabs {...props} />
-```
-
-### ENTÃO (Task 3 Completa - LearningPathPanel Enhancement)
-1. Usar `useLearningProgress` no `LearningPathPanel`
-2. Mostrar completion % para cada path
-3. Mostrar pré-requisitos faltantes
-4. Botão "Mark as Learned" com feedback visual
-5. Sugestão de próximo caminho automática
+### PRÓXIMO (Validação Final)
+1. Executar `cd apps/web && npm run build`
+2. Abrir `http://localhost:5173` e verificar o drawer de conceitos
+3. Testar as tabs de detalhes, dependências e caminhos
+4. Marcar alguns conceitos como aprendidos e confirmar o progresso persistido
+5. Capturar screenshots atualizadas para a documentação
 
 ## 📈 Métricas de Qualidade
 
@@ -188,8 +175,8 @@ import { ConceptDetailTabs } from "./components/ConceptDetailTabs";
 - [ ] Todos os testes passam
 - [ ] Mobile responsivo (tested)
 - [ ] localStorage funciona (DevTools Application tab)
-- [ ] Componentes integrados em App.tsx
-- [ ] LearningPathPanel atualizado com hook
+- [x] Componentes integrados na navegação do lab
+- [x] LearningPathPanel atualizado com hook
 - [ ] Screenshots para docs atualizado
 - [ ] Commit com message descritivo
 
