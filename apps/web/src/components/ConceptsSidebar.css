@@ -1,16 +1,16 @@
 .concepts-sidebar {
   display: flex;
   flex-direction: column;
-  width: 240px;
-  min-width: 240px;
-  min-height: calc(100vh - 100px);
+  width: 260px;
+  min-width: 260px;
+  min-height: calc(100vh - 84px);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--panel);
-  box-shadow: 0 14px 28px rgba(43, 38, 30, 0.08);
+  box-shadow: var(--shadow);
   overflow: hidden;
   position: sticky;
-  top: 18px;
+  top: 10px;
   align-self: start;
 }
 
@@ -19,8 +19,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--accent);
-  color: #fff;
+  background: linear-gradient(180deg, rgba(0, 214, 163, 0.2), rgba(0, 214, 163, 0.08));
+  color: var(--accent-strong);
   font-size: 0.88rem;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -31,7 +31,7 @@
 .concepts-sidebar__filter-toggle {
   background: transparent;
   border: none;
-  color: #fff;
+  color: var(--accent-strong);
   font-size: 1.1rem;
   cursor: pointer;
   padding: 0;
@@ -204,13 +204,17 @@
 }
 
 .sidebar-concept-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 214, 163, 0.08);
   color: var(--text);
 }
 
-@media (prefers-color-scheme: dark) {
-  .sidebar-concept-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
+@media (max-width: 940px) {
+  .concepts-sidebar {
+    position: static;
+    top: auto;
+    width: 100%;
+    min-width: 0;
+    min-height: auto;
   }
 }
 

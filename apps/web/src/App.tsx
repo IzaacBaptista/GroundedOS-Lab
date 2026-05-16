@@ -93,6 +93,13 @@ const PROVIDER_OPTIONS: EmbeddingProviderId[] = [
   "openai",
 ];
 
+const QUERY_SUGGESTIONS = [
+  "Como funciona o chunking?",
+  "Hybrid vs dense search",
+  "Fluxo de re-ranking",
+  "Cache hit vs latência",
+];
+
 const AUTH_STORAGE_KEY = "groundedos-auth-session";
 
 interface StoredAuthSession {
@@ -949,13 +956,24 @@ export default function App() {
   const busy = appState === "indexing" || appState === "asking";
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Phase 7 Lab</p>
-          <h1>Local RAG Console</h1>
+    <main className="shell lab-shell">
+      <header className="topbar lab-header">
+        <div className="lab-brand">
+          <div className="lab-brand__logo" aria-hidden="true" />
+          <div>
+            <h1>GroundedOS</h1>
+            <p className="lab-brand__subtitle">Local RAG Console · Phase 7</p>
+          </div>
         </div>
-        <div className="topbar__meta">
+        <div className="topbar__meta lab-header__meta">
+          <span className={`health health--${healthStatus}`}>
+            {healthStatus === "checking"
+              ? "API checking"
+              : healthStatus === "online"
+                ? "API online"
+                : "API offline"}
+          </span>
+          <span className="tag">Local retrieval</span>
           <div className="auth-box" aria-label="Authentication">
             {authUser ? (
               <>
@@ -968,7 +986,7 @@ export default function App() {
                   disabled={authBusy}
                   onClick={() => void handleLogout()}
                 >
-                  {authBusy ? "Signing out" : "Logout"}
+                  {authBusy ? "Signing out" : "Sign out"}
                 </button>
               </>
             ) : (
@@ -994,7 +1012,7 @@ export default function App() {
                   type="submit"
                   disabled={authBusy}
                 >
-                  {authBusy ? "Signing in" : "Login"}
+                  {authBusy ? "Signing in" : "Sign in"}
                 </button>
               </form>
             )}
@@ -1006,23 +1024,14 @@ export default function App() {
               {authMessage}
             </span>
           </div>
-          <span className={`health health--${healthStatus}`}>
-            {healthStatus === "checking"
-              ? "API checking"
-              : healthStatus === "online"
-                ? "API online"
-                : "API offline"}
-          </span>
-          <span className="tag">Local retrieval</span>
         </div>
       </header>
 
-      <div className="app-body">
+      <div className="app-body lab-grid">
         <ConceptsSidebar onConceptClick={setConceptModalId} />
-        <section className="workspace" aria-label="Local RAG workspace">
-        <form className="panel input-panel" onSubmit={handleSubmit}>
+        <section className="panel input-panel sources-panel" aria-label="Painel de fontes">
           <div className="panel__header">
-            <h2>Source</h2>
+            <h2>Fontes</h2>
             <button
               className="secondary-button"
               type="button"
@@ -1193,17 +1202,6 @@ export default function App() {
             </label>
           </div>
 
-          <label className="field">
-            <span>Question</span>
-            <textarea
-              rows={4}
-              required
-              placeholder="Ask a question about the indexed document..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-
           <details className="advanced-options" open>
             <summary>Advanced options</summary>
             <label className="field">
@@ -1263,13 +1261,6 @@ export default function App() {
               >
                 {appState === "indexing" ? "Indexing" : "Index"}
               </button>
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={busy}
-              >
-                {appState === "asking" ? "Asking" : "Ask"}
-              </button>
             </div>
           </div>
 
@@ -1281,50 +1272,111 @@ export default function App() {
           >
             {message}
           </p>
-        </form>
+        </section>
 
-        <ResultPanel
-          outputTab={outputTab}
-          setOutputTab={setOutputTab}
-          activeIndex={activeIndex}
-          result={result}
-          compare={compare}
-          setCompare={setCompare}
-          compareMessage={compareMessage}
-          compareMessageIsError={compareMessageIsError}
-          tradeoffMetrics={tradeoffMetrics}
-          tradeoffMetricsLoading={tradeoffMetricsLoading}
-          onRefreshTradeoffs={() => void loadTradeoffs()}
-          tradeoffMessage={tradeoffMessage}
-          tradeoffMessageIsError={tradeoffMessageIsError}
-          embeddingMap={embeddingMap}
-          embeddingMapLoading={embeddingMapLoading}
-          onRefreshEmbeddingMap={() => void loadEmbeddingMap()}
-          embeddingMapMessage={embeddingMapMessage}
-          embeddingMapMessageIsError={embeddingMapMessageIsError}
-          modelBenchmark={modelBenchmark}
-          modelBenchmarkPrecheck={modelBenchmarkPrecheck}
-          modelBenchmarkLoading={modelBenchmarkLoading}
-          modelBenchmarkPrecheckLoading={modelBenchmarkPrecheckLoading}
-          modelBenchmarkRunLoading={modelBenchmarkRunLoading}
-          onRefreshModelBenchmark={() => void loadModelBenchmark()}
-          onRunModelBenchmarkPrecheck={() => void loadModelBenchmarkPrecheck()}
-          onRunModelBenchmark={() => void executeModelBenchmarkRun()}
-          modelBenchmarkMessage={modelBenchmarkMessage}
-          modelBenchmarkMessageIsError={modelBenchmarkMessageIsError}
-          modelBenchmarkPrecheckMessage={modelBenchmarkPrecheckMessage}
-          modelBenchmarkPrecheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
-          benchmarkProviders={benchmarkProviders}
-          onChangeBenchmarkProviders={setBenchmarkProviders}
-          labExperiments={labExperiments}
-          labExperimentsLoading={labExperimentsLoading}
-          onRefreshLabExperiments={() => void loadLabExperiments()}
-          labMessage={labMessage}
-          labMessageIsError={labMessageIsError}
-          reportApiError={reportApiError}
-          onConceptClick={setConceptModalId}
-        />
-      </section>
+        <section className="panel query-panel" aria-label="Área de conversa">
+          <header className="panel__header query-panel__header">
+            <h2>Conversa</h2>
+            <span className="count">
+              {activeIndex
+                ? `${activeIndex.chunkCount} chunks`
+                : "Nenhum índice selecionado"}
+            </span>
+          </header>
+
+          <div className="query-panel__content">
+            {result ? (
+              <div className="query-stream">
+                <article className="query-bubble query-bubble--user">
+                  <p>{query.trim() || "Pergunta enviada"}</p>
+                </article>
+                <article className="query-bubble query-bubble--assistant">
+                  <p>{result.answer.text}</p>
+                </article>
+              </div>
+            ) : (
+              <div className="empty-state query-empty-state">
+                <div className="empty-state__mark" />
+                <h3>Vamos iniciar sua query...</h3>
+                <p className="empty-state__message">
+                  Indexe um documento e faça uma pergunta para ver o caminho completo da resposta RAG.
+                </p>
+                <div className="query-suggestions" aria-label="Sugestões de query">
+                  {QUERY_SUGGESTIONS.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      className="result-tab"
+                      onClick={() => setQuery(suggestion)}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form className="query-composer" onSubmit={handleSubmit}>
+            <label className="field query-composer__field">
+              <span>Pergunta</span>
+              <input
+                type="text"
+                required
+                placeholder="Faça uma pergunta sobre os documentos..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <button className="primary-button" type="submit" disabled={busy}>
+              {appState === "asking" ? "Asking" : "Ask"}
+            </button>
+          </form>
+        </section>
+
+        <aside className="studio-shell" aria-label="Painel de estúdio">
+          <ResultPanel
+            outputTab={outputTab}
+            setOutputTab={setOutputTab}
+            activeIndex={activeIndex}
+            result={result}
+            compare={compare}
+            setCompare={setCompare}
+            compareMessage={compareMessage}
+            compareMessageIsError={compareMessageIsError}
+            tradeoffMetrics={tradeoffMetrics}
+            tradeoffMetricsLoading={tradeoffMetricsLoading}
+            onRefreshTradeoffs={() => void loadTradeoffs()}
+            tradeoffMessage={tradeoffMessage}
+            tradeoffMessageIsError={tradeoffMessageIsError}
+            embeddingMap={embeddingMap}
+            embeddingMapLoading={embeddingMapLoading}
+            onRefreshEmbeddingMap={() => void loadEmbeddingMap()}
+            embeddingMapMessage={embeddingMapMessage}
+            embeddingMapMessageIsError={embeddingMapMessageIsError}
+            modelBenchmark={modelBenchmark}
+            modelBenchmarkPrecheck={modelBenchmarkPrecheck}
+            modelBenchmarkLoading={modelBenchmarkLoading}
+            modelBenchmarkPrecheckLoading={modelBenchmarkPrecheckLoading}
+            modelBenchmarkRunLoading={modelBenchmarkRunLoading}
+            onRefreshModelBenchmark={() => void loadModelBenchmark()}
+            onRunModelBenchmarkPrecheck={() => void loadModelBenchmarkPrecheck()}
+            onRunModelBenchmark={() => void executeModelBenchmarkRun()}
+            modelBenchmarkMessage={modelBenchmarkMessage}
+            modelBenchmarkMessageIsError={modelBenchmarkMessageIsError}
+            modelBenchmarkPrecheckMessage={modelBenchmarkPrecheckMessage}
+            modelBenchmarkPrecheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
+            benchmarkProviders={benchmarkProviders}
+            onChangeBenchmarkProviders={setBenchmarkProviders}
+            labExperiments={labExperiments}
+            labExperimentsLoading={labExperimentsLoading}
+            onRefreshLabExperiments={() => void loadLabExperiments()}
+            labMessage={labMessage}
+            labMessageIsError={labMessageIsError}
+            reportApiError={reportApiError}
+            onConceptClick={setConceptModalId}
+          />
+        </aside>
       </div>
       <ConceptModal
         conceptId={conceptModalId}
@@ -1341,10 +1393,9 @@ export default function App() {
           };
           const exp = experiments[conceptId];
           if (exp) {
-            const questionField = document.querySelector("textarea[placeholder*='Faça uma pergunta']") as HTMLTextAreaElement;
-            if (questionField) {
-              questionField.value = exp.question;
-              questionField.focus();
+            setQuery(exp.question);
+            if (typeof exp.topK === "number") {
+              setTopK(exp.topK);
             }
           }
           setConceptModalId(null);
@@ -1438,8 +1489,6 @@ function ResultPanel({
   onConceptClick,
 }: ResultPanelProps) {
   const [answerPanelTab, setAnswerPanelTab] = useState<PedagogicalAnswerTab>("chunks");
-  const [isResultModalOpen, setResultModalOpen] = useState(false);
-  const results = result?.devMode?.results ?? [];
   const hasResult = Boolean(result);
   const resultMeta = result
     ? `${result.index.chunkCount ?? 0} chunks | ${
@@ -1462,7 +1511,6 @@ function ResultPanel({
         : outputTab === "lab"
           ? "Safety checks"
         : "No result";
-  const showPanelHeader = outputTab === "embeddings" || outputTab === "models";
 
   const tabConcepts: string[] =
     outputTab === "answer"
@@ -1486,48 +1534,25 @@ function ResultPanel({
         : outputTab === "lab"
           ? ["guardrails", "grounding"]
           : [];
-  const modalTitle =
-    outputTab === "answer"
-      ? answerPanelTab === "chunks"
-        ? "Busca e chunks"
-        : answerPanelTab === "citations"
-          ? "Fontes e grounding"
-          : answerPanelTab === "workflow"
-            ? "Etapas da pergunta"
-            : "Tempo, custo e cache"
-      : outputTab === "compare"
-        ? "Comparar retrieval"
-        : outputTab === "routing"
-          ? "Routing"
-          : outputTab === "context"
-            ? "Contexto"
-            : outputTab === "cache"
-              ? "Cache"
-              : outputTab === "evals"
-                ? "Evals"
-                : outputTab === "lab"
-                  ? "Guardrails"
-                  : "Visualização";
-
   const openAnswerView = (tab: PedagogicalAnswerTab) => {
     setAnswerPanelTab(tab);
     setOutputTab("answer");
-    setResultModalOpen(true);
   };
 
   const openOutputView = (tab: ResultMode) => {
     setOutputTab(tab);
-    setResultModalOpen(true);
   };
 
   return (
-    <section className="panel output-panel" aria-label="RAG output">
-      {showPanelHeader && (
-        <div className="panel__header">
-          <h2>Answer</h2>
-          <span className="tag">{resultMeta}</span>
-        </div>
-      )}
+    <section className="panel output-panel studio-panel" aria-label="RAG output">
+      <div className="panel__header studio-panel__header">
+        <h2>Estúdio</h2>
+        <span className="tag">{hasResult ? "1 fonte" : "Sem preview"}</span>
+      </div>
+
+      <div className="section-title studio-section-title">
+        <h3>Visualizações</h3>
+      </div>
 
       <div className="result-tabs" role="tablist" aria-label="Output modes">
         <button
@@ -1622,267 +1647,178 @@ function ResultPanel({
         </button>
       </div>
 
-      {isResultModalOpen && tabConcepts.length > 0 && (
+      {tabConcepts.length > 0 && (
         <div className="concepts-tab-hints" aria-label="Referências de conceitos desta visualização">
           <span className="chunk-text">Conceitos nesta visualização:</span>
           <ConceptBadgeGroup conceptIds={tabConcepts} small onClick={onConceptClick} />
         </div>
       )}
 
-      {!isResultModalOpen && (
-        <ResultPanelLanding
-          result={result}
-          hasResult={hasResult}
-          resultMeta={resultMeta}
-          onOpen={() => openAnswerView("citations")}
-        />
-      )}
-
-      {isResultModalOpen && (
-        <ResultModal title={modalTitle} meta={resultMeta} onClose={() => setResultModalOpen(false)}>
-      {outputTab === "answer" && (
-        <AnswerPanel
-          response={result ?? null}
-          tradeoffs={tradeoffMetrics ?? null}
-          tradeoffsLoading={tradeoffMetricsLoading}
-          onRefreshTradeoffs={onRefreshTradeoffs}
-          activeTab={answerPanelTab}
-          onActiveTabChange={setAnswerPanelTab}
-          showTabs={false}
-        />
-      )}
-
-      {outputTab === "compare" && (
-        <div className="compare-view">
-          <div className="section-title" style={{ marginBottom: 6 }}>
-            <h3>Compare mode — divergência semântica vs lexical</h3>
-          </div>
-          <p className="chunk-text" style={{ marginBottom: 12 }}>
-            Mesma query, mesmo documento, providers diferentes. Se o rank 1 divergir,
-            isso mostra como cada estratégia define relevância.
-          </p>
-
-          <section className="compare-controls">
-            <label className="field field--compact">
-              <span>Provider A</span>
-              <select
-                value={compare.providerA}
-                onChange={(event) =>
-                  setCompare((state) => ({
-                    ...state,
-                    providerA: event.target.value as EmbeddingProviderId,
-                  }))
-                }
-              >
-                {PROVIDER_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field field--compact">
-              <span>Provider B</span>
-              <select
-                value={compare.providerB}
-                onChange={(event) =>
-                  setCompare((state) => ({
-                    ...state,
-                    providerB: event.target.value as EmbeddingProviderId,
-                  }))
-                }
-              >
-                {PROVIDER_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
-
-          <p
-            className={`form-message${compareMessageIsError ? " is-error" : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            {compareMessage}
-          </p>
-
-          <p
-            className="compare-tip"
-            title="api-lexical e local-hash são estratégias lexicais; ollama e openai são semânticos e tendem a divergir mais em ranking."
-          >
-            {explainCompareTip(compare.providerA, compare.providerB)}
-          </p>
-
-          <CompareDivergenceBanner
-            providerA={compare.providerA}
-            outputA={compare.outputA}
-            providerB={compare.providerB}
-            outputB={compare.outputB}
+      <div className="studio-preview" aria-label="Preview">
+        <div className="studio-preview__meta">{resultMeta}</div>
+        {outputTab === "answer" && (
+          <AnswerPanel
+            response={result ?? null}
+            tradeoffs={tradeoffMetrics ?? null}
+            tradeoffsLoading={tradeoffMetricsLoading}
+            onRefreshTradeoffs={onRefreshTradeoffs}
+            activeTab={answerPanelTab}
+            onActiveTabChange={setAnswerPanelTab}
+            showTabs={false}
           />
+        )}
 
-          <div className="compare-grid">
-            <CompareColumn
-              provider={compare.providerA}
-              output={compare.outputA}
-            />
-            <CompareColumn
-              provider={compare.providerB}
-              output={compare.outputB}
-            />
-          </div>
-        </div>
-      )}
+        {outputTab === "compare" && (
+          <div className="compare-view">
+            <div className="section-title" style={{ marginBottom: 6 }}>
+              <h3>Compare mode — divergência semântica vs lexical</h3>
+            </div>
+            <p className="chunk-text" style={{ marginBottom: 12 }}>
+              Mesma query, mesmo documento, providers diferentes. Se o rank 1 divergir,
+              isso mostra como cada estratégia define relevância.
+            </p>
 
-      {outputTab === "embeddings" && (
-        <div className="embedding-view">
-          <div className="panel__header">
-            <h3>Embedding Map</h3>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={onRefreshEmbeddingMap}
-              disabled={embeddingMapLoading || !activeIndex}
+            <section className="compare-controls">
+              <label className="field field--compact">
+                <span>Provider A</span>
+                <select
+                  value={compare.providerA}
+                  onChange={(event) =>
+                    setCompare((state) => ({
+                      ...state,
+                      providerA: event.target.value as EmbeddingProviderId,
+                    }))
+                  }
+                >
+                  {PROVIDER_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field field--compact">
+                <span>Provider B</span>
+                <select
+                  value={compare.providerB}
+                  onChange={(event) =>
+                    setCompare((state) => ({
+                      ...state,
+                      providerB: event.target.value as EmbeddingProviderId,
+                    }))
+                  }
+                >
+                  {PROVIDER_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+
+            <p
+              className={`form-message${compareMessageIsError ? " is-error" : ""}`}
+              role="status"
+              aria-live="polite"
             >
-              {embeddingMapLoading ? "Refreshing" : "Refresh"}
-            </button>
+              {compareMessage}
+            </p>
+
+            <p
+              className="compare-tip"
+              title="api-lexical e local-hash são estratégias lexicais; ollama e openai são semânticos e tendem a divergir mais em ranking."
+            >
+              {explainCompareTip(compare.providerA, compare.providerB)}
+            </p>
+
+            <CompareDivergenceBanner
+              providerA={compare.providerA}
+              outputA={compare.outputA}
+              providerB={compare.providerB}
+              outputB={compare.outputB}
+            />
+
+            <div className="compare-grid">
+              <CompareColumn
+                provider={compare.providerA}
+                output={compare.outputA}
+              />
+              <CompareColumn
+                provider={compare.providerB}
+                output={compare.outputB}
+              />
+            </div>
           </div>
+        )}
 
-          <p
-            className={`form-message${embeddingMapMessageIsError ? " is-error" : ""}`}
-            role="status"
-            aria-live="polite"
-          >
-            {embeddingMapMessage}
-          </p>
+        {outputTab === "embeddings" && (
+          <div className="embedding-view">
+            <div className="panel__header">
+              <h3>Embedding Map</h3>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onRefreshEmbeddingMap}
+                disabled={embeddingMapLoading || !activeIndex}
+              >
+                {embeddingMapLoading ? "Refreshing" : "Refresh"}
+              </button>
+            </div>
 
-          {!activeIndex && (
-            <p className="chunk-text">Select a persisted index to inspect its chunks.</p>
-          )}
+            <p
+              className={`form-message${embeddingMapMessageIsError ? " is-error" : ""}`}
+              role="status"
+              aria-live="polite"
+            >
+              {embeddingMapMessage}
+            </p>
 
-          {activeIndex && !embeddingMap && !embeddingMapLoading && (
-            <p className="chunk-text">No embedding map loaded yet.</p>
-          )}
+            {!activeIndex && (
+              <p className="chunk-text">Select a persisted index to inspect its chunks.</p>
+            )}
 
-          {embeddingMap && <EmbeddingMapView map={embeddingMap} />}
-        </div>
-      )}
+            {activeIndex && !embeddingMap && !embeddingMapLoading && (
+              <p className="chunk-text">No embedding map loaded yet.</p>
+            )}
 
-      {outputTab === "models" && (
-        <ModelBenchmarkView
-          benchmark={modelBenchmark}
-          precheck={modelBenchmarkPrecheck}
-          loading={modelBenchmarkLoading}
-          precheckLoading={modelBenchmarkPrecheckLoading}
-          runLoading={modelBenchmarkRunLoading}
-          onRefresh={onRefreshModelBenchmark}
-          onRunPrecheck={onRunModelBenchmarkPrecheck}
-          onRunBenchmark={onRunModelBenchmark}
-          message={modelBenchmarkMessage}
-          messageIsError={modelBenchmarkMessageIsError}
-          precheckMessage={modelBenchmarkPrecheckMessage}
-          precheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
-          providers={benchmarkProviders}
-          onChangeProviders={onChangeBenchmarkProviders}
-        />
-      )}
+            {embeddingMap && <EmbeddingMapView map={embeddingMap} />}
+          </div>
+        )}
 
-      {outputTab === "routing" && <RoutingView response={result} />}
+        {outputTab === "models" && (
+          <ModelBenchmarkView
+            benchmark={modelBenchmark}
+            precheck={modelBenchmarkPrecheck}
+            loading={modelBenchmarkLoading}
+            precheckLoading={modelBenchmarkPrecheckLoading}
+            runLoading={modelBenchmarkRunLoading}
+            onRefresh={onRefreshModelBenchmark}
+            onRunPrecheck={onRunModelBenchmarkPrecheck}
+            onRunBenchmark={onRunModelBenchmark}
+            message={modelBenchmarkMessage}
+            messageIsError={modelBenchmarkMessageIsError}
+            precheckMessage={modelBenchmarkPrecheckMessage}
+            precheckMessageIsError={modelBenchmarkPrecheckMessageIsError}
+            providers={benchmarkProviders}
+            onChangeProviders={onChangeBenchmarkProviders}
+          />
+        )}
 
-  {outputTab === "context" && <ContextView response={result} />}
+        {outputTab === "routing" && <RoutingView response={result} />}
 
-      {outputTab === "cache" && <CacheView response={result} />}
+        {outputTab === "context" && <ContextView response={result} />}
 
-      {outputTab === "evals" && <EvalsView response={result} />}
+        {outputTab === "cache" && <CacheView response={result} />}
 
-      {outputTab === "lab" && (
-        <LabExperimentsView reportApiError={reportApiError} />
-      )}
-        </ResultModal>
-      )}
+        {outputTab === "evals" && <EvalsView response={result} />}
 
-    </section>
-  );
-}
-
-function ResultPanelLanding({
-  result,
-  hasResult,
-  resultMeta,
-  onOpen,
-}: {
-  result: RagAskResponse | undefined;
-  hasResult: boolean;
-  resultMeta: string;
-  onOpen: () => void;
-}) {
-  return (
-    <div className="result-launch">
-      <div>
-        <h3>{hasResult ? "Resumo da resposta" : "Escolha uma visualização"}</h3>
-        <p className="chunk-text">
-          {hasResult
-            ? "Use os botões acima para abrir cada camada em uma janela ampla: fontes, busca, etapas, custos, evals e guardrails."
-            : "Depois de executar Ask, cada botão abre uma visualização dedicada em modal para facilitar leitura e prints."}
-        </p>
-      </div>
-
-      <div className="result-launch__answer">
-        <Pill variant={hasResult ? "green" : "gray"}>{resultMeta}</Pill>
-        <p>
-          {result?.answer.text ??
-            "Indexe um documento e faça uma pergunta para ver o caminho completo da resposta."}
-        </p>
-        {hasResult && (
-          <button type="button" className="primary-button" onClick={onOpen}>
-            Abrir fontes
-          </button>
+        {outputTab === "lab" && (
+          <LabExperimentsView reportApiError={reportApiError} />
         )}
       </div>
-    </div>
-  );
-}
 
-function ResultModal({
-  title,
-  meta,
-  onClose,
-  children,
-}: {
-  title: string;
-  meta: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  return (
-    <div className="result-modal" role="dialog" aria-modal="true" aria-labelledby="result-modal-title">
-      <div className="result-modal__backdrop" onClick={onClose} />
-      <section className="result-modal__panel">
-        <header className="result-modal__header">
-          <div>
-            <h2 id="result-modal-title">{title}</h2>
-            <span>{meta}</span>
-          </div>
-          <button type="button" className="secondary-button" onClick={onClose}>
-            Fechar
-          </button>
-        </header>
-        <div className="result-modal__body">{children}</div>
-      </section>
-    </div>
+    </section>
   );
 }
 
