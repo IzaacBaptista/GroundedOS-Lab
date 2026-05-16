@@ -18,7 +18,7 @@ docker-compose --profile observability up -d
 - Metrics: `/metrics` endpoint at http://localhost:9090/api/v1/query
 
 **Grafana (visualization):**
-- URL: http://localhost:3000
+- URL: http://localhost:3100
 - Default credentials: admin / admin (change on first login)
 - Queue Dashboard: Already imported and available
 
@@ -52,7 +52,7 @@ The dashboard shows:
 
 If the dashboard is not auto-imported:
 
-1. Open Grafana: http://localhost:3000
+1. Open Grafana: http://localhost:3100
 2. Click "+" → "Import"
 3. Upload: `config/grafana/groundedos-queue-hardening-dashboard.json`
 4. Select Prometheus as the data source

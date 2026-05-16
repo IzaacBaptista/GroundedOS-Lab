@@ -251,7 +251,7 @@ services:
     profiles:
       - observability
     ports:
-      - "3002:3000"
+      - "3100:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
