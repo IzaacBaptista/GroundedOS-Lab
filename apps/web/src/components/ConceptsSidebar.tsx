@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { getConceptsByCategory, getUniqueCategories } from "../concepts";
 import { CONCEPTS } from "../concepts/concepts-data";
-import { useConceptsFilter } from "../hooks/useConceptsFilter";
-import type { ConceptCategory, ConceptStatus, Concept } from "../concepts/types";
+import type { Concept, ConceptCategory, ConceptStatus } from "../concepts/types";
 import "./ConceptsSidebar.css";
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -47,17 +46,9 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
     () => new Set(allCategories.slice(0, 2))
   );
   const [showFilters, setShowFilters] = useState(false);
-
-  const {
-    filter,
-    filteredConcepts,
-    setSearch,
-    setCategory,
-    setStatus,
-    clearFilters,
-    isFiltered,
-    total,
-  } = useConceptsFilter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<ConceptCategory | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<ConceptStatus | null>(null);
 
   const toggle = (cat: string) => {
     setExpanded((prev) => {
@@ -71,9 +62,36 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
     });
   };
 
+  // Filter concepts based on search, category, and status
+  const filteredConcepts = useMemo(() => {
+    return CONCEPTS.filter((concept: Concept) => {
+      // Search filter
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matches =
+          concept.title.toLowerCase().includes(q) ||
+          concept.shortDefinition.toLowerCase().includes(q) ||
+          concept.explanation.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+
+      // Category filter
+      if (selectedCategory && concept.category !== selectedCategory) {
+        return false;
+      }
+
+      // Status filter
+      if (selectedStatus && concept.status !== selectedStatus) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [searchQuery, selectedCategory, selectedStatus]);
+
   // Group filtered concepts by category
   const groupedConcepts = useMemo(() => {
-    const groups: Record<string, typeof filteredConcepts> = {};
+    const groups: Record<string, Concept[]> = {};
     filteredConcepts.forEach((concept: Concept) => {
       if (!groups[concept.category]) {
         groups[concept.category] = [];
@@ -87,6 +105,8 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
   const visibleCategories = useMemo(() => {
     return allCategories.filter((cat) => groupedConcepts[cat]?.length > 0);
   }, [allCategories, groupedConcepts]);
+
+  const isFiltered = searchQuery || selectedCategory || selectedStatus;
 
   return (
     <aside className="concepts-sidebar" aria-label="Laboratório de conceitos">
@@ -114,8 +134,8 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
               type="text"
               className="filter-group__input"
               placeholder="Título ou descrição..."
-              value={filter.search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
@@ -127,9 +147,9 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
             <select
               id="concept-category"
               className="filter-group__select"
-              value={filter.category || ""}
+              value={selectedCategory || ""}
               onChange={(e) =>
-                setCategory((e.target.value as ConceptCategory) || null)
+                setSelectedCategory((e.target.value as ConceptCategory) || null)
               }
             >
               <option value="">Todas</option>
@@ -149,9 +169,9 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
             <select
               id="concept-status"
               className="filter-group__select"
-              value={filter.status || ""}
+              value={selectedStatus || ""}
               onChange={(e) =>
-                setStatus((e.target.value as ConceptStatus) || null)
+                setSelectedStatus((e.target.value as ConceptStatus) || null)
               }
             >
               <option value="">Todos</option>
@@ -174,14 +194,18 @@ export function ConceptsSidebar({ onConceptClick }: ConceptsSidebarProps) {
           {isFiltered && (
             <button
               className="concepts-sidebar__clear-btn"
-              onClick={clearFilters}
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedCategory(null);
+                setSelectedStatus(null);
+              }}
             >
               Limpar filtros
             </button>
           )}
 
           <div className="concepts-sidebar__filter-count">
-            Mostrando {total} de {allCategories.length} categorias
+            Mostrando {filteredConcepts.length} de {CONCEPTS.length} conceitos
           </div>
         </div>
       )}
