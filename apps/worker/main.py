@@ -336,7 +336,7 @@ async def run_polling_consumer(redis_url: str, guard: IdempotencyGuard) -> None:
                         job_id,
                         job_name=job_name,
                         job_data=data,
-                        active_key,
+                        active_key=active_key,
                         reason=str(exc),
                         attempts_made=attempts_made,
                         policy=resolve_retry_policy(str(job_type)),

@@ -138,7 +138,7 @@ Inspect failed jobs and re-drive:
 curl http://localhost:3001/jobs/dlq/list | jq '.entries'
 
 # Inspect specific entry
-curl http://localhost:3001/jobs/dlq/dlq:job-abc123 | jq '.envelope'
+curl http://localhost:3001/jobs/dlq/entry/dlq:job-abc123 | jq '.envelope'
 
 # Dry-run re-drive (validate without action)
 curl -X POST -H 'Content-Type: application/json' \

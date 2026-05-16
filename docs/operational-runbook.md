@@ -93,6 +93,7 @@ Poll job status:
 ```bash
 curl "http://localhost:3001/jobs/${JOB_ID}" \
   -H 'x-api-key: <api-key>'
+```
 
 Read queue metrics snapshot:
 
@@ -108,7 +109,6 @@ curl "http://localhost:3001/jobs/metrics" \
 - Exhausted jobs are copied to DLQ with envelope metadata for triage/re-drive.
 - Correlation IDs are accepted in enqueue payload and logged when present.
 - Lifecycle logs are structured (created, started, completed, failed, retry, dlq).
-```
 
 ## Required Queue Configuration
 

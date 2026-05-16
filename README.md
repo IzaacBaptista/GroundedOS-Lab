@@ -118,12 +118,12 @@ npm run api:dev
 npm run api:jobs:worker
 
 # 2) Enqueue async jobs
-curl -X POST http://localhost:3001/jobs/phase5 \
+JOB_ID=$(curl -s -X POST http://localhost:3001/jobs/phase5 \
   -H 'content-type: application/json' \
-  -d '{"track": "quantization"}'
+  -d '{"track": "quantization"}' | jq -r '.jobId')
 
 # 3) Poll job status
-curl http://localhost:3001/jobs/{jobId}
+curl "http://localhost:3001/jobs/${JOB_ID}"
 
 # 4) View queue metrics
 curl "http://localhost:3001/jobs/metrics?format=prometheus"
@@ -970,7 +970,7 @@ docker-compose ps | grep -E "otelcol|jaeger|prometheus|grafana"
 **Access the observability UIs:**
 - **Jaeger UI** (distributed traces): http://localhost:16686
 - **Prometheus UI** (metrics, PromQL queries): http://localhost:9090
-- **Grafana UI** (dashboards, alerts): http://localhost:3002 (default: admin/admin)
+- **Grafana UI** (dashboards, alerts): http://localhost:3100 (default: admin/admin)
 
 **Trace export is automatically enabled:**
 - API service: `OTEL_EXPORT_ENABLED=true` → sends traces to OTEL Collector (http://otelcol:4318)

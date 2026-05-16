@@ -164,7 +164,7 @@ export class JobsService {
         jobType: entry.envelope.jobType,
         redrivenAt: new Date().toISOString(),
         redrivenBy,
-        status: "scheduled",
+        status: "dry-run",
         reason: "Dry-run validation passed",
       });
 
@@ -186,6 +186,11 @@ export class JobsService {
         backoff: toBullMqBackoff(resolveQueueRetryPolicy(entry.envelope.jobType)),
         timestamp: Date.now(),
       });
+
+      const dlqJob = await this.dlq?.getJob(dlqJobId);
+      if (dlqJob) {
+        await dlqJob.remove();
+      }
 
       // Remove from DLQ store and re-drive
       this.dlqStore.redrive(dlqJobId, false);
@@ -254,8 +259,12 @@ export class JobsService {
   /**
    * Get re-drive history by job type.
    */
-  getRedriveHistoryByJobType(jobType: Phase6JobType): RedriveHistory {
-    return this.redriveAudit.getHistoryByJobType(jobType);
+  getRedriveHistoryByJobType(
+    jobType: Phase6JobType,
+    limit?: number,
+    offset?: number
+  ): RedriveHistory {
+    return this.redriveAudit.getHistoryByJobType(jobType, limit, offset);
   }
 
   private async enqueue(name: string, payload: Phase6JobPayload): Promise<Job<Phase6JobPayload>> {

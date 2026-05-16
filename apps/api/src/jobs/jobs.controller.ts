@@ -50,13 +50,12 @@ export class JobsController {
   @Get("metrics")
   async getMetrics(
     @Query("format") format?: string,
-    @Res() response?: FastifyReply
+    @Res({ passthrough: true }) response?: FastifyReply
   ) {
     if (format === "prometheus") {
       const prometheusText = this.jobs.getQueueMetricsPrometheus();
       if (response) {
         response.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-        response.send(prometheusText);
       }
       return prometheusText;
     }
@@ -79,14 +78,22 @@ export class JobsController {
   }
 
   @Get("dlq/history/:jobType")
-  getDlqRedriveHistoryByJobType(@Param("jobType") jobType: string) {
+  getDlqRedriveHistoryByJobType(
+    @Param("jobType") jobType: string,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string
+  ) {
     if (jobType !== "phase5-experiment" && jobType !== "model-benchmark") {
       throw new ApiRequestError(
         `Invalid jobType: ${jobType}. Must be 'phase5-experiment' or 'model-benchmark'.`,
         400
       );
     }
-    return this.jobs.getRedriveHistoryByJobType(jobType);
+    return this.jobs.getRedriveHistoryByJobType(
+      jobType,
+      limit ? Math.min(parseInt(limit, 10), 100) : 100,
+      offset ? parseInt(offset, 10) : 0
+    );
   }
 
   @Get("dlq/entry/:dlqJobId")

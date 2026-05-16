@@ -89,7 +89,7 @@ curl -s http://localhost:3001/jobs/dlq/list | jq
 
 ### Get Specific DLQ Entry
 ```bash
-curl -s http://localhost:3001/jobs/dlq/dlq:job-123 | jq
+curl -s http://localhost:3001/jobs/dlq/entry/dlq:job-123 | jq
 ```
 
 ### Inspect Re-drive History

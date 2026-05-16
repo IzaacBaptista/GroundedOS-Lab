@@ -5,7 +5,7 @@ export interface RedriveAuditEntry {
   jobType: Phase6JobType;
   redrivenAt: string;
   redrivenBy?: string;
-  status: "scheduled" | "failed";
+  status: "scheduled" | "failed" | "dry-run";
   reason?: string;
   newJobId?: string;
 }
@@ -53,14 +53,19 @@ export class RedriveAuditStore {
   /**
    * Get history by job type.
    */
-  getHistoryByJobType(jobType: Phase6JobType): RedriveHistory {
+  getHistoryByJobType(
+    jobType: Phase6JobType,
+    limit: number = 100,
+    offset: number = 0
+  ): RedriveHistory {
     const filtered = this.entries.filter((e) => e.jobType === jobType);
+    const sliced = filtered.slice(offset, offset + limit);
 
     return {
       total: filtered.length,
       successful: filtered.filter((e) => e.status === "scheduled").length,
       failed: filtered.filter((e) => e.status === "failed").length,
-      entries: filtered,
+      entries: sliced,
     };
   }
 

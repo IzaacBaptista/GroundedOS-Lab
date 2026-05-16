@@ -18,7 +18,7 @@ docker-compose logs -f otelcol jaeger prometheus grafana
 
 - **Jaeger UI**: http://localhost:16686
 - **Prometheus UI**: http://localhost:9090
-- **Grafana UI**: http://localhost:3002
+- **Grafana UI**: http://localhost:3100
   - Default credentials: admin/admin
 
 ## Architecture
@@ -56,7 +56,7 @@ docker-compose logs -f otelcol jaeger prometheus grafana
         └────┬────┘   └────┬──────────┘
              │             │
         ┌────▼─────────────▼────┐
-        │  Grafana (3002)       │
+        │  Grafana (3100)       │
         │  - Visualize traces   │
         │  - Dashboard metrics  │
         └──────────────────────┘
@@ -159,7 +159,7 @@ API Request (span_id=123)
 
 ## Viewing Dashboards in Grafana
 
-1. Open http://localhost:3002 (default: admin/admin)
+1. Open http://localhost:3100 (default: admin/admin)
 2. Create new dashboard or import from JSON
 3. Add panels with Prometheus queries and Jaeger links
 
@@ -272,7 +272,7 @@ For production, consider:
 1. **Access Services**:
    - Jaeger: http://localhost:16686
    - Prometheus: http://localhost:9090
-   - Grafana: http://localhost:3002
+   - Grafana: http://localhost:3100
 
 2. **Run a Test Job**:
    ```bash

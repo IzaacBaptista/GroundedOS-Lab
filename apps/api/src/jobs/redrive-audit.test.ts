@@ -43,8 +43,17 @@ describe("RedriveAuditStore", () => {
       reason: "Queue not available",
     });
 
+    store.record({
+      dlqJobId: "dlq:job-3",
+      jobType: "phase5-experiment",
+      redrivenAt: "2026-05-16T10:10:00Z",
+      redrivenBy: "user-3",
+      status: "dry-run",
+      reason: "Dry-run validation passed",
+    });
+
     const history = store.getHistory();
-    expect(history.total).toBe(2);
+    expect(history.total).toBe(3);
     expect(history.successful).toBe(1);
     expect(history.failed).toBe(1);
   });
@@ -79,6 +88,24 @@ describe("RedriveAuditStore", () => {
 
     const benchmarkHistory = store.getHistoryByJobType("model-benchmark");
     expect(benchmarkHistory.total).toBe(1);
+  });
+
+  it("should paginate history by job type", () => {
+    for (let i = 0; i < 4; i++) {
+      store.record({
+        dlqJobId: `dlq:phase5-${i}`,
+        jobType: "phase5-experiment",
+        redrivenAt: `2026-05-16T10:1${i}:00Z`,
+        status: "scheduled",
+      });
+    }
+
+    const page1 = store.getHistoryByJobType("phase5-experiment", 2, 0);
+    const page2 = store.getHistoryByJobType("phase5-experiment", 2, 2);
+
+    expect(page1.total).toBe(4);
+    expect(page1.entries).toHaveLength(2);
+    expect(page2.entries).toHaveLength(2);
   });
 
   it("should support pagination", () => {

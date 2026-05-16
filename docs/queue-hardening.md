@@ -1,6 +1,6 @@
 # Queue Hardening Guide
 
-This document describes the Phase Queue Hardening baseline for GroundedOS Lab.
+This document describes the Phase 6 Queue Hardening baseline for GroundedOS Lab.
 
 ## Scope
 
