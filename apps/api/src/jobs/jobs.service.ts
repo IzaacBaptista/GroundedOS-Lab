@@ -16,6 +16,7 @@ import {
 } from "./job-queue";
 import { logQueueEvent } from "./queue-logging";
 import { QueueMetricsStore, type QueueMetricSnapshot } from "./queue-metrics";
+import { RedriveAuditStore, type RedriveHistory } from "./redrive-audit";
 import { resolveQueueRetryPolicy, toBullMqBackoff } from "./queue-policy";
 
 export interface EnqueuedJobResponse {
@@ -51,6 +52,7 @@ export class JobsService {
   private readonly queueEvents = this.createQueueEvents();
   private readonly metrics = new QueueMetricsStore();
   private readonly dlqStore = new DlqStore();
+  private readonly redriveAudit = new RedriveAuditStore();
 
   constructor() {
     this.attachObservers();
@@ -143,26 +145,89 @@ export class JobsService {
    *
    * @param dlqJobId - The DLQ job ID
    * @param dryRun - If true, validate without taking action
+   * @param redrivenBy - Optional user/service identifier for audit
    */
-  redriveDlqJob(dlqJobId: string, dryRun: boolean = false): DlqRedriveResult {
+  async redriveDlqJob(
+    dlqJobId: string,
+    dryRun: boolean = false,
+    redrivenBy?: string
+  ): Promise<DlqRedriveResult> {
     const entry = this.dlqStore.get(dlqJobId);
     if (!entry) {
       throw new ApiRequestError(`DLQ entry ${dlqJobId} not found.`, 404);
     }
 
-    const result = this.dlqStore.redrive(dlqJobId, dryRun);
+    if (dryRun) {
+      // Dry-run: validate without taking action
+      this.redriveAudit.record({
+        dlqJobId,
+        jobType: entry.envelope.jobType,
+        redrivenAt: new Date().toISOString(),
+        redrivenBy,
+        status: "scheduled",
+        reason: "Dry-run validation passed",
+      });
 
-    if (!dryRun && result.status === "scheduled") {
+      return {
+        dlqJobId,
+        dryRun: true,
+        status: "skipped",
+        reason: "Dry-run mode: no action taken",
+      };
+    }
+
+    // Real re-drive: attempt to re-enqueue
+    try {
+      const queue = this.requireQueue();
+      const newJob = await queue.add(entry.envelope.jobType, entry.envelope.payload, {
+        removeOnComplete: 100,
+        removeOnFail: 100,
+        attempts: entry.envelope.maxAttempts,
+        backoff: toBullMqBackoff(resolveQueueRetryPolicy(entry.envelope.jobType)),
+        timestamp: Date.now(),
+      });
+
+      // Remove from DLQ store and re-drive
+      this.dlqStore.redrive(dlqJobId, false);
+
+      // Record audit entry
+      this.redriveAudit.record({
+        dlqJobId,
+        jobType: entry.envelope.jobType,
+        redrivenAt: new Date().toISOString(),
+        redrivenBy,
+        status: "scheduled",
+        newJobId: String(newJob.id),
+      });
+
       logQueueEvent({
         event: "dlq_redrive",
         queueName: PHASE6_QUEUE_NAME,
         jobType: entry.envelope.jobType,
-        jobId: String(entry.envelope.payload.jobId || "unknown"),
+        jobId: String(newJob.id),
         correlation: entry.envelope.correlation,
       });
-    }
 
-    return result;
+      return {
+        dlqJobId,
+        dryRun: false,
+        status: "scheduled",
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Record failed re-drive attempt
+      this.redriveAudit.record({
+        dlqJobId,
+        jobType: entry.envelope.jobType,
+        redrivenAt: new Date().toISOString(),
+        redrivenBy,
+        status: "failed",
+        reason: errorMessage,
+      });
+
+      throw new ApiRequestError(`Failed to re-drive job: ${errorMessage}`, 500);
+    }
   }
 
   /**
@@ -177,6 +242,20 @@ export class JobsService {
    */
   getDlqCountByJobType(): Record<Phase6JobType, number> {
     return this.dlqStore.countByJobType();
+  }
+
+  /**
+   * Get re-drive history.
+   */
+  getRedriveHistory(limit?: number, offset?: number): RedriveHistory {
+    return this.redriveAudit.getHistory(limit, offset);
+  }
+
+  /**
+   * Get re-drive history by job type.
+   */
+  getRedriveHistoryByJobType(jobType: Phase6JobType): RedriveHistory {
+    return this.redriveAudit.getHistoryByJobType(jobType);
   }
 
   private async enqueue(name: string, payload: Phase6JobPayload): Promise<Job<Phase6JobPayload>> {

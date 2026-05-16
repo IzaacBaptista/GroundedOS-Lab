@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from "@nestjs/common";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getRequestUserId } from "../common/auth-context";
 import { ApiRequestError } from "../errors";
@@ -48,10 +48,20 @@ export class JobsController {
   }
 
   @Get("metrics")
-  getMetrics(@Query("format") format?: string, @Req() request?: FastifyRequest, @Param() _rep?: FastifyReply) {
+  async getMetrics(
+    @Query("format") format?: string,
+    @Res() response?: FastifyReply
+  ) {
     if (format === "prometheus") {
-      return this.jobs.getQueueMetricsPrometheus();
+      const prometheusText = this.jobs.getQueueMetricsPrometheus();
+      if (response) {
+        response.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+        response.send(prometheusText);
+      }
+      return prometheusText;
     }
+
+    // Default JSON format
     return this.jobs.getQueueMetrics();
   }
 
@@ -60,7 +70,26 @@ export class JobsController {
     return this.jobs.listDlqEntries();
   }
 
-  @Get("dlq/:dlqJobId")
+  @Get("dlq/history")
+  getDlqRedriveHistory(@Query("limit") limit?: string, @Query("offset") offset?: string) {
+    return this.jobs.getRedriveHistory(
+      limit ? Math.min(parseInt(limit, 10), 100) : 100,
+      offset ? parseInt(offset, 10) : 0
+    );
+  }
+
+  @Get("dlq/history/:jobType")
+  getDlqRedriveHistoryByJobType(@Param("jobType") jobType: string) {
+    if (jobType !== "phase5-experiment" && jobType !== "model-benchmark") {
+      throw new ApiRequestError(
+        `Invalid jobType: ${jobType}. Must be 'phase5-experiment' or 'model-benchmark'.`,
+        400
+      );
+    }
+    return this.jobs.getRedriveHistoryByJobType(jobType);
+  }
+
+  @Get("dlq/entry/:dlqJobId")
   getDlqEntry(@Param("dlqJobId") dlqJobId: string) {
     const normalized = dlqJobId.trim();
     if (!normalized) {
@@ -76,13 +105,18 @@ export class JobsController {
   }
 
   @Post("dlq/:dlqJobId/redrive")
-  redriveDlq(@Param("dlqJobId") dlqJobId: string, @Body() body: { dryRun?: boolean }) {
+  async redriveDlq(
+    @Param("dlqJobId") dlqJobId: string,
+    @Body() body: { dryRun?: boolean },
+    @Req() request: FastifyRequest
+  ) {
     const normalized = dlqJobId.trim();
     if (!normalized) {
       throw new ApiRequestError("dlqJobId is required.", 400);
     }
 
-    return this.jobs.redriveDlqJob(normalized, body.dryRun ?? false);
+    const redrivenBy = getRequestUserId(request);
+    return this.jobs.redriveDlqJob(normalized, body.dryRun ?? false, redrivenBy);
   }
 
   @Get(":jobId")
