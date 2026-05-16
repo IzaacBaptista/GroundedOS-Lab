@@ -15,6 +15,12 @@ class Phase5ExperimentPayload(BaseModel):
     type: Literal["phase5-experiment"]
     track: Literal["quantization", "lora", "fine-tuning", "distillation"]
     _otel_context: str | None = Field(default=None, alias="_otel_context")
+    requestId: str | None = None
+    jobId: str | None = None
+    sessionId: str | None = None
+    tenantId: str | None = None
+    userId: str | None = None
+    indexId: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -23,6 +29,12 @@ class ModelBenchmarkPayload(BaseModel):
     type: Literal["model-benchmark"]
     providers: list[str]
     _otel_context: str | None = Field(default=None, alias="_otel_context")
+    requestId: str | None = None
+    jobId: str | None = None
+    sessionId: str | None = None
+    tenantId: str | None = None
+    userId: str | None = None
+    indexId: str | None = None
 
     model_config = {"populate_by_name": True}
 

@@ -11,10 +11,12 @@ Node.js API.  Implements:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
 import sys
+import time
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -22,16 +24,16 @@ import redis.asyncio as aioredis
 from idempotency import IdempotencyGuard
 from job_types import JobPayload, parse_payload
 from otel_setup import configure_otel, extract_context_from_job, get_tracer
+from queue_metrics import QueueMetricsStore
+from retry_policy import compute_backoff_delay_ms, resolve_retry_policy
+from structured_logging import log_queue_event
 
 logger = logging.getLogger(__name__)
 
 QUEUE_NAME = "groundedos-phase6-jobs"
 DLQ_NAME = "groundedos-phase6-jobs-dlq"
 
-# Retry policy: up to 5 attempts, exponential backoff starting at 2 s.
-MAX_ATTEMPTS = 5
-BACKOFF_BASE_SECONDS = 2.0
-BACKOFF_JITTER_SECONDS = 0.5
+QUEUE_METRICS = QueueMetricsStore()
 
 # Use the official bullmq Python package when available; otherwise fall back
 # to a direct Redis polling loop that speaks the same wire protocol.
@@ -121,10 +123,20 @@ async def run_bullmq_consumer(redis_url: str, guard: IdempotencyGuard) -> None:
         job_id = str(job.id)
         job_data: dict = job.data or {}
         parent_ctx = extract_context_from_job(job_data)
+        started_at = time.perf_counter()
 
         with tracer.start_as_current_span("worker.process_job", context=parent_ctx) as span:
             span.set_attribute("job.id", job_id)
             span.set_attribute("job.name", job.name)
+
+            correlation = extract_correlation(job_data)
+            log_queue_event(
+                "job_started",
+                queueName=QUEUE_NAME,
+                jobType=job_data.get("type", job.name),
+                jobId=job_id,
+                correlation=correlation,
+            )
 
             if await guard.is_already_processed(job_id):
                 logger.info("[worker] duplicate delivery ignored job=%s", job_id)
@@ -135,10 +147,57 @@ async def run_bullmq_consumer(redis_url: str, guard: IdempotencyGuard) -> None:
                 result = await dispatch(payload, job_id)
                 await guard.mark_processed(job_id)
                 logger.info("[worker] completed job=%s", job_id)
+
+                duration_ms = int((time.perf_counter() - started_at) * 1000)
+                attempts_made = int(getattr(job, "attempts_made", 0) or getattr(job, "attemptsMade", 0) or 0) + 1
+                QUEUE_METRICS.record_success(QUEUE_NAME, payload.type, attempts_made, duration_ms)
+                log_queue_event(
+                    "job_completed",
+                    queueName=QUEUE_NAME,
+                    jobType=payload.type,
+                    jobId=job_id,
+                    attemptsMade=attempts_made,
+                    durationMs=duration_ms,
+                    correlation=correlation,
+                )
                 return result
             except Exception as exc:
                 span.record_exception(exc)
                 logger.error("[worker] job=%s failed: %s", job_id, exc)
+
+                attempts_made = int(getattr(job, "attempts_made", 0) or getattr(job, "attemptsMade", 0) or 0) + 1
+                job_type = str(job_data.get("type", job.name))
+                policy = resolve_retry_policy(job_type)
+                QUEUE_METRICS.record_failure(
+                    QUEUE_NAME,
+                    job_type,
+                    attempts_made,
+                    str(exc),
+                    correlation,
+                )
+
+                if attempts_made < policy.max_attempts:
+                    QUEUE_METRICS.record_retry(QUEUE_NAME, job_type)
+                    log_queue_event(
+                        "job_retry",
+                        queueName=QUEUE_NAME,
+                        jobType=job_type,
+                        jobId=job_id,
+                        attemptsMade=attempts_made,
+                        maxAttempts=policy.max_attempts,
+                        correlation=correlation,
+                    )
+                else:
+                    log_queue_event(
+                        "job_failed",
+                        queueName=QUEUE_NAME,
+                        jobType=job_type,
+                        jobId=job_id,
+                        attemptsMade=attempts_made,
+                        maxAttempts=policy.max_attempts,
+                        error=str(exc),
+                        correlation=correlation,
+                    )
                 raise
 
     worker = BullMQWorker(
@@ -181,8 +240,6 @@ async def run_polling_consumer(redis_url: str, guard: IdempotencyGuard) -> None:
     This is intentionally simple — install the bullmq Python package
     for production use.
     """
-    import json
-
     tracer = get_tracer()
     client = aioredis.from_url(redis_url, decode_responses=True)
     wait_key = f"bull:{QUEUE_NAME}:wait"
@@ -231,20 +288,58 @@ async def run_polling_consumer(redis_url: str, guard: IdempotencyGuard) -> None:
 
                 try:
                     payload = parse_payload(data)
+                    log_queue_event(
+                        "job_started",
+                        queueName=QUEUE_NAME,
+                        jobType=payload.type,
+                        jobId=job_id,
+                        attemptsMade=attempts_made + 1,
+                        correlation=extract_correlation(data),
+                    )
+                    started_at = time.perf_counter()
                     result_value = await dispatch(payload, job_id)
                     await guard.mark_processed(job_id)
                     await _ack(client, job_id, active_key, result=result_value)
                     logger.info("[worker] completed job=%s", job_id)
+
+                    duration_ms = int((time.perf_counter() - started_at) * 1000)
+                    QUEUE_METRICS.record_success(
+                        QUEUE_NAME,
+                        payload.type,
+                        attempts_made + 1,
+                        duration_ms,
+                    )
+                    log_queue_event(
+                        "job_completed",
+                        queueName=QUEUE_NAME,
+                        jobType=payload.type,
+                        jobId=job_id,
+                        attemptsMade=attempts_made + 1,
+                        durationMs=duration_ms,
+                        correlation=extract_correlation(data),
+                    )
                 except Exception as exc:
                     span.record_exception(exc)
                     logger.error("[worker] job=%s error: %s", job_id, exc)
+
+                    job_type = data.get("type", job_name)
+                    correlation = extract_correlation(data)
+                    QUEUE_METRICS.record_failure(
+                        QUEUE_NAME,
+                        job_type,
+                        attempts_made + 1,
+                        str(exc),
+                        correlation,
+                    )
                     await _fail(
                         client,
                         job_id,
+                        job_name=job_name,
+                        job_data=data,
                         active_key,
                         reason=str(exc),
                         attempts_made=attempts_made,
-                        max_attempts=MAX_ATTEMPTS,
+                        policy=resolve_retry_policy(str(job_type)),
                         queue_name=QUEUE_NAME,
                         dlq_name=DLQ_NAME,
                     )
@@ -285,16 +380,15 @@ async def _ack(
 async def _fail(
     client: aioredis.Redis,
     job_id: str,
+    job_name: str,
+    job_data: dict,
     active_key: str,
     reason: str,
     attempts_made: int,
-    max_attempts: int,
+    policy,
     queue_name: str,
     dlq_name: str,
 ) -> None:
-    import random
-    import time
-
     pipe = client.pipeline()
     pipe.lrem(active_key, 1, job_id)
 
@@ -302,19 +396,67 @@ async def _fail(
     job_key = f"bull:{queue_name}:{job_id}"
     pipe.hset(job_key, mapping={"failedReason": reason, "attemptsMade": str(new_attempts)})
 
-    if new_attempts >= max_attempts:
+    correlation = extract_correlation(job_data)
+    job_type = str(job_data.get("type", job_name))
+
+    if new_attempts >= policy.max_attempts:
         dlq_key = f"bull:{dlq_name}:wait"
-        pipe.lpush(dlq_key, job_id)
-        logger.warning("[worker] job=%s exhausted retries → DLQ", job_id)
-    else:
-        delay_ms = int(
-            (BACKOFF_BASE_SECONDS * (2 ** (new_attempts - 1)) + random.uniform(0, BACKOFF_JITTER_SECONDS))
-            * 1000
+        dlq_job_id = f"dlq:{job_id}:{int(time.time() * 1000)}"
+        dlq_job_key = f"bull:{dlq_name}:{dlq_job_id}"
+        envelope = {
+            "payload": job_data,
+            "jobType": job_type,
+            "queueName": queue_name,
+            "attempts": new_attempts,
+            "maxAttempts": policy.max_attempts,
+            "createdAt": str(job_data.get("queuedAt") or datetime_iso()),
+            "failedAt": datetime_iso(),
+            "error": reason,
+            "correlation": correlation,
+        }
+
+        pipe.hset(
+            dlq_job_key,
+            mapping={
+                "name": "dlq-envelope",
+                "data": json.dumps({"type": "dlq-envelope", "envelope": envelope}),
+                "timestamp": str(int(time.time() * 1000)),
+                "attemptsMade": str(new_attempts),
+                "failedReason": reason,
+            },
         )
+        pipe.lpush(dlq_key, dlq_job_id)
+
+        QUEUE_METRICS.record_dlq(queue_name, job_type)
+        logger.warning("[worker] job=%s exhausted retries → DLQ", job_id)
+        log_queue_event(
+            "job_dlq",
+            queueName=queue_name,
+            jobType=job_type,
+            jobId=job_id,
+            attemptsMade=new_attempts,
+            maxAttempts=policy.max_attempts,
+            error=reason,
+            correlation=correlation,
+        )
+    else:
+        delay_ms = compute_backoff_delay_ms(policy, new_attempts)
         score = int(time.time() * 1000) + delay_ms
         delayed_key = f"bull:{queue_name}:delayed"
         pipe.zadd(delayed_key, {job_id: score})
-        logger.info("[worker] job=%s retry %d/%d in %d ms", job_id, new_attempts, max_attempts, delay_ms)
+        QUEUE_METRICS.record_retry(queue_name, job_type)
+        logger.info("[worker] job=%s retry %d/%d in %d ms", job_id, new_attempts, policy.max_attempts, delay_ms)
+        log_queue_event(
+            "job_retry",
+            queueName=queue_name,
+            jobType=job_type,
+            jobId=job_id,
+            attemptsMade=new_attempts,
+            maxAttempts=policy.max_attempts,
+            delayMs=delay_ms,
+            error=reason,
+            correlation=correlation,
+        )
 
     await pipe.execute()
 
@@ -360,6 +502,19 @@ async def _main() -> None:
 
 def main() -> None:
     asyncio.run(_main())
+
+
+def extract_correlation(payload: dict) -> dict[str, str]:
+    correlation_keys = ["requestId", "jobId", "sessionId", "tenantId", "userId", "indexId"]
+    return {
+        key: str(payload[key])
+        for key in correlation_keys
+        if key in payload and payload[key] is not None and str(payload[key]).strip()
+    }
+
+
+def datetime_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 if __name__ == "__main__":

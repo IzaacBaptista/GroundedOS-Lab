@@ -34,12 +34,12 @@ Canonical operational examples live in
 
 ## Current limits
 
-- Queue processing is still a baseline slice; advanced retry policy and dead-letter handling are pending.
+- Queue hardening baseline is implemented (policy abstraction, fixed/exponential backoff, DLQ envelope, structured lifecycle logs).
 - Multi-worker coordination and queue observability dashboards are not complete.
 - Production hardening (resource isolation, autoscaling, deployment profiles) is tracked under Phase 6+.
 
 ## Next milestones
 
 1. Stabilize queue consumers for `phase5` and model benchmark jobs.
-2. Add retry/backoff, failure classification and dead-letter queue handling.
-3. Expose worker health and queue depth telemetry in the observability stack.
+2. Expose queue metrics in Prometheus-native series with long-term retention.
+3. Add DLQ re-drive and operational triage workflows.
