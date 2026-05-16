@@ -439,6 +439,121 @@ const CONCEPT_PROFILES: Record<string, ConceptLearningProfile> = {
       inferenceLatency: "Baixa",
     },
   },
+  "system-prompt": {
+    whenToUse: [
+      "Definir regras globais de comportamento do assistente.",
+      "Padronizar tom, formato e politicas de seguranca em todas as respostas.",
+      "Impor obrigatoriedade de citacao de fonte em cenarios RAG.",
+    ],
+    commonProblems: [
+      "System prompt generico demais para o dominio da aplicacao.",
+      "Conflito entre instrucoes de sistema e instrucoes do usuario.",
+      "Prompts extensos com regras redundantes e baixa manutenibilidade.",
+      "Mudancas de prompt sem versionamento e sem experimento controlado.",
+    ],
+    popularLibraries: ["LangChain", "DSPy", "Promptfoo", "Guidance"],
+    ragWhyItMatters:
+      "System prompt e o contrato de comportamento do modelo. No RAG, ele orienta como usar o contexto recuperado com consistencia e seguranca.",
+    cost: {
+      level: "low",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Baixo",
+      inferenceLatency: "Baixa",
+    },
+  },
+  "tool-calling": {
+    whenToUse: [
+      "Acionar funcoes externas para buscar dados, executar acoes ou validar respostas.",
+      "Fluxos agenticos que exigem etapas de decisao com ferramentas.",
+      "Integrar RAG com APIs internas e processos operacionais.",
+    ],
+    commonProblems: [
+      "Schema de ferramenta mal definido, gerando chamadas invalidas.",
+      "Ferramentas lentas sem timeout e retry controlado.",
+      "Loop de chamadas sem criterio de parada.",
+      "Falta de trilha de auditoria para entender por que uma ferramenta foi acionada.",
+    ],
+    popularLibraries: ["LangChain Tools", "OpenAI function calling", "LangGraph", "MCP"],
+    ragWhyItMatters:
+      "Tool calling amplia o RAG para alem da resposta textual, permitindo validacao, enriquecimento e execucao de acao com contexto controlado.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Media",
+    },
+  },
+  "context-window": {
+    whenToUse: [
+      "Planejar quanto contexto cabe na inferencia sem truncamento perigoso.",
+      "Definir estrategia de compactacao para perguntas longas ou multi-turno.",
+      "Comparar modelos com janelas diferentes para custo e qualidade.",
+    ],
+    commonProblems: [
+      "Exceder limite de tokens e perder trechos importantes no truncamento.",
+      "Enviar contexto irrelevante que ocupa janela util.",
+      "Nao considerar tokenizacao real ao estimar tamanho da entrada.",
+      "Confundir janela grande com qualidade automaticamente melhor.",
+    ],
+    popularLibraries: ["tiktoken", "Transformers tokenizer", "LlamaIndex", "LangChain"],
+    ragWhyItMatters:
+      "Context window define o quanto de evidencia o modelo consegue processar por resposta. Gestao ruim da janela reduz groundedness e aumenta custo.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Media",
+    },
+  },
+  "temperature-top-p-top-k": {
+    whenToUse: [
+      "Ajustar equilibrio entre criatividade e determinismo da resposta.",
+      "Padronizar comportamento em tarefas sensiveis a factualidade.",
+      "Testar configuracoes por tipo de consulta em modo de laboratorio.",
+    ],
+    commonProblems: [
+      "Temperature alta em tarefas factuais aumenta risco de alucinacao.",
+      "Combinar top-p e top-k sem metodologia de avaliacao.",
+      "Comparar respostas sem fixar seed ou contexto equivalente.",
+      "Otimizar parametro isolado sem olhar retrieval e prompt juntos.",
+    ],
+    popularLibraries: ["Transformers", "vLLM", "Ollama", "OpenAI API"],
+    ragWhyItMatters:
+      "Esses parametros afetam diretamente consistencia da geracao final. No RAG, eles devem reforcar fidelidade a evidencia, nao criatividade livre.",
+    cost: {
+      level: "low",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Baixo",
+      inferenceLatency: "Baixa",
+    },
+  },
+  "cost-analysis": {
+    whenToUse: [
+      "Entender custo por request, por provedor e por etapa do pipeline.",
+      "Comparar trade-offs entre qualidade, latencia e preco.",
+      "Definir limites operacionais e alertas financeiros.",
+    ],
+    commonProblems: [
+      "Medir apenas custo de inferencia e ignorar retrieval/infra.",
+      "Custo medio mascarando picos em consultas mais complexas.",
+      "Nao separar custo por ambiente, modelo e perfil de usuario.",
+      "Tomar decisao de corte sem correlacionar com queda de qualidade.",
+    ],
+    popularLibraries: ["OpenTelemetry", "Prometheus", "Grafana", "Weights & Biases", "Langfuse"],
+    ragWhyItMatters:
+      "Cost analysis permite escalar RAG com previsibilidade, garantindo que ganhos de qualidade nao inviabilizem o sistema economicamente.",
+    cost: {
+      level: "medium",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Baixo",
+      inferenceLatency: "Baixa",
+    },
+  },
 };
 
 function resolveConceptProfile(concept: Concept): ConceptLearningProfile {
