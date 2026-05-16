@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Inject, Param, Post, Req } from "@nestjs/common";
-import type { FastifyRequest } from "fastify";
+import { Body, Controller, Get, Inject, Param, Post, Query, Req } from "@nestjs/common";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { getRequestUserId } from "../common/auth-context";
 import { ApiRequestError } from "../errors";
 import { JobsService, type EnqueuedJobResponse, type JobStatusResponse } from "./jobs.service";
@@ -48,8 +48,41 @@ export class JobsController {
   }
 
   @Get("metrics")
-  getMetrics() {
+  getMetrics(@Query("format") format?: string, @Req() request?: FastifyRequest, @Param() _rep?: FastifyReply) {
+    if (format === "prometheus") {
+      return this.jobs.getQueueMetricsPrometheus();
+    }
     return this.jobs.getQueueMetrics();
+  }
+
+  @Get("dlq/list")
+  listDlq() {
+    return this.jobs.listDlqEntries();
+  }
+
+  @Get("dlq/:dlqJobId")
+  getDlqEntry(@Param("dlqJobId") dlqJobId: string) {
+    const normalized = dlqJobId.trim();
+    if (!normalized) {
+      throw new ApiRequestError("dlqJobId is required.", 400);
+    }
+
+    const entry = this.jobs.getDlqEntry(normalized);
+    if (!entry) {
+      throw new ApiRequestError(`DLQ entry ${normalized} not found.`, 404);
+    }
+
+    return entry;
+  }
+
+  @Post("dlq/:dlqJobId/redrive")
+  redriveDlq(@Param("dlqJobId") dlqJobId: string, @Body() body: { dryRun?: boolean }) {
+    const normalized = dlqJobId.trim();
+    if (!normalized) {
+      throw new ApiRequestError("dlqJobId is required.", 400);
+    }
+
+    return this.jobs.redriveDlqJob(normalized, body.dryRun ?? false);
   }
 
   @Get(":jobId")

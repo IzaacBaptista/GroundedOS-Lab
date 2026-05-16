@@ -2,10 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { Job, Queue, QueueEvents } from "bullmq";
 import { ApiRequestError } from "../errors";
 import { getActiveTraceparent } from "../otel";
+import { DlqStore, type DlqInspectionResult, type DlqListFilter, type DlqRedriveResult } from "./dlq-store";
 import {
   PHASE6_DLQ_NAME,
   PHASE6_QUEUE_NAME,
   type JobCorrelationIds,
+  type Phase6DlqEnvelope,
   type Phase6DlqPayload,
   type Phase5ExperimentTrack,
   type Phase6JobPayload,
@@ -48,6 +50,7 @@ export class JobsService {
   private readonly dlq = this.createDlq();
   private readonly queueEvents = this.createQueueEvents();
   private readonly metrics = new QueueMetricsStore();
+  private readonly dlqStore = new DlqStore();
 
   constructor() {
     this.attachObservers();
@@ -93,6 +96,10 @@ export class JobsService {
     return this.metrics.snapshot();
   }
 
+  getQueueMetricsPrometheus(): string {
+    return this.metrics.toPrometheusFormat();
+  }
+
   async getJobStatus(jobId: string): Promise<JobStatusResponse> {
     const queue = this.requireQueue();
     const job = await queue.getJob(jobId);
@@ -114,6 +121,62 @@ export class JobsService {
       returnValue: job.returnvalue,
       failedReason: job.failedReason || undefined,
     };
+  }
+
+  /**
+   * Get a single DLQ entry by ID.
+   */
+  getDlqEntry(dlqJobId: string): DlqInspectionResult | null {
+    return this.dlqStore.get(dlqJobId);
+  }
+
+  /**
+   * List all DLQ entries with optional filtering.
+   */
+  listDlqEntries(filter: DlqListFilter = {}): DlqInspectionResult[] {
+    return this.dlqStore.list(filter);
+  }
+
+  /**
+   * Attempt to re-drive a DLQ entry.
+   * In a full implementation, this would re-enqueue the job and remove it from DLQ.
+   *
+   * @param dlqJobId - The DLQ job ID
+   * @param dryRun - If true, validate without taking action
+   */
+  redriveDlqJob(dlqJobId: string, dryRun: boolean = false): DlqRedriveResult {
+    const entry = this.dlqStore.get(dlqJobId);
+    if (!entry) {
+      throw new ApiRequestError(`DLQ entry ${dlqJobId} not found.`, 404);
+    }
+
+    const result = this.dlqStore.redrive(dlqJobId, dryRun);
+
+    if (!dryRun && result.status === "scheduled") {
+      logQueueEvent({
+        event: "dlq_redrive",
+        queueName: PHASE6_QUEUE_NAME,
+        jobType: entry.envelope.jobType,
+        jobId: String(entry.envelope.payload.jobId || "unknown"),
+        correlation: entry.envelope.correlation,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get DLQ store count.
+   */
+  getDlqCount(): number {
+    return this.dlqStore.count();
+  }
+
+  /**
+   * Get DLQ count by job type.
+   */
+  getDlqCountByJobType(): Record<Phase6JobType, number> {
+    return this.dlqStore.countByJobType();
   }
 
   private async enqueue(name: string, payload: Phase6JobPayload): Promise<Job<Phase6JobPayload>> {
@@ -255,20 +318,25 @@ export class JobsService {
     }
 
     const maxAttempts = job.opts.attempts ?? resolveQueueRetryPolicy(job.name).maxAttempts;
+    const envelope: Phase6DlqEnvelope = {
+      payload: job.data,
+      jobType: job.name,
+      queueName: PHASE6_QUEUE_NAME,
+      attempts: job.attemptsMade,
+      maxAttempts,
+      createdAt: toIso(job.timestamp) ?? new Date().toISOString(),
+      failedAt: toIso(job.finishedOn) ?? new Date().toISOString(),
+      error: failedReason,
+      correlation: extractCorrelation(job.data),
+    };
+
     const dlqPayload: Phase6DlqPayload = {
       type: "dlq-envelope",
-      envelope: {
-        payload: job.data,
-        jobType: job.name,
-        queueName: PHASE6_QUEUE_NAME,
-        attempts: job.attemptsMade,
-        maxAttempts,
-        createdAt: toIso(job.timestamp) ?? new Date().toISOString(),
-        failedAt: toIso(job.finishedOn) ?? new Date().toISOString(),
-        error: failedReason,
-        correlation: extractCorrelation(job.data),
-      },
+      envelope,
     };
+
+    // Add to in-memory DLQ store for inspection/redrive endpoints
+    this.dlqStore.add(dlqJobId, envelope);
 
     await this.dlq.add("dlq-envelope", dlqPayload, {
       jobId: dlqJobId,

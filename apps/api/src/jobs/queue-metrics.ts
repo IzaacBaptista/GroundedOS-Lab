@@ -52,6 +52,142 @@ export class QueueMetricsStore {
     }
   }
 
+  /**
+   * Export metrics in Prometheus text format (OpenMetrics).
+   * Can be scraped by Prometheus or used with custom collectors.
+   */
+  toPrometheusFormat(): string {
+    const lines: string[] = [];
+
+    // HELP and TYPE declarations
+    lines.push(
+      "# HELP queue_jobs_succeeded_total Total jobs succeeded per queue and job type"
+    );
+    lines.push("# TYPE queue_jobs_succeeded_total counter");
+    lines.push(
+      "# HELP queue_jobs_failed_total Total jobs failed per queue and job type"
+    );
+    lines.push("# TYPE queue_jobs_failed_total counter");
+    lines.push(
+      "# HELP queue_jobs_retrying_total Total jobs retrying per queue and job type"
+    );
+    lines.push("# TYPE queue_jobs_retrying_total counter");
+    lines.push("# HELP queue_jobs_dlq_total Total jobs in DLQ per queue and job type");
+    lines.push("# TYPE queue_jobs_dlq_total counter");
+    lines.push("# HELP queue_attempts_total Total attempts made per queue and job type");
+    lines.push("# TYPE queue_attempts_total counter");
+    lines.push(
+      "# HELP queue_duration_ms_average Average job duration in milliseconds per queue and job type"
+    );
+    lines.push("# TYPE queue_duration_ms_average gauge");
+    lines.push(
+      "# HELP queue_duration_ms_p95 95th percentile job duration in milliseconds per queue and job type"
+    );
+    lines.push("# TYPE queue_duration_ms_p95 gauge");
+
+    // Metrics
+    const snapshots = this.snapshot();
+    for (const snap of snapshots) {
+      const labels = this.formatLabels({
+        queue: snap.queueName,
+        job_type: snap.jobType,
+      });
+
+      lines.push(`queue_jobs_succeeded_total${labels} ${snap.jobsSucceeded}`);
+      lines.push(`queue_jobs_failed_total${labels} ${snap.jobsErrored}`);
+      lines.push(`queue_jobs_retrying_total${labels} ${snap.jobsRetrying}`);
+      lines.push(`queue_jobs_dlq_total${labels} ${snap.jobsDlq}`);
+      lines.push(`queue_attempts_total${labels} ${snap.totalAttempts}`);
+      lines.push(`queue_duration_ms_average${labels} ${snap.averageDurationMs}`);
+      lines.push(`queue_duration_ms_p95${labels} ${snap.p95DurationMs}`);
+    }
+
+    lines.push("# EOF");
+    return lines.join("\n");
+  }
+
+  /**
+   * Export metrics as JSON (OpenMetrics-compatible structure).
+   * Useful for custom exporters or applications that prefer JSON.
+   */
+  toPrometheusJson(): Array<{
+    name: string;
+    labels: Record<string, string>;
+    value: number;
+    type: "counter" | "gauge";
+  }> {
+    const result: Array<{
+      name: string;
+      labels: Record<string, string>;
+      value: number;
+      type: "counter" | "gauge";
+    }> = [];
+
+    const snapshots = this.snapshot();
+    for (const snap of snapshots) {
+      const baseLabels = { queue: snap.queueName, job_type: snap.jobType };
+
+      result.push({
+        name: "queue_jobs_succeeded_total",
+        labels: baseLabels,
+        value: snap.jobsSucceeded,
+        type: "counter",
+      });
+      result.push({
+        name: "queue_jobs_failed_total",
+        labels: baseLabels,
+        value: snap.jobsErrored,
+        type: "counter",
+      });
+      result.push({
+        name: "queue_jobs_retrying_total",
+        labels: baseLabels,
+        value: snap.jobsRetrying,
+        type: "counter",
+      });
+      result.push({
+        name: "queue_jobs_dlq_total",
+        labels: baseLabels,
+        value: snap.jobsDlq,
+        type: "counter",
+      });
+      result.push({
+        name: "queue_attempts_total",
+        labels: baseLabels,
+        value: snap.totalAttempts,
+        type: "counter",
+      });
+      result.push({
+        name: "queue_duration_ms_average",
+        labels: baseLabels,
+        value: snap.averageDurationMs,
+        type: "gauge",
+      });
+      result.push({
+        name: "queue_duration_ms_p95",
+        labels: baseLabels,
+        value: snap.p95DurationMs,
+        type: "gauge",
+      });
+    }
+
+    return result;
+  }
+
+  private formatLabels(labels: Record<string, string>): string {
+    const pairs = Object.entries(labels)
+      .map(([key, value]) => `${key}="${this.escapePrometheusLabel(value)}"`)
+      .join(",");
+    return `{${pairs}}`;
+  }
+
+  private escapePrometheusLabel(value: string): string {
+    return value
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n");
+  }
+
   recordFailure(input: {
     queueName: string;
     jobType: Phase6JobType;

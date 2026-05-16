@@ -6,7 +6,8 @@ export type QueueLifecycleEvent =
   | "job_completed"
   | "job_failed"
   | "job_retry"
-  | "job_dlq";
+  | "job_dlq"
+  | "dlq_redrive";
 
 export interface QueueLogPayload {
   queueName: string;
