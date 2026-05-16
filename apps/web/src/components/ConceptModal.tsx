@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { getConceptById, getRelatedConcepts, toDisplayStatus } from "../concepts";
-import { ConceptBadgeGroup } from "./ConceptBadge";
+import { getConceptById, toDisplayStatus } from "../concepts";
+import { ConceptDetailTabs } from "./ConceptDetailTabs";
 import "./ConceptModal.css";
 
 interface ConceptModalProps {
@@ -8,26 +8,6 @@ interface ConceptModalProps {
   onClose: () => void;
   onSelectConcept: (id: string) => void;
   onRunExperiment?: (conceptId: string) => void;
-}
-
-interface SectionListProps {
-  title: string;
-  values: string[];
-}
-
-function SectionList({ title, values }: SectionListProps) {
-  if (!values.length) return null;
-
-  return (
-    <div className="concept-modal__section">
-      <h4>{title}</h4>
-      <ul>
-        {values.map((v) => (
-          <li key={v}>{v}</li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 export function ConceptModal({ conceptId, onClose, onSelectConcept, onRunExperiment }: ConceptModalProps) {
@@ -42,8 +22,6 @@ export function ConceptModal({ conceptId, onClose, onSelectConcept, onRunExperim
   }, [onClose]);
 
   if (!concept) return null;
-
-  const related = getRelatedConcepts(concept.id);
 
   return (
     <div
@@ -65,6 +43,16 @@ export function ConceptModal({ conceptId, onClose, onSelectConcept, onRunExperim
           </div>
           <div className="concept-modal__header-actions">
             <span className="tag">{toDisplayStatus(concept.status)}</span>
+            {onRunExperiment && (
+              <button
+                type="button"
+                className="concept-btn-experiment"
+                onClick={() => onRunExperiment(concept.id)}
+                title="Preenche automaticamente os campos para você testar este conceito"
+              >
+                ▶ Executar
+              </button>
+            )}
             <button
               type="button"
               className="concept-modal__close"
@@ -78,64 +66,8 @@ export function ConceptModal({ conceptId, onClose, onSelectConcept, onRunExperim
 
         {/* Body */}
         <div className="concept-modal__body">
-          <div className="concept-modal__col concept-modal__col--left">
-            {concept.testingSteps && concept.testingSteps.length > 0 && (
-              <div className="concept-modal__section concept-modal__section--highlight">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
-                  <h4 style={{ margin: 0 }}>🎯 Como testar agora</h4>
-                  {onRunExperiment && (
-                    <button
-                      type="button"
-                      className="concept-btn-experiment"
-                      onClick={() => onRunExperiment(concept.id)}
-                      title="Preenche automaticamente os campos para você testar este conceito"
-                    >
-                      ▶ Executar
-                    </button>
-                  )}
-                </div>
-                <ol style={{ margin: "8px 0", paddingLeft: "20px" }}>
-                  {concept.testingSteps.map((step, i) => (
-                    <li key={i} style={{ marginBottom: "6px", lineHeight: "1.4" }}>
-                      {step}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-
-            <div className="concept-modal__section">
-              <h4>Por que importa</h4>
-              <p>{concept.whyItMatters}</p>
-            </div>
-
-            <div className="concept-modal__section">
-              <h4>Como funciona</h4>
-              <p>{concept.explanation}</p>
-            </div>
-
-            <SectionList title="Como estudar" values={concept.howToStudy} />
-            <SectionList title="Como praticar no GroundedOS" values={concept.howToPracticeInProject} />
-          </div>
-
-          <div className="concept-modal__col concept-modal__col--right">
-            <SectionList title="Aplicado no projeto" values={concept.appliedInGroundedOS} />
-            <SectionList title="Visível nos dados atuais" values={concept.visibleInCurrentData} />
-            <SectionList title="Onde ver na UI" values={concept.whereToSeeInUI} />
-            <SectionList title="Trade-offs e limitações" values={concept.tradeoffsAndLimitations} />
-            <SectionList title="Experimentos sugeridos" values={concept.suggestedExperiments} />
-            <SectionList title="Arquivos relacionados" values={concept.relatedFiles} />
-
-            {related.length > 0 && (
-              <div className="concept-modal__section">
-                <h4>Conceitos relacionados</h4>
-                <ConceptBadgeGroup
-                  conceptIds={related.map((c) => c.id)}
-                  onClick={onSelectConcept}
-                  small
-                />
-              </div>
-            )}
+          <div className="concept-modal__tabs">
+            <ConceptDetailTabs conceptId={concept.id} onSelectConcept={onSelectConcept} />
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@
 .concept-modal {
   display: flex;
   flex-direction: column;
-  width: min(900px, 100%);
+  width: min(980px, 100%);
   max-height: 88vh;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -76,84 +76,19 @@
 
 /* ── Body ─────────────────────────────────────── */
 .concept-modal__body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-  overflow-y: auto;
+  display: flex;
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.concept-modal__col {
-  padding: 18px 20px;
-}
-
-.concept-modal__col--left {
-  border-right: 1px solid var(--line);
-}
-
-/* ── Sections ─────────────────────────────────── */
-.concept-modal__section {
-  padding-top: 14px;
-  margin-top: 14px;
-  border-top: 1px dashed var(--line);
-}
-
-.concept-modal__section:first-child {
-  padding-top: 0;
-  margin-top: 0;
-  border-top: none;
-}
-
-.concept-modal__section h4 {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.concept-modal__section p {
-  margin: 0;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-.concept-modal__section ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--text);
-}
-
-.concept-modal__section li {
-  margin-bottom: 4px;
-  line-height: 1.45;
-  font-size: 0.88rem;
-}
-
-.concept-modal__section--highlight {
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  padding: 12px 14px !important;
-  margin-bottom: 12px;
-}
-
-.concept-modal__section--highlight h4 {
-  color: var(--accent-strong);
-  margin-bottom: 10px;
-}
-
-.concept-modal__section--highlight ol {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.concept-modal__section--highlight li {
-  color: var(--text);
-  margin-bottom: 6px;
-  font-size: 0.87rem;
+.concept-modal__tabs {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  padding: 14px;
 }
 
 .concept-btn-experiment {
@@ -179,12 +114,15 @@
 
 /* ── Responsive ───────────────────────────────── */
 @media (max-width: 720px) {
-  .concept-modal__body {
-    grid-template-columns: 1fr;
+  .concept-modal-overlay {
+    padding: 12px;
   }
 
-  .concept-modal__col--left {
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+  .concept-modal {
+    max-height: 92vh;
+  }
+
+  .concept-modal__tabs {
+    padding: 10px;
   }
 }

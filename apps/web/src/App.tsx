@@ -972,6 +972,10 @@ export default function App() {
   const [conceptModalId, setConceptModalId] = useState<string | null>(null);
   const busy = appState === "indexing" || appState === "asking";
 
+  const handleOpenConcept = useCallback((conceptId: string) => {
+    setConceptModalId(conceptId);
+  }, []);
+
   return (
     <main className="shell lab-shell">
       <header className="topbar lab-header">
@@ -1045,7 +1049,7 @@ export default function App() {
       </header>
 
       <div className="app-body lab-grid">
-        <ConceptsSidebar onConceptClick={setConceptModalId} />
+        <ConceptsSidebar onConceptClick={handleOpenConcept} />
         <section className="panel input-panel sources-panel" aria-label="Painel de fontes">
           <div className="panel__header sources-panel__header">
             <h2>Fontes</h2>
@@ -1367,7 +1371,7 @@ export default function App() {
             labMessage={labMessage}
             labMessageIsError={labMessageIsError}
             reportApiError={reportApiError}
-            onConceptClick={setConceptModalId}
+            onConceptClick={handleOpenConcept}
           />
         </aside>
       </div>
@@ -1376,13 +1380,14 @@ export default function App() {
         onClose={() => setConceptModalId(null)}
         onSelectConcept={setConceptModalId}
         onRunExperiment={(conceptId) => {
-          // Suggested experiment for each concept
           const experiments: Record<string, { question: string; topK?: number }> = {
-            "chunking": { question: "Qual é o tamanho típico de um chunk?" },
-            "embeddings": { question: "Como os embeddings medem similaridade semântica?" },
-            "vector-database": { question: "Qual é a velocidade de recuperação com muitos documentos?" },
-            "rag": { question: "Como o RAG garante respostas baseadas em documentos?" },
-            "grounding": { question: "Como verificar se uma resposta foi fundamentada?" },
+            chunking: { question: "Qual é o tamanho típico de um chunk?" },
+            embeddings: { question: "Como os embeddings medem similaridade semântica?" },
+            "vector-database": {
+              question: "Qual é a velocidade de recuperação com muitos documentos?",
+            },
+            rag: { question: "Como o RAG garante respostas baseadas em documentos?" },
+            grounding: { question: "Como verificar se uma resposta foi fundamentada?" },
           };
           const exp = experiments[conceptId];
           if (exp) {
