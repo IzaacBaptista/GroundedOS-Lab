@@ -517,6 +517,23 @@ export default function App() {
     invalidateIndexOnChange();
   };
 
+  const handleAddSourceClick = () => {
+    setSourceMode("file");
+    fileInputRef.current?.click();
+  };
+
+  const handleSelectIndexedDocument = (documentId: string) => {
+    const selected = indexes.find((item) => item.document.documentId === documentId);
+
+    if (!selected) {
+      clearActiveIndex();
+      return;
+    }
+
+    setActiveIndex(indexToActive(selected));
+    reportMessage(`Selected ${selected.document.title}.`);
+  };
+
   const handleIndexSelectionChange = (
     event: ChangeEvent<HTMLSelectElement>
   ) => {
@@ -1030,182 +1047,142 @@ export default function App() {
       <div className="app-body lab-grid">
         <ConceptsSidebar onConceptClick={setConceptModalId} />
         <section className="panel input-panel sources-panel" aria-label="Painel de fontes">
-          <div className="panel__header">
+          <div className="panel__header sources-panel__header">
             <h2>Fontes</h2>
             <button
-              className="secondary-button"
+              className="sources-panel__corner-btn"
               type="button"
+              aria-label="Limpar painel de fontes"
               onClick={handleClear}
+            />
+          </div>
+
+          <div className="sources-panel__block">
+            <button
+              className="secondary-button sources-panel__add-btn"
+              type="button"
+              onClick={handleAddSourceClick}
             >
-              Clear
+              Adicionar fonte
             </button>
+            <input
+              ref={fileInputRef}
+              className="sources-panel__hidden-file"
+              type="file"
+              accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
+              onChange={handleFileChange}
+            />
           </div>
 
-          <div className="segmented" aria-label="Source mode">
-            <label>
-              <input
-                type="radio"
-                name="sourceMode"
-                value="file"
-                checked={sourceMode === "file"}
-                onChange={() => {
-                  setSourceMode("file");
-                  clearActiveIndex();
-                }}
-              />
-              <span>File</span>
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="sourceMode"
-                value="text"
-                checked={sourceMode === "text"}
-                onChange={() => {
-                  setSourceMode("text");
-                  clearActiveIndex();
-                }}
-              />
-              <span>Text</span>
-            </label>
-          </div>
-
-          <div className="index-tools">
-            <label className="field">
-              <span>Indexed documents</span>
+          <div className="sources-panel__block">
+            <label className="field sources-field">
+              <span>Index</span>
               <select
                 value={activeIndex?.documentId ?? ""}
                 onChange={handleIndexSelectionChange}
                 disabled={indexes.length === 0}
               >
                 {indexes.length === 0 ? (
-                  <option value="">No indexed documents</option>
+                  <option value="">Selecionar index</option>
                 ) : (
                   <>
-                    <option value="">Select an index</option>
+                    <option value="">Selecionar index</option>
                     {indexes.map((item) => (
                       <option
                         key={item.document.documentId}
                         value={item.document.documentId}
                       >
-                        {`${item.document.title} | ${item.index.chunkCount} chunks | ${item.index.embeddingProvider}`}
+                        {item.document.title}
                       </option>
                     ))}
                   </>
                 )}
               </select>
             </label>
-            <div className="index-tools__actions">
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => void refreshIndexes()}
-              >
-                Refresh
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={!activeIndex}
-                onClick={() => void handleDeleteIndex()}
-              >
-                Delete
-              </button>
-            </div>
           </div>
 
-          <label className="field">
-            <span>Embedding provider</span>
-            <select
-              value={embeddingProvider}
-              onChange={(event) => {
-                setEmbeddingProvider(event.target.value as EmbeddingProviderId);
-                clearActiveIndex();
-              }}
-            >
-              {PROVIDER_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="mode-panel" data-mode-panel="file" hidden={sourceMode !== "file"}>
-            <label className="field">
-              <span>File</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
-                onChange={handleFileChange}
-              />
+          <div className="sources-panel__block">
+            <label className="field sources-field">
+              <span>Embedding provider</span>
+              <select
+                value={embeddingProvider}
+                onChange={(event) => {
+                  setEmbeddingProvider(event.target.value as EmbeddingProviderId);
+                  clearActiveIndex();
+                }}
+              >
+                {PROVIDER_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
             </label>
+          </div>
 
-            <div className="field-grid">
-              <label className="field">
-                <span>Type</span>
-                <select
-                  value={fileType}
-                  onChange={(event) => {
-                    setFileType(event.target.value as FileType);
-                    clearActiveIndex();
-                  }}
+          <div className="sources-panel__block">
+            <label className="field sources-field">
+              <span>Tipo</span>
+              <select
+                value={fileType}
+                onChange={(event) => {
+                  setFileType(event.target.value as FileType);
+                  clearActiveIndex();
+                }}
+              >
+                <option value="text">Text</option>
+                <option value="pdf">PDF</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="sources-panel__block">
+            <div className="sources-docs-header">
+              <span>Documentos indexados</span>
+              <div className="sources-docs-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => void refreshIndexes()}
                 >
-                  <option value="text">Text</option>
-                  <option value="pdf">PDF</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Title</span>
-                <input
-                  type="text"
-                  autoComplete="off"
-                  placeholder="Optional"
-                  value={fileTitle}
-                  onChange={(event) => {
-                    setFileTitle(event.target.value);
-                    clearActiveIndex();
-                  }}
-                />
-              </label>
+                  Atualizar
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={!activeIndex}
+                  onClick={() => void handleDeleteIndex()}
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+            <div className="sources-docs-list" role="list" aria-label="Documentos indexados">
+              {indexes.length === 0 && (
+                <p className="sources-docs-empty">Nenhum documento indexado ainda.</p>
+              )}
+              {indexes.map((item) => {
+                const isActive = activeIndex?.documentId === item.document.documentId;
+                return (
+                  <button
+                    key={item.document.documentId}
+                    type="button"
+                    className={`sources-doc-card${isActive ? " sources-doc-card--active" : ""}`}
+                    onClick={() => handleSelectIndexedDocument(item.document.documentId)}
+                  >
+                    <span className="sources-doc-card__title">{item.document.title}</span>
+                    <span className="sources-doc-card__meta">
+                      {item.document.modality} · {item.index.chunkCount} chunks
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="mode-panel" data-mode-panel="text" hidden={sourceMode !== "text"}>
-            <label className="field">
-              <span>Text</span>
-              <textarea
-                rows={11}
-                placeholder="Document content"
-                value={textContent}
-                onChange={(event) => {
-                  setTextContent(event.target.value);
-                  clearActiveIndex();
-                }}
-              />
-            </label>
-
-            <label className="field">
-              <span>Title</span>
-              <input
-                type="text"
-                autoComplete="off"
-                placeholder="Inline text"
-                value={textTitle}
-                onChange={(event) => {
-                  setTextTitle(event.target.value);
-                  clearActiveIndex();
-                }}
-              />
-            </label>
-          </div>
-
-          <details className="advanced-options" open>
-            <summary>Advanced options</summary>
-            <label className="field">
-              <span>Session ID (memory)</span>
+          <div className="sources-panel__block">
+            <label className="field sources-field">
+              <span>Session ID</span>
               <input
                 type="text"
                 autoComplete="off"
@@ -1214,42 +1191,58 @@ export default function App() {
                 onChange={(event) => setSessionId(event.target.value)}
               />
             </label>
-            <label className="field">
+          </div>
+
+          <div className="sources-panel__block">
+            <label className="field sources-field sources-field--topk">
               <span>Top K</span>
-              <input
-                type="number"
+              <div className="topk-control">
+                <input
+                type="range"
                 min={1}
                 max={10}
                 step={1}
                 value={topK}
                 onChange={(event) => setTopK(Number(event.target.value))}
               />
+                <strong>{topK}</strong>
+              </div>
             </label>
-            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={useMultiModelOrchestration}
-                onChange={(event) => setUseMultiModelOrchestration(event.target.checked)}
-              />
-              <span>Multi-model orchestration</span>
-            </label>
-            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={reasoningEnabled}
-                onChange={(event) => setReasoningEnabled(event.target.checked)}
-              />
-              <span>Reasoning mode (summary only)</span>
-            </label>
-            <label className="field" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={enableShadowRetrieval}
-                onChange={(event) => setEnableShadowRetrieval(event.target.checked)}
-              />
-              <span>Shadow retrieval for cache quality</span>
-            </label>
-          </details>
+          </div>
+
+          <div className="sources-panel__block">
+            <span className="sources-exec-title">Execução</span>
+            <div className="sources-toggle-list">
+              <label className="sources-toggle-row">
+                <span>Multi-model</span>
+                <input
+                  type="checkbox"
+                  checked={useMultiModelOrchestration}
+                  onChange={(event) => setUseMultiModelOrchestration(event.target.checked)}
+                />
+              </label>
+              <label className="sources-toggle-row">
+                <span>Reasoning mode</span>
+                <input
+                  type="checkbox"
+                  checked={reasoningEnabled}
+                  onChange={(event) => setReasoningEnabled(event.target.checked)}
+                />
+              </label>
+              <label className="sources-toggle-row">
+                <span>Shadow retrieval</span>
+                <input
+                  type="checkbox"
+                  checked={enableShadowRetrieval}
+                  onChange={(event) => setEnableShadowRetrieval(event.target.checked)}
+                />
+              </label>
+              <label className="sources-toggle-row sources-toggle-row--disabled" title="Visual placeholder para Guardrails">
+                <span>Guardrails</span>
+                <input type="checkbox" checked={false} readOnly disabled />
+              </label>
+            </div>
+          </div>
 
           <div className="run-row">
             <div className="action-buttons">
