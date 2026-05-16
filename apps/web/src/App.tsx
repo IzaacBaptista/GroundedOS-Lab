@@ -952,7 +952,7 @@ export default function App() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Phase 4 Lab</p>
+          <p className="eyebrow">Phase 7 Lab</p>
           <h1>Local RAG Console</h1>
         </div>
         <div className="topbar__meta">
