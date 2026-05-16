@@ -230,7 +230,7 @@ h3 {
 
 .app-body {
   display: grid;
-  grid-template-columns: 260px 360px minmax(0, 1fr) 300px;
+  grid-template-columns: 260px 350px minmax(0, 1fr) 500px;
   gap: 10px;
   align-items: start;
   padding-top: 10px;
@@ -873,8 +873,12 @@ textarea:focus {
 }
 
 .result-tab {
+  display: grid;
+  gap: 2px;
+  align-content: center;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
+  min-height: 54px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.01);
   color: var(--text);
@@ -883,11 +887,34 @@ textarea:focus {
   text-align: left;
 }
 
+.result-tab__title {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.result-tab__subtitle {
+  display: block;
+  color: #6f8192;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.result-tab--wide {
+  grid-column: 1 / -1;
+}
+
 .result-tab--active {
   background: rgba(0, 214, 163, 0.12);
   border-color: rgba(0, 214, 163, 0.56);
   color: var(--accent-strong);
   box-shadow: inset 0 0 0 1px rgba(0, 214, 163, 0.18);
+}
+
+.result-tab--active .result-tab__subtitle {
+  color: rgba(0, 230, 184, 0.74);
 }
 
 .concepts-tab-hints {

@@ -1555,7 +1555,8 @@ function ResultPanel({
           aria-selected={outputTab === "answer" && answerPanelTab === "chunks"}
           onClick={() => openAnswerView("chunks")}
         >
-          Cache hit
+          <span className="result-tab__title">Cache hit</span>
+          <span className="result-tab__subtitle">Latência e taxa de acerto</span>
         </button>
         <button
           className={`result-tab${outputTab === "answer" && answerPanelTab === "citations" ? " result-tab--active" : ""}`}
@@ -1564,7 +1565,8 @@ function ResultPanel({
           aria-selected={outputTab === "answer" && answerPanelTab === "citations"}
           onClick={() => openAnswerView("citations")}
         >
-          Citações
+          <span className="result-tab__title">Citações</span>
+          <span className="result-tab__subtitle">Chunks e scores</span>
         </button>
         <button
           className={`result-tab${outputTab === "answer" && answerPanelTab === "workflow" ? " result-tab--active" : ""}`}
@@ -1573,7 +1575,8 @@ function ResultPanel({
           aria-selected={outputTab === "answer" && answerPanelTab === "workflow"}
           onClick={() => openAnswerView("workflow")}
         >
-          Workflow
+          <span className="result-tab__title">Workflow</span>
+          <span className="result-tab__subtitle">Pipeline completo</span>
         </button>
         <button
           className={`result-tab${outputTab === "answer" && answerPanelTab === "tradeoffs" ? " result-tab--active" : ""}`}
@@ -1582,16 +1585,18 @@ function ResultPanel({
           aria-selected={outputTab === "answer" && answerPanelTab === "tradeoffs"}
           onClick={() => openAnswerView("tradeoffs")}
         >
-          Trade-offs
+          <span className="result-tab__title">Trade-offs</span>
+          <span className="result-tab__subtitle">Precisão vs custo</span>
         </button>
         <button
-          className={`result-tab${outputTab === "compare" ? " result-tab--active" : ""}`}
+          className={`result-tab result-tab--wide${outputTab === "compare" ? " result-tab--active" : ""}`}
           type="button"
           role="tab"
           aria-selected={outputTab === "compare"}
           onClick={() => openOutputView("compare")}
         >
-          Compare mode
+          <span className="result-tab__title">Compare mode</span>
+          <span className="result-tab__subtitle">Side-by-side entre providers</span>
         </button>
         <button
           className={`result-tab${outputTab === "routing" ? " result-tab--active" : ""}`}
@@ -1600,7 +1605,8 @@ function ResultPanel({
           aria-selected={outputTab === "routing"}
           onClick={() => openOutputView("routing")}
         >
-          Routing
+          <span className="result-tab__title">Routing</span>
+          <span className="result-tab__subtitle">Decisão do provedor</span>
         </button>
         <button
           className={`result-tab${outputTab === "context" ? " result-tab--active" : ""}`}
@@ -1609,7 +1615,8 @@ function ResultPanel({
           aria-selected={outputTab === "context"}
           onClick={() => openOutputView("context")}
         >
-          Context
+          <span className="result-tab__title">Context</span>
+          <span className="result-tab__subtitle">Janela de contexto</span>
         </button>
         <button
           className={`result-tab${outputTab === "cache" ? " result-tab--active" : ""}`}
@@ -1618,7 +1625,8 @@ function ResultPanel({
           aria-selected={outputTab === "cache"}
           onClick={() => openOutputView("cache")}
         >
-          Cache
+          <span className="result-tab__title">Cache</span>
+          <span className="result-tab__subtitle">Reuso de respostas</span>
         </button>
         <button
           className={`result-tab${outputTab === "evals" ? " result-tab--active" : ""}`}
@@ -1627,7 +1635,8 @@ function ResultPanel({
           aria-selected={outputTab === "evals"}
           onClick={() => openOutputView("evals")}
         >
-          Evals
+          <span className="result-tab__title">Evals</span>
+          <span className="result-tab__subtitle">Faithfulness e qualidade</span>
         </button>
         <button
           className={`result-tab${outputTab === "lab" ? " result-tab--active" : ""}`}
@@ -1636,7 +1645,8 @@ function ResultPanel({
           aria-selected={outputTab === "lab"}
           onClick={() => openOutputView("lab")}
         >
-          Guardrails
+          <span className="result-tab__title">Guardrails</span>
+          <span className="result-tab__subtitle">Segurança e bloqueios</span>
         </button>
       </div>
 
