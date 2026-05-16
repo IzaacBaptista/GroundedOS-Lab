@@ -118,8 +118,11 @@ capture, and troubleshooting are documented in
 | Feature | Planned phase |
 |---|---|
 | OAuth / external identity providers | Phase 6+ |
-| Production vector database and external observability stack | Phase 6 |
+| Production-grade vector database deployment (Qdrant) | Phase 6+ |
 | Queue observability, retries and multi-worker orchestration | Phase 6+ |
+| Long-term trace storage and retention | Phase 7+ |
+| Streaming responses and WebSockets | Phase 7+ |
+| Multimodal (complete image + audio extraction) | Phase 7+ |
 
 ---
 
@@ -836,29 +839,40 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 * Docker and docker-compose for local full-stack environment
 * CI pipeline (lint, typecheck, test on every PR)
 * Environment configuration and secrets management
+* OpenTelemetry observability stack (Jaeger, Prometheus, Grafana)
+* Authentication and authorization baseline
 * Staging deployment (optional cloud target)
 
 **✅ Success Criteria:**
 - [x] `docker-compose up` configuration exists for the full local stack (API, web, worker, Redis, Postgres)
+- [x] `docker-compose --profile observability up -d` starts Jaeger, Prometheus, Grafana with OTEL collection enabled
+- [x] OTEL trace export is enabled in docker-compose: API and worker send traces to OTEL Collector
+- [x] Jaeger receives and visualizes distributed traces with span hierarchy, timing, and attributes
+- [x] Prometheus scrapes metrics from API, worker, and infrastructure with working alert rules
+- [x] Grafana auto-provisions Prometheus and Jaeger datasources; sample dashboard queries work
 - [x] GitHub Actions CI runs lint, typecheck and tests on every PR (`.github/workflows/ci.yml`)
-- [x] `.env.example` files for root, API and web document required variables
+- [x] `.env.example` files for root, API and web document required variables (including OTEL_EXPORT_ENABLED)
 - [x] Authentication strategy is documented (see [ADR-014](./docs/adr/ADR-014-authentication-strategy.md))
+- [x] Security hardening audit complete: auth middleware, rate limiting, audit logging, CORS (see [PHASE-6-OBSERVABILITY-VALIDATION.md](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md))
 
 ---
 
 ## 🧭 Execution Plan (Current)
 
-Phases 0, 1, 2, 2b, 3, 4 and 5 are complete. The active
-implementation focus is Phase 6 Infrastructure & Deploy.
+Phases 0, 1, 2, 2b, 3, 4 and 5 are complete. Phase 6 Infrastructure & Deploy is **in active rollout**.
 
 ### Current focus
 
 - Phase 5 is complete with real runs across quantization, LoRA, fine-tuning
    and distillation artifacts in `datasets/experiments/phase-5/`.
-- Current implementation focus is Phase 6 hardening:
-   Docker/Compose local stack, CI gate, env standardization and auth rollout.
+- **Phase 6 observability stack** ✅ complete:
+   - OTEL trace export enabled (API and worker export to Jaeger)
+   - Prometheus scrape config for all services
+   - Grafana auto-provisioning with Prometheus + Jaeger datasources
+   - Alert rules defined (API, worker, infrastructure)
+   - Validation guide: [docs/PHASE-6-OBSERVABILITY-VALIDATION.md](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md)
 - Phase 6 baseline infra already landed:
-   `docker-compose.yml`, `Dockerfile`, `Dockerfile.web`,
+   `docker-compose.yml` with observability profile, `Dockerfile`, `Dockerfile.web`,
    `apps/worker/Dockerfile`, `.github/workflows/ci.yml`.
 - Authentication/authorization baseline already landed:
    `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`,
@@ -867,9 +881,11 @@ implementation focus is Phase 6 Infrastructure & Deploy.
 - Auth enforcement now follows environment defaults:
    opt-in in local development, and enabled by default in non-dev/non-test
    environments when `AUTH_ENFORCEMENT` is unset.
+- Security hardening verified:
+   bearer token + cookie auth, rate limiting, audit logging, multipart limits, response validation.
 - Next technical priorities:
-   OAuth/provider-based identity, production observability and deployment
-   hardening.
+   OAuth/provider-based identity, production deployment hardening, database scaling,
+   queue observability and multi-worker orchestration.
 - Keep roadmap checkboxes and package READMEs synchronized with implementation
    status.
 
@@ -877,6 +893,8 @@ The local RAG usage guide is documented in
 [`docs/phase-1-local-rag.md`](./docs/phase-1-local-rag.md).
 The Ollama installation and integration guide is documented in
 [`docs/ollama-setup.md`](./docs/ollama-setup.md).
+The complete observability stack validation guide is documented in
+[`docs/PHASE-6-OBSERVABILITY-VALIDATION.md`](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md).
 Reference environment files live in [`.env.example`](./.env.example),
 [`apps/api/.env.example`](./apps/api/.env.example) and
 [`apps/web/.env.example`](./apps/web/.env.example). Node-side commands load
@@ -889,37 +907,86 @@ A complete observability stack is available for local development and debugging 
 
 **Start the observability stack:**
 ```bash
-# Start core services
+# Start core services (with OTEL export enabled by default)
 docker-compose up -d
 
-# Start with observability services (Jaeger, Prometheus, Grafana)
+# Verify core services are healthy
+docker-compose ps | grep -E "api|worker|postgres|redis"
+
+# Start observability services (Jaeger, Prometheus, Grafana, OTEL Collector)
 docker-compose --profile observability up -d
+
+# Verify observability services are healthy
+docker-compose ps | grep -E "otelcol|jaeger|prometheus|grafana"
 ```
 
-**Access the services:**
+**Access the observability UIs:**
 - **Jaeger UI** (distributed traces): http://localhost:16686
-- **Prometheus UI** (metrics): http://localhost:9090
-- **Grafana UI** (dashboards): http://localhost:3002 (default: admin/admin)
+- **Prometheus UI** (metrics, PromQL queries): http://localhost:9090
+- **Grafana UI** (dashboards, alerts): http://localhost:3002 (default: admin/admin)
+
+**Trace export is automatically enabled:**
+- API service: `OTEL_EXPORT_ENABLED=true` → sends traces to OTEL Collector (http://otelcol:4318)
+- Worker service: `OTEL_EXPORT_ENABLED=true` → sends traces to OTEL Collector
+- OTEL Collector receives traces via OTLP gRPC (4317) / HTTP (4318) and exports to Jaeger
 
 **View traces in Jaeger:**
 1. Open http://localhost:16686
-2. Select a service from the dropdown (e.g., "groundedos-api")
+2. Select a service from dropdown (e.g., "groundedos-api", "groundedos-worker")
 3. Click "Find Traces" to view recent requests
-4. Click a trace to inspect the span hierarchy, timing and attributes
+4. Click a trace to inspect span hierarchy, timing, duration and attributes
 
-**Query metrics in Prometheus:**
-- View active services: `up{job=~"groundedos-.*"}`
-- Request rate: `rate(http_requests_total[5m])`
-- Error rate: `rate(http_requests_total{status=~"5.."}[5m])`
-- Job queue depth: `job_queue_depth`
-
-**Enable trace export from API and worker:**
-```bash
-export OTEL_EXPORT_ENABLED=true
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+**Example trace flow for `/rag/ask` request:**
+```
+groundedos-api (span)
+├── http.request (HTTP handler)
+│   └── rag.ask.process (RAG pipeline)
+│       ├── query_understanding (rewrite, expansion, intent)
+│       ├── rag.retrieve (hybrid search, reranking)
+│       └── llm.inference (if applicable)
+└── (if worker job enqueued: traceparent propagated to groundedos-worker)
+    └── job.process (model execution, experiment tracking)
 ```
 
-See [docs/observability-stack-guide.md](./docs/observability-stack-guide.md) for detailed configuration, troubleshooting and dashboard setup.
+**Query metrics in Prometheus:**
+```promql
+# Service health
+up{job=~"groundedos-.*"}
+
+# Request rate (requests/sec)
+rate(http_requests_total[5m])
+
+# Error rate (errors/sec)
+rate(http_requests_total{status=~"5.."}[5m])
+
+# P99 latency (milliseconds)
+histogram_quantile(0.99, http_request_duration_seconds) * 1000
+
+# Job queue depth (number of pending jobs)
+job_queue_depth
+
+# Cache hit rate (percentage)
+rate(cache_hits_total[5m]) / rate(cache_requests_total[5m])
+```
+
+**Create Grafana dashboards:**
+1. New > Dashboard
+2. Add panel > Prometheus
+3. Use queries from above
+4. Visualize as graph, gauge, or table
+5. Save and set refresh interval (15s or 30s)
+
+**Configure alerts:**
+- Alert rules are defined in [config/prometheus-alert-rules.yml](./config/prometheus-alert-rules.yml)
+- Pre-configured alerts:
+  - APIDown (API unavailable > 1 min)
+  - APIHighErrorRate (> 5% error rate over 5 min)
+  - APIHighLatency (p99 latency > 1 sec over 5 min)
+  - WorkerDown, QueueDepthHigh, JobFailureRate
+  - Infrastructure alerts (database, cache, memory, disk)
+- To enable notifications, configure Alertmanager (future work)
+
+See [docs/PHASE-6-OBSERVABILITY-VALIDATION.md](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md) for complete validation guide, troubleshooting, and performance tuning.
 
 
 ### Local RAG commands

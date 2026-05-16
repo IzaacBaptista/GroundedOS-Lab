@@ -84,6 +84,11 @@ services:
       JWT_EXPIRY: ${JWT_EXPIRY:-24h}
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
       
+      # Observability (Phase 6 — OpenTelemetry)
+      OTEL_EXPORT_ENABLED: ${OTEL_EXPORT_ENABLED:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otelcol:4318}
+      OTEL_SERVICE_NAME: groundedos-api
+      
     ports:
       - "${API_PORT:-3001}:3001"
     volumes:
@@ -127,6 +132,11 @@ services:
       POSTGRES_URL: postgresql://${POSTGRES_USER:-groundedos}:${POSTGRES_PASSWORD:-groundedos-dev-password}@postgres:5432/${POSTGRES_DB:-groundedos}
       GROUNDEDOS_INDEX_DIR: /app/.groundedos/indexes
       GROUNDEDOS_MEMORY_DIR: /app/.groundedos/memory/sessions
+      
+      # Observability (Phase 6 — OpenTelemetry)
+      OTEL_EXPORT_ENABLED: ${OTEL_EXPORT_ENABLED:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otelcol:4318}
+      OTEL_SERVICE_NAME: groundedos-worker
     volumes:
       - groundedos_app_data:/app/.groundedos
     depends_on:
