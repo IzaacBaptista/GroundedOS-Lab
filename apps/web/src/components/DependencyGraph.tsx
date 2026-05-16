@@ -255,6 +255,190 @@ const CONCEPT_PROFILES: Record<string, ConceptLearningProfile> = {
       inferenceLatency: "Baixa",
     },
   },
+  grounding: {
+    whenToUse: [
+      "Quando a resposta precisa vir com evidencia rastreavel dos documentos.",
+      "Assistentes corporativos com exigencia de confiabilidade e auditoria.",
+      "Fluxos em que alucinacao precisa ser minimizada de forma sistematica.",
+    ],
+    commonProblems: [
+      "Resposta final sem citar os trechos realmente usados no contexto.",
+      "Trechos recuperados relevantes, mas prompt ignora a instrucao de citar fonte.",
+      "Confundir confianca do modelo com qualidade da evidencia.",
+      "Nao medir faithfulness/groundedness de forma continua.",
+    ],
+    popularLibraries: ["RAGAS", "DeepEval", "LangSmith", "LlamaIndex", "Haystack"],
+    ragWhyItMatters:
+      "Grounding e o mecanismo que transforma RAG em sistema confiavel: sem ele, a resposta pode soar correta sem estar ancorada em fonte real.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Baixo a moderado",
+      inferenceLatency: "Baixa a media",
+    },
+  },
+  "context-engineering": {
+    whenToUse: [
+      "Projetar como o contexto recuperado entra no prompt final.",
+      "Balancear informacao util versus limite de tokens.",
+      "Definir ordem, formato e regras de prioridade do contexto.",
+    ],
+    commonProblems: [
+      "Contexto relevante em excesso, sem estrategia de priorizacao.",
+      "Formato inconsistente entre diferentes tipos de documento.",
+      "Juntar chunks sem metadados e perder rastreabilidade.",
+      "Mandar contexto longo demais e degradar latencia e custo.",
+    ],
+    popularLibraries: ["LangChain", "LlamaIndex", "DSPy", "Guidance"],
+    ragWhyItMatters:
+      "Context engineering conecta retrieval e geracao: mesmo com bons documentos, uma montagem ruim do contexto reduz muito a qualidade da resposta.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Media",
+    },
+  },
+  "prompt-engineering": {
+    whenToUse: [
+      "Definir instrucoes claras de estilo, formato e politica de resposta.",
+      "Padronizar comportamento do assistente entre dominios diferentes.",
+      "Forcar citacao de fonte e tratamento de incerteza.",
+    ],
+    commonProblems: [
+      "Prompts muito longos e pouco objetivos.",
+      "Instrucoes conflitantes entre system prompt e user prompt.",
+      "Falta de fallback quando nao ha evidencia suficiente.",
+      "Prompts sem testes comparativos por versao.",
+    ],
+    popularLibraries: ["LangChain", "DSPy", "Promptfoo", "Guidance"],
+    ragWhyItMatters:
+      "Prompt engineering define como o modelo usa o contexto recuperado. Um prompt ruim pode desperdiçar retrieval de alta qualidade.",
+    cost: {
+      level: "low",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Baixo",
+      inferenceLatency: "Baixa",
+    },
+  },
+  "context-pruning": {
+    whenToUse: [
+      "Quando o volume de contexto recuperado excede o necessario.",
+      "Para reduzir custo por token mantendo evidencia essencial.",
+      "Em sistemas com limites estritos de latencia.",
+    ],
+    commonProblems: [
+      "Cortar contexto demais e perder informacao critica.",
+      "Heuristica simples removendo trechos com alto valor semantico.",
+      "Pruning sem considerar metadados de confiabilidade da fonte.",
+      "Nao validar impacto do pruning em recall e faithfulness.",
+    ],
+    popularLibraries: ["LlamaIndex", "LangChain", "Haystack"],
+    ragWhyItMatters:
+      "Context pruning melhora eficiencia do RAG, mas precisa preservar o nucleo de evidencia para nao sacrificar qualidade final.",
+    cost: {
+      level: "low",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Baixo",
+      inferenceLatency: "Baixa",
+    },
+  },
+  "adaptive-rag": {
+    whenToUse: [
+      "Selecionar estrategia de retrieval conforme tipo de pergunta.",
+      "Ajustar dinamicamente top-k, reranking e uso de ferramentas.",
+      "Ambientes com variacao alta de dominio e dificuldade de consulta.",
+    ],
+    commonProblems: [
+      "Regras adaptativas opacas e dificeis de depurar.",
+      "Mudanca agressiva de estrategia causando comportamento instavel.",
+      "Falta de guardrails para evitar overfitting da heuristica.",
+      "Nao registrar decisao de roteamento para analise posterior.",
+    ],
+    popularLibraries: ["LangGraph", "LlamaIndex", "DSPy", "Haystack"],
+    ragWhyItMatters:
+      "Adaptive RAG permite respostas melhores em cenarios variados, decidindo quando usar pipeline mais leve ou mais robusto para cada consulta.",
+    cost: {
+      level: "high",
+      cpuIntensive: true,
+      gpuRecommended: true,
+      memoryUsage: "Moderado a alto",
+      inferenceLatency: "Media a alta",
+    },
+  },
+  inference: {
+    whenToUse: [
+      "Executar geracao final de resposta com contexto recuperado.",
+      "Comparar modelos/provedores por custo, latencia e qualidade.",
+      "Controlar parametros como temperature/top-p/top-k por caso de uso.",
+    ],
+    commonProblems: [
+      "Escolha de modelo desalinhada com restricao de latencia.",
+      "Parametros de amostragem gerando instabilidade em respostas.",
+      "Nao separar gargalo de retrieval do gargalo de inferencia.",
+      "Estimativa de custo por token sem monitoramento real.",
+    ],
+    popularLibraries: ["Ollama", "vLLM", "Transformers", "OpenAI API", "Groq"],
+    ragWhyItMatters:
+      "Inferences e onde o valor aparece para o usuario. Mesmo com retrieval excelente, um passo de inferencia mal calibrado reduz utilidade da resposta.",
+    cost: {
+      level: "high",
+      cpuIntensive: true,
+      gpuRecommended: true,
+      memoryUsage: "Alto",
+      inferenceLatency: "Media a alta",
+    },
+  },
+  etl: {
+    whenToUse: [
+      "Ingerir e normalizar documentos antes de chunking e embeddings.",
+      "Padronizar extracao de texto e metadata de multiplas fontes.",
+      "Fluxos com atualizacao frequente de base documental.",
+    ],
+    commonProblems: [
+      "Perda de estrutura semantica durante extracao de PDF.",
+      "Metadata incompleta dificultando filtros e auditoria.",
+      "Pipeline sem idempotencia gerando duplicacao de documentos.",
+      "Falhas silenciosas em parsing sem observabilidade adequada.",
+    ],
+    popularLibraries: ["Unstructured", "Apache Tika", "pdfplumber", "LangChain document loaders"],
+    ragWhyItMatters:
+      "ETL define a qualidade da base de conhecimento. Se a ingestao vier ruim, todas as etapas seguintes do RAG herdam esse problema.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Baixa",
+    },
+  },
+  "data-lineage": {
+    whenToUse: [
+      "Rastrear origem de cada resposta ate documento/chunk original.",
+      "Auditoria, compliance e investigacao de incidentes.",
+      "Comparar versoes de dados e impacto em qualidade de resposta.",
+    ],
+    commonProblems: [
+      "IDs de documento/chunk inconsistentes entre etapas do pipeline.",
+      "Perda de historico de versao apos reindexacao.",
+      "Rastreabilidade parcial sem ligacao clara com resposta final.",
+      "Lineage coletado mas nao usado em debug e governanca.",
+    ],
+    popularLibraries: ["OpenLineage", "Marquez", "DataHub", "OpenMetadata"],
+    ragWhyItMatters:
+      "Data lineage fecha o ciclo de confiabilidade do RAG: permite provar de onde veio cada afirmacao e diagnosticar rapidamente regressao de dados.",
+    cost: {
+      level: "medium",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Baixa",
+    },
+  },
 };
 
 function resolveConceptProfile(concept: Concept): ConceptLearningProfile {
