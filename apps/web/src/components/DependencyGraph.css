@@ -49,16 +49,17 @@
 }
 
 .dependency-graph__edges {
-  stroke: var(--line);
-  stroke-width: 1.5;
+  color: var(--line-strong);
+  stroke: currentColor;
+  stroke-width: 2;
   fill: none;
-  opacity: 0.6;
+  opacity: 0.9;
 }
 
 .dependency-graph__edge--highlighted {
   stroke: var(--accent);
   opacity: 1;
-  stroke-width: 2.5;
+  stroke-width: 3;
 }
 
 /* ── Nodes ──────────────────────────────────── */
