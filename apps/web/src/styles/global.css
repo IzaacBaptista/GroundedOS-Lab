@@ -230,7 +230,7 @@ h3 {
 
 .app-body {
   display: grid;
-  grid-template-columns: 260px 300px minmax(0, 1fr) 320px;
+  grid-template-columns: 260px 360px minmax(0, 1fr) 300px;
   gap: 10px;
   align-items: start;
   padding-top: 10px;
@@ -259,7 +259,7 @@ h3 {
 .sources-panel {
   max-height: calc(100vh - 84px);
   overflow: auto;
-  padding: 12px;
+  padding: 12px 14px 12px 12px;
   border-radius: 0;
 }
 
@@ -427,33 +427,51 @@ h3 {
 
 .sources-toggle-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  padding-right: 4px;
 }
 
 .sources-toggle-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  column-gap: 14px;
+  min-height: 30px;
+  padding-right: 4px;
   color: #9cade0;
-  font-size: 0.92rem;
+  font-size: 0.89rem;
+}
+
+.sources-toggle-row span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .sources-toggle-row input[type="checkbox"] {
+  -webkit-appearance: none;
   appearance: none;
-  width: 32px;
+  width: 34px;
   height: 18px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  justify-self: end;
+  flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07);
   position: relative;
-  transition: background 0.2s ease;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .sources-toggle-row input[type="checkbox"]::after {
   content: "";
   position: absolute;
-  top: 2px;
+  top: 1px;
   left: 2px;
   width: 12px;
   height: 12px;
@@ -467,8 +485,13 @@ h3 {
   background: rgba(0, 214, 163, 0.24);
 }
 
+.sources-toggle-row input[type="checkbox"]:focus,
+.sources-toggle-row input[type="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(0, 214, 163, 0.2);
+}
+
 .sources-toggle-row input[type="checkbox"]:checked::after {
-  transform: translateX(13px);
+  transform: translateX(14px);
   background: #00dbac;
 }
 
