@@ -75,7 +75,7 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
 
     // Add prerequisites (going up the chain)
     const addPrerequisites = (id: string, depth: number) => {
-      if (depth > 3 || visited.has(id)) return;
+      if (depth > 3) return;
       const prereqs = getPrerequisites(id, 0);
       prereqs.forEach((prereq: Concept, index: number) => {
         if (!visited.has(prereq.id)) {
@@ -98,7 +98,7 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
 
     // Add dependents (going down the chain)
     const addDependents = (id: string, depth: number) => {
-      if (depth > 2 || visited.has(id)) return;
+      if (depth > 2) return;
       const deps = getDependents(id, 0);
       deps.forEach((dep: Concept, index: number) => {
         if (!visited.has(dep.id)) {
