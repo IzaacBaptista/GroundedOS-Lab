@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getConceptById } from "../concepts";
 import { CONCEPTS } from "../concepts/concepts-data";
 import type { Concept } from "../concepts/types";
@@ -22,11 +22,155 @@ interface DependencyGraphProps {
   conceptId: string;
 }
 
+interface ConceptCostProfile {
+  level: "low" | "medium" | "high";
+  cpuIntensive: boolean;
+  gpuRecommended: boolean;
+  memoryUsage: string;
+  inferenceLatency: string;
+}
+
+interface ConceptLearningProfile {
+  whenToUse: string[];
+  commonProblems: string[];
+  popularLibraries: string[];
+  ragWhyItMatters: string;
+  cost: ConceptCostProfile;
+}
+
+const DEFAULT_PROFILE: ConceptLearningProfile = {
+  whenToUse: [
+    "Quando voce precisa conectar este conceito com o fluxo principal de retrieval.",
+    "Quando quer comparar qualidade de resposta e impacto operacional no pipeline.",
+  ],
+  commonProblems: [
+    "Configuracao inconsistente entre ambientes locais e testes.",
+    "Dependencias indiretas mal definidas no fluxo de execucao.",
+    "Interpretacao ambigua de metricas sem contexto do dataset.",
+  ],
+  popularLibraries: ["Ollama", "FAISS", "Chroma", "pgvector"],
+  ragWhyItMatters:
+    "Este conceito afeta diretamente a qualidade, confiabilidade e custo de um sistema RAG em producao.",
+  cost: {
+    level: "medium",
+    cpuIntensive: true,
+    gpuRecommended: false,
+    memoryUsage: "Moderado",
+    inferenceLatency: "Media",
+  },
+};
+
+const CONCEPT_PROFILES: Record<string, ConceptLearningProfile> = {
+  embeddings: {
+    whenToUse: [
+      "Busca semantica em bases de conhecimento e FAQ corporativo.",
+      "Recomendacao de conteudo por similaridade de significado.",
+      "Recuperacao semantica em pipelines de RAG.",
+      "Agrupamento de documentos por tema (clustering).",
+    ],
+    commonProblems: [
+      "Embeddings inconsistentes entre modelos/provedores diferentes.",
+      "Chunk size ruim reduzindo qualidade da recuperacao.",
+      "Dimensionalidade incompatível com o vetor/index configurado.",
+      "Cosine similarity enganosa em textos muito curtos.",
+      "Degradacao em cenarios multilíngues sem modelo adequado.",
+    ],
+    popularLibraries: [
+      "sentence-transformers",
+      "OpenAI embeddings",
+      "Cohere",
+      "Ollama",
+      "FAISS",
+      "Chroma",
+      "pgvector",
+    ],
+    ragWhyItMatters:
+      "Sem embeddings, a recuperacao semantica deixa de existir, porque o sistema nao consegue representar significado numericamente.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: true,
+      memoryUsage: "Moderado a alto",
+      inferenceLatency: "Media",
+    },
+  },
+  chunking: {
+    whenToUse: [
+      "Quebrar documentos longos antes da indexacao vetorial.",
+      "Melhorar granularidade de citacoes em respostas RAG.",
+      "Controlar janela de contexto e custo por consulta.",
+    ],
+    commonProblems: [
+      "Chunks longos demais perdem foco semantico.",
+      "Chunks curtos demais quebram contexto essencial.",
+      "Overlap mal configurado gera redundancia de resultados.",
+      "Quebra em limites ruins reduz precisao de citacoes.",
+    ],
+    popularLibraries: ["LangChain text splitters", "LlamaIndex", "Haystack"],
+    ragWhyItMatters:
+      "Chunking define o que o retriever consegue encontrar. Se os cortes forem ruins, a resposta sera incompleta ou pouco confiavel.",
+    cost: {
+      level: "low",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Baixo",
+      inferenceLatency: "Baixa",
+    },
+  },
+  rag: {
+    whenToUse: [
+      "Responder perguntas com base em documentos internos atualizados.",
+      "Reduzir alucinacao em assistentes corporativos.",
+      "Exigir rastreabilidade por citacoes e evidencias.",
+    ],
+    commonProblems: [
+      "Recuperacao ruim derruba qualidade da resposta final.",
+      "Prompt sem instrucao de grounding aumenta alucinacao.",
+      "Top-K inadequado causa ruido ou falta de contexto.",
+      "Latencia alta quando o pipeline nao esta balanceado.",
+    ],
+    popularLibraries: ["LangChain", "LlamaIndex", "Haystack", "Milvus", "Weaviate"],
+    ragWhyItMatters:
+      "RAG e a ponte entre conhecimento externo e resposta gerada. Sem isso, o sistema depende apenas do que o modelo memoriza nos pesos.",
+    cost: {
+      level: "high",
+      cpuIntensive: true,
+      gpuRecommended: true,
+      memoryUsage: "Alto",
+      inferenceLatency: "Media a alta",
+    },
+  },
+};
+
+function resolveConceptProfile(concept: Concept): ConceptLearningProfile {
+  const profile = CONCEPT_PROFILES[concept.id];
+  if (profile) {
+    return profile;
+  }
+
+  return {
+    ...DEFAULT_PROFILE,
+    ragWhyItMatters: `${concept.title} influencia diretamente a capacidade do RAG de recuperar contexto certo e responder com evidencia.`,
+  };
+}
+
+function toCostLevelLabel(level: ConceptCostProfile["level"]): string {
+  if (level === "low") {
+    return "Baixo";
+  }
+  if (level === "high") {
+    return "Alto";
+  }
+  return "Medio";
+}
+
 export function DependencyGraph({ conceptId }: DependencyGraphProps) {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(conceptId);
   const [selectedPath, setSelectedPath] = useState<string[] | null>(null);
   const [focusDirectRelations, setFocusDirectRelations] = useState(false);
+  const [shouldScrollSummary, setShouldScrollSummary] = useState(false);
+  const summaryRef = useRef<HTMLDivElement | null>(null);
 
   const concept = getConceptById(conceptId);
   if (!concept) {
@@ -37,6 +181,15 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
     setSelectedNodeId(conceptId);
     setSelectedPath(null);
   }, [conceptId]);
+
+  useEffect(() => {
+    if (!shouldScrollSummary) {
+      return;
+    }
+
+    summaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setShouldScrollSummary(false);
+  }, [shouldScrollSummary]);
 
   // Build graph of prerequisites and dependents
   const { nodes, edges } = useMemo(() => {
@@ -257,6 +410,38 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
     return nodes.find((node) => node.id === selectedNodeId) ?? null;
   }, [conceptId, nodes, selectedNodeId]);
 
+  const selectedConceptSummaryPt = useMemo(() => {
+    const prerequisitesCount = selectedConcept.dependsOn?.length ?? 0;
+    const dependentsCount = CONCEPTS.filter(
+      (item: Concept) =>
+        item.dependsOn?.includes(selectedConcept.id) ||
+        item.nextConcepts?.includes(selectedConcept.id)
+    ).length;
+
+    const nodeRole =
+      selectedNode?.type === "prerequisite"
+        ? "pré-requisito"
+        : selectedNode?.type === "dependent"
+          ? "conceito dependente"
+          : "conceito central";
+
+    const statusLabel: Record<Concept["status"], string> = {
+      implemented: "implementado",
+      partial: "parcial",
+      planned: "planejado",
+      stub: "rascunho",
+    };
+
+    return {
+      oQueE: `${selectedConcept.title} é um ${nodeRole} na categoria ${selectedConcept.category}. No lab, o status atual é ${statusLabel[selectedConcept.status]}.`,
+      comoFunciona: `Neste mapa, ele se relaciona com ${prerequisitesCount} pré-requisito(s) e ${dependentsCount} conceito(s) dependente(s). Siga o fluxo azul -> verde -> laranja para navegar da base para os próximos tópicos.`,
+    };
+  }, [selectedConcept, selectedNode]);
+
+  const selectedConceptProfile = useMemo(() => {
+    return resolveConceptProfile(selectedConcept);
+  }, [selectedConcept]);
+
   const adjacency = useMemo(() => {
     const map = new Map<string, string[]>();
     edges.forEach((edge: Edge) => {
@@ -307,6 +492,7 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
 
   const handleNodeClick = (node: Node) => {
     setSelectedNodeId(node.id);
+    setShouldScrollSummary(true);
 
     if (node.id === conceptId) {
       setSelectedPath([conceptId]);
@@ -433,7 +619,11 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
         </g>
       </svg>
 
-      <div className="dependency-graph__summary" aria-label="Resumo do conceito selecionado">
+      <div
+        ref={summaryRef}
+        className="dependency-graph__summary"
+        aria-label="Resumo do conceito selecionado"
+      >
         <h4>{selectedConcept.title}</h4>
         {selectedNode && (
           <p className="dependency-graph__summary-meta">
@@ -444,8 +634,75 @@ export function DependencyGraph({ conceptId }: DependencyGraphProps) {
                 : "Conceito atual"}
           </p>
         )}
-        <p>{selectedConcept.shortDefinition}</p>
-        <p>{selectedConcept.explanation}</p>
+        <p>{selectedConceptSummaryPt.oQueE}</p>
+        <p>{selectedConceptSummaryPt.comoFunciona}</p>
+
+        <div className="dependency-graph__summary-grid">
+          <section className="dependency-graph__summary-section">
+            <h5>Definicao</h5>
+            <p>{selectedConceptSummaryPt.oQueE}</p>
+          </section>
+
+          <section className="dependency-graph__summary-section">
+            <h5>Quando usar</h5>
+            <ul>
+              {selectedConceptProfile.whenToUse.map((item) => (
+                <li key={`use-${item}`}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="dependency-graph__summary-section">
+            <h5>Problemas comuns</h5>
+            <ul>
+              {selectedConceptProfile.commonProblems.map((item) => (
+                <li key={`problem-${item}`}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="dependency-graph__summary-section">
+            <h5>Custo computacional</h5>
+            <div className="dependency-graph__cost-badges">
+              <span
+                className={`dependency-graph__cost-level dependency-graph__cost-level--${selectedConceptProfile.cost.level}`}
+              >
+                {selectedConceptProfile.cost.level === "low"
+                  ? "🟢"
+                  : selectedConceptProfile.cost.level === "medium"
+                    ? "🟡"
+                    : "🔴"}{" "}
+                {toCostLevelLabel(selectedConceptProfile.cost.level)}
+              </span>
+              <span className="dependency-graph__cost-chip">
+                CPU: {selectedConceptProfile.cost.cpuIntensive ? "intensivo" : "leve"}
+              </span>
+              <span className="dependency-graph__cost-chip">
+                GPU: {selectedConceptProfile.cost.gpuRecommended ? "recomendada" : "opcional"}
+              </span>
+              <span className="dependency-graph__cost-chip">
+                Memoria: {selectedConceptProfile.cost.memoryUsage}
+              </span>
+              <span className="dependency-graph__cost-chip">
+                Latencia: {selectedConceptProfile.cost.inferenceLatency}
+              </span>
+            </div>
+          </section>
+
+          <section className="dependency-graph__summary-section">
+            <h5>Bibliotecas populares</h5>
+            <ul>
+              {selectedConceptProfile.popularLibraries.map((lib) => (
+                <li key={`lib-${lib}`}>{lib}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="dependency-graph__summary-section">
+            <h5>Por que isso importa no RAG</h5>
+            <p>{selectedConceptProfile.ragWhyItMatters}</p>
+          </section>
+        </div>
       </div>
 
       {/* Legend */}

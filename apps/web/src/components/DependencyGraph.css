@@ -163,6 +163,71 @@
   color: var(--text);
 }
 
+.dependency-graph__summary-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.dependency-graph__summary-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 8px 10px;
+}
+
+.dependency-graph__summary-section h5 {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.dependency-graph__summary-section p {
+  margin: 6px 0 0;
+}
+
+.dependency-graph__summary-section ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dependency-graph__summary-section li + li {
+  margin-top: 4px;
+}
+
+.dependency-graph__cost-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.dependency-graph__cost-level,
+.dependency-graph__cost-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.74rem;
+  color: var(--text);
+}
+
+.dependency-graph__cost-level--low {
+  border-color: rgba(21, 109, 97, 0.35);
+  background: var(--accent-soft);
+}
+
+.dependency-graph__cost-level--medium {
+  border-color: rgba(216, 172, 87, 0.35);
+  background: var(--amber-soft);
+}
+
+.dependency-graph__cost-level--high {
+  border-color: rgba(179, 52, 43, 0.35);
+  background: var(--danger-soft);
+}
+
 /* ── Legend ────────────────────────────────── */
 .dependency-graph__legend {
   display: flex;
