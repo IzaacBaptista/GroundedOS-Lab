@@ -140,6 +140,121 @@ const CONCEPT_PROFILES: Record<string, ConceptLearningProfile> = {
       inferenceLatency: "Media a alta",
     },
   },
+  "vector-database": {
+    whenToUse: [
+      "Armazenar e consultar embeddings em escala com baixa latencia.",
+      "Suportar retrieval semantico com filtros por metadata.",
+      "Projetos que precisam de indexacao incremental e atualizacao frequente.",
+    ],
+    commonProblems: [
+      "Escolha incorreta de indice ANN reduz recall.",
+      "Falta de estrategia de particionamento aumenta custo e latencia.",
+      "Mistura de embeddings de modelos diferentes no mesmo indice.",
+      "Filtros de metadata mal modelados geram resultados inconsistentes.",
+    ],
+    popularLibraries: ["FAISS", "Chroma", "pgvector", "Qdrant", "Milvus", "Weaviate"],
+    ragWhyItMatters:
+      "Vector database e o nucleo de retrieval semantico do RAG. Ele define se o contexto certo sera recuperado com velocidade e estabilidade.",
+    cost: {
+      level: "high",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Alto",
+      inferenceLatency: "Baixa a media",
+    },
+  },
+  "hybrid-search": {
+    whenToUse: [
+      "Combinar busca lexical e semantica para consultas ambiguas.",
+      "Dominios com termos tecnicos, siglas e variacoes de escrita.",
+      "Casos em que somente dense retrieval perde palavras-chave criticas.",
+    ],
+    commonProblems: [
+      "Peso mal calibrado entre sparse e dense piora ranking final.",
+      "Duplicacao de candidatos na etapa de merge sem deduplicacao robusta.",
+      "Ruido lexical elevando documentos superficiais no top-k.",
+      "Avaliar so por latencia e ignorar ganho de relevancia.",
+    ],
+    popularLibraries: ["Elasticsearch", "OpenSearch", "BM25", "FAISS", "Qdrant", "LlamaIndex"],
+    ragWhyItMatters:
+      "Hybrid search melhora cobertura e precisao no retrieval, reduzindo falhas em consultas mistas onde semantica e termo exato importam ao mesmo tempo.",
+    cost: {
+      level: "high",
+      cpuIntensive: true,
+      gpuRecommended: true,
+      memoryUsage: "Moderado a alto",
+      inferenceLatency: "Media",
+    },
+  },
+  reranking: {
+    whenToUse: [
+      "Refinar top-k inicial para aumentar precisao antes da geracao.",
+      "Cenarios com base grande e muito documento semanticamente parecido.",
+      "Fluxos onde qualidade final importa mais que minima latencia.",
+    ],
+    commonProblems: [
+      "Aplicar reranking em candidatos fracos demais nao recupera contexto perdido.",
+      "k inicial muito pequeno limita ganho do reranker.",
+      "Modelo de reranking inadequado para dominio especifico.",
+      "Custo e latencia subestimados em horario de pico.",
+    ],
+    popularLibraries: ["Cohere Rerank", "cross-encoder", "sentence-transformers", "Jina AI reranker"],
+    ragWhyItMatters:
+      "Reranking melhora a qualidade do contexto enviado ao LLM e reduz respostas parcialmente corretas causadas por ordem ruim de documentos.",
+    cost: {
+      level: "high",
+      cpuIntensive: true,
+      gpuRecommended: true,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Media a alta",
+    },
+  },
+  guardrails: {
+    whenToUse: [
+      "Proteger o sistema contra prompt injection e vazamento de dados.",
+      "Aplicacoes com requisitos de conformidade e politicas de uso.",
+      "Cenarios com risco de conteudo inseguro ou nao autorizado.",
+    ],
+    commonProblems: [
+      "Excesso de bloqueio gerando falso positivo e piorando UX.",
+      "Regras vagas que deixam passar bypass simples.",
+      "Ausencia de telemetria para entender por que uma resposta foi bloqueada.",
+      "Guardrail desconectado do contexto recuperado no RAG.",
+    ],
+    popularLibraries: ["Guardrails AI", "Llama Guard", "NeMo Guardrails", "OpenAI moderation", "Presidio"],
+    ragWhyItMatters:
+      "Guardrails reduzem risco operacional e juridico no RAG, filtrando entradas e saidas sem perder controle de rastreabilidade.",
+    cost: {
+      level: "medium",
+      cpuIntensive: true,
+      gpuRecommended: false,
+      memoryUsage: "Baixo a moderado",
+      inferenceLatency: "Baixa a media",
+    },
+  },
+  observability: {
+    whenToUse: [
+      "Monitorar qualidade, custo e latencia ponta a ponta do pipeline.",
+      "Diagnosticar regressao de retrieval ou queda de groundedness.",
+      "Comparar provedores, prompts e configuracoes com evidencia.",
+    ],
+    commonProblems: [
+      "Coletar metrica demais sem perguntas de negocio claras.",
+      "Nao versionar experimentos e perder comparabilidade historica.",
+      "Focar apenas em latencia e ignorar faithfulness/recall.",
+      "Tracing incompleto que dificulta localizar gargalos.",
+    ],
+    popularLibraries: ["OpenTelemetry", "Prometheus", "Grafana", "Langfuse", "Phoenix", "Weights & Biases"],
+    ragWhyItMatters:
+      "Observability torna o RAG operavel: sem telemetria e tracing, erros de retrieval e custo excessivo passam despercebidos em producao.",
+    cost: {
+      level: "medium",
+      cpuIntensive: false,
+      gpuRecommended: false,
+      memoryUsage: "Moderado",
+      inferenceLatency: "Baixa",
+    },
+  },
 };
 
 function resolveConceptProfile(concept: Concept): ConceptLearningProfile {

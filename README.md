@@ -18,6 +18,7 @@
 | **Try the working RAG pipeline right now** | [▶ What works today](#-what-works-today) |
 | **Run it in 5 minutes** | [⚙ Quick start](#-quick-start) |
 | **Understand the code end to end** | [📄 Phase 1 RAG internals guide](./docs/phase-1-rag-internals.md) |
+| **See what changed in Conceitos Lab UX** | [🧭 Phase 7 summary](./docs/PHASE-7-SUMMARY.md) |
 | **Understand what we're building and why** | [🎯 Objectives](#-objectives) |
 | **See the architecture** | [🏗 Architecture](#-architecture) |
 | **Learn AI concepts behind the code** | [📖 Concepts](./docs/concepts/README.md) |
@@ -112,6 +113,25 @@ Then use `POST /jobs/phase5` (or `POST /jobs/model-benchmark`) and poll with
 `GET /jobs/:jobId`. Full request examples (bearer token + API key), `jobId`
 capture, and troubleshooting are documented in
 [docs/operational-runbook.md](./docs/operational-runbook.md).
+
+### Phase 7 — Conceitos Lab UX ✅ Complete (Frontend Scope)
+
+- Sidebar now supports full-text concept search and category/status filters.
+- Concept flow is consolidated in a modal with tabs (Details, Dependencies,
+   Paths).
+- Dependency graph now supports multi-level expansion with clear hierarchical
+   columns and mandatory directed edges.
+- Node interactions include primary-path highlighting, direct-relations focus
+   mode and auto-scroll into a selected concept summary.
+- Educational summary panel is structured in Portuguese for didactic use
+   (definition, when to use, common pitfalls, computational cost, popular libs,
+   and why it matters for RAG).
+- Learning Path panel tracks progress and recommends next concepts.
+
+Reference docs:
+
+- [Phase 7 implementation status](./docs/PHASE-7-CONCEITOS-UX.md)
+- [Phase 7 delivery summary](./docs/PHASE-7-SUMMARY.md)
 
 ### What is NOT yet implemented
 

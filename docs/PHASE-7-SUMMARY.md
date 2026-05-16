@@ -1,187 +1,93 @@
-# Phase 7: Conceitos Lab UX — Sessão Concluída ✅
+# Phase 7: Conceitos Lab UX - Sessao consolidada
 
-## 📊 Status Final
+## Status final
 
-**Tempo investido:** ~2 horas  
-**Tasks completadas:** 5/5 ✅  
-**Linhas de código:** ~1,000  
-**Componentes criados:** 6 novos  
-**Erros TypeScript:** 0
+- Tasks completadas: 5/5
+- Build frontend: OK
+- Testes frontend: OK (32 passed, 4 skipped)
+- Erros TypeScript relevantes da entrega: 0
 
-## 🎯 O que foi entregue
+## O que foi entregue
 
-### 1️⃣ Sidebar com Filtros Avançados ✅
-- **Busca full-text** (título + descrição + explicação)
-- **Filtro por categoria** (dropdown)
-- **Filtro por status** (implemented/partial/planned/stub)
-- **Filtro por dificuldade** (infra pronta)
-- **Persistência localStorage** (filtros salvos entre sessões)
-- **Contador dinâmico** por categoria
-- **Mobile-responsive** (filtros colapsáveis)
+### 1. Descoberta de conceitos
 
-**Arquivo:** `useConceptsFilter.ts` + `ConceptsSidebar.tsx`
+- Sidebar com busca full-text
+- Filtros por categoria e status
+- Persistencia local de filtros
+- Melhor responsividade para navegação no Lab
 
-### 2️⃣ Grafo de Dependências Interativo 📈
-- **Visualização SVG** (sem dependências pesadas)
-- **Nós coloridos:** Pré-requisitos (azul) → Atual (verde) → Dependentes (amarelo)
-- **Algoritmo de layout** (força-dirigida simplificado)
-- **Tooltips ao hover** (mostra nome completo)
-- **Legenda visual** clara
-- **Responsivo** (zoom automático)
+Arquivos:
 
-**Arquivo:** `DependencyGraph.tsx` + `DependencyGraph.css`
+- `apps/web/src/components/ConceptsSidebar.tsx`
+- `apps/web/src/components/ConceptsSidebar.css`
+- `apps/web/src/hooks/useConceptsFilter.ts`
 
-### 3️⃣ Rastreamento de Progresso de Aprendizado 🎓
-- **Track viewed/learned concepts** (localStorage)
-- **Calcular progresso por learning path** (% completion)
-- **Recomendações inteligentes** (beginner → intermediate → advanced)
-- **Encontrar pré-requisitos faltantes** para um caminho
-- **Streak tracking** (dias consecutivos)
-- **Estatísticas** (total viewed/learned)
+### 2. Fluxo de detalhe de conceito
 
-**Arquivo:** `useLearningProgress.ts`
+- Abertura por modal no fluxo principal (substituindo abordagens anteriores)
+- Abas integradas de Detalhes, Dependencias e Caminhos
+- Integracao com acao de executar experimento
 
-### 4️⃣ Interface com Abas (Tabs) 📋
-- **Aba 1: Detalhes** (ConceptDetailPanel original)
-- **Aba 2: Dependências** (DependencyGraph)
-- **Aba 3: Caminhos** (LearningPathPanel melhorado)
-- **Navegação suave** entre abas
-- **Estados desabilitados** (ex: dependências desabilitada sem conceito selecionado)
+Arquivos:
 
-**Arquivo:** `ConceptDetailTabs.tsx` + `ConceptDetailTabs.css`
+- `apps/web/src/App.tsx`
+- `apps/web/src/components/ConceptModal.tsx`
+- `apps/web/src/components/ConceptModal.css`
+- `apps/web/src/components/ConceptDetailTabs.tsx`
+- `apps/web/src/components/ConceptDetailTabs.css`
 
-## 📦 Arquivos Criados
+### 3. Grafo de dependencias
 
-```
-apps/web/src/
-├── hooks/
-│   ├── useConceptsFilter.ts         (140 linhas)  ✅ NEW
-│   └── useLearningProgress.ts       (220 linhas)  ✅ NEW
-├── components/
-│   ├── ConceptDetailTabs.tsx        (60 linhas)   ✅ NEW
-│   ├── ConceptDetailTabs.css        (80 linhas)   ✅ NEW
-│   ├── DependencyGraph.tsx          (200 linhas)  ✅ NEW
-│   ├── DependencyGraph.css          (100 linhas)  ✅ NEW
-│   ├── ConceptsSidebar.tsx          (MODIFIED)    ✅ REFACTORED
-│   └── ConceptsSidebar.css          (MODIFIED)    ✅ ENHANCED
-```
+- Expansao em multiplos niveis
+- Hierarquia visual clara por colunas
+- Arestas direcionais obrigatoriamente visiveis
+- Destaque de caminho primario ao clicar em no
+- Toggle para focar relacoes diretas
+- Resumo do conceito selecionado com auto-scroll
 
-## 🚀 Próximos Passos
+Arquivos:
 
-### HOJE (Build & Test)
+- `apps/web/src/components/DependencyGraph.tsx`
+- `apps/web/src/components/DependencyGraph.css`
+
+### 4. Painel didatico em portugues
+
+No resumo inferior do grafo, o conteudo foi estruturado em blocos pedagogicos:
+
+- Definicao
+- Quando usar
+- Problemas comuns
+- Custo computacional
+- Bibliotecas populares
+- Por que isso importa no RAG
+
+Observacao: nomes dos conceitos permanecem em ingles quando aplicavel.
+
+### 5. Trilha de aprendizado
+
+- Progresso local viewed/learned
+- Recomendacoes de proximo passo
+- Indicacao de pre-requisitos faltantes
+
+Arquivos:
+
+- `apps/web/src/components/LearningPathPanel.tsx`
+- `apps/web/src/components/LearningPathPanel.css`
+- `apps/web/src/hooks/useLearningProgress.ts`
+
+## Validacao executada
+
+Comando:
+
 ```bash
-cd apps/web
-
-# 1. Verificar build
-npm run build
-
-# 2. Testar localmente
-npm run dev
-
-# 3. Testar features manualmente
-# - Abrir http://localhost:5173
-# - Buscar um conceito (ex: "embeddings")
-# - Clicar em conceito
-# - Ver aba de dependências renderizar
-# - Trocar para aba de caminhos
-
-# 4. Mobile test
-# - Abrir DevTools (F12)
-# - Responsive mode (Ctrl+Shift+M)
-# - Verificar filtros colapsáveis
+npm --workspace @groundedos/web run build && npm --workspace @groundedos/web run test
 ```
 
-### PRÓXIMO (Validação Final)
-1. Executar `cd apps/web && npm run build`
-2. Abrir `http://localhost:5173` e verificar o drawer de conceitos
-3. Testar as tabs de detalhes, dependências e caminhos
-4. Marcar alguns conceitos como aprendidos e confirmar o progresso persistido
-5. Capturar screenshots atualizadas para a documentação
+Resultado:
 
-## 📈 Métricas de Qualidade
+- Build finalizou com sucesso
+- Suite Vitest finalizou com sucesso
 
-| Métrica | Valor | Status |
-|---------|-------|--------|
-| TypeScript Errors | 0 | ✅ |
-| Build Size | +15KB (gzipped) | ✅ |
-| Performance (filter) | <50ms | ✅ (memoized) |
-| Accessibility | labels, aria | ✅ |
-| Mobile Support | responsive | ✅ |
-| localStorage | functional | ✅ |
+## Pendencia nao bloqueante
 
-## 🎨 UX Improvements
-
-| Feature | Before | After |
-|---------|--------|-------|
-| Finding concepts | Scroll through 36 | Search + filter (3 sec) |
-| Understanding relationships | Text only | Visual graph |
-| Learning progress | Unclear | Tracked & recommended |
-| Mobile sidebar | Full width | Collapsible |
-
-## 🔍 Code Quality
-
-- ✅ **Modular hooks** — Fácil de reutilizar em outros componentes
-- ✅ **Zero dependencies** — SVG nativo (sem D3, Force-Graph, etc)
-- ✅ **Responsive design** — Funciona em mobile/tablet/desktop
-- ✅ **Accessible** — Labels, ARIA, keyboard navigation
-- ✅ **Persistent state** — localStorage com fallback
-- ✅ **Type-safe** — TypeScript strict mode
-
-## 📝 Notas Técnicas
-
-### Design Decisions
-
-1. **SVG vs Canvas** → Escolhemos SVG para:
-   - Melhor interatividade (hover, click)
-   - Escalável sem pixelação
-   - Css styling direto
-   - Sem dependências externas
-
-2. **Força-dirigida simplificada** → Evitar D3:
-   - Layout previsível (radial por profundidade)
-   - Renderização rápida
-   - Mantém conceito central
-   - Responsivo auto-scale
-
-3. **localStorage para progresso** → Alternativa simples:
-   - Sem backend necessário em dev
-   - Pronto para migrar para API depois
-   - Funciona offline
-   - Válido para MVP
-
-4. **Tabs pattern** → Melhor UX:
-   - Évita scrolling excessivo
-   - Organiza 3 contextos diferente
-   - Deixa App.tsx clean
-   - Fácil desativar abas individuais
-
-## 🎯 KPIs Esperados
-
-**User Discovery:**
-- Tempo para achar conceito: ⬇️ -60% (search + filter)
-- Conceitos relacionados encontrados: ⬆️ +40% (graph)
-
-**Learning:**
-- Taxa de conclusão de path: ⬆️ +25% (recommendations)
-- Retenção entre sessões: ⬆️ +50% (localStorage tracking)
-
-**Engagement:**
-- DAU no Lab: ⬆️ (mobile now works)
-- Avg session time: ⬆️ (more features to explore)
-
-## ✅ Checklist Pré-Produção
-
-- [ ] Build sem erros
-- [ ] Todos os testes passam
-- [ ] Mobile responsivo (tested)
-- [ ] localStorage funciona (DevTools Application tab)
-- [x] Componentes integrados na navegação do lab
-- [x] LearningPathPanel atualizado com hook
-- [ ] Screenshots para docs atualizado
-- [ ] Commit com message descritivo
-
----
-
-**Pronto para testes! 🚀**
-
-Execute: `cd apps/web && npm run build && npm run dev`
+- Expandir `CONCEPT_PROFILES` para reduzir o uso de fallback generico em conceitos menos cobertos.

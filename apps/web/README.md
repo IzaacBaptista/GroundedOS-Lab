@@ -13,6 +13,8 @@ grounded retrieval workflows.
 - Expose the raw Dev Mode JSON returned by the API
 - Show a Trade-offs dashboard tab with rolling request/provider metrics
 - Support optional session IDs for persistent conversation memory continuity
+- Provide the Conceitos Lab UX flow with searchable concept navigation,
+  dependency graph exploration and learning-path guidance
 
 ## Status
 
@@ -21,6 +23,21 @@ web app exposes local RAG upload/index/ask flows, provider selection, optional
 session-aware asks, concept and lab surfaces, and the Trade-offs dashboard.
 Phase 6 auth UX is implemented with login/logout plus session restore/refresh
 behavior for protected API usage.
+
+Phase 7 frontend slice is complete for the Conceitos Lab UX: concept modal with
+tabs, hierarchical dependency graph with multi-level expansion, direct-relations
+focus mode, primary-path highlighting, Portuguese educational summary panel and
+learning-path progress recommendations.
+
+## Conceitos Lab UX (Phase 7)
+
+- Concepts open in a modal with tabs for Details, Dependencies and Paths
+- Sidebar supports full-text search and category/status filtering
+- Dependency graph supports multi-level expansion and clear directed edges
+- Node click highlights a primary learning path and updates an educational
+  summary panel in Portuguese
+- Graph includes a direct-relations focus toggle for simplified traversal
+- Learning Path panel tracks progress and suggests next concepts
 
 ## Local usage
 

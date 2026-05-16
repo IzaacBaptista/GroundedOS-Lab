@@ -26,10 +26,14 @@ This folder contains documentation for the GroundedOS Lab project. It covers AI 
 | [`phase-1-dev-mode-output.md`](./phase-1-dev-mode-output.md) | Stable Dev Mode output contract (retrieval baseline + adaptive extensions: cache/routing/orchestration/evals/cost). |
 | [`phase-1-local-rag.md`](./phase-1-local-rag.md) | Local RAG usage guide (commands, limits, providers). |
 | [`phase-1-rag-internals.md`](./phase-1-rag-internals.md) | End-to-end Phase 1 RAG internals guide mapping concepts to code. |
+| [`PHASE-7-CONCEITOS-UX.md`](./PHASE-7-CONCEITOS-UX.md) | Consolidated implementation status for the Conceitos Lab UX frontend scope. |
+| [`PHASE-7-SUMMARY.md`](./PHASE-7-SUMMARY.md) | Final delivery summary for Phase 7 with validation results and follow-ups. |
 | [`ollama-setup.md`](./ollama-setup.md) | Ollama installation and GroundedOS integration guide. |
 
 ## Status
 
-In progress (Phase 6 documentation rollout): aligned with runnable implementation through Phase 5,
-with Phase 6 in active rollout (auth/admin/rate-limit/audit baseline,
-optional DB-backed auth persistence, and Redis-backed async jobs).
+In progress (Phase 6-7 documentation rollout): aligned with runnable
+implementation through Phase 5, with Phase 6 in active rollout
+(auth/admin/rate-limit/audit baseline, optional DB-backed auth persistence,
+and Redis-backed async jobs), and Phase 7 frontend UX delivery documented for
+the Conceitos Lab surface.
