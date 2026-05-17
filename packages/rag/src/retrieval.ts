@@ -21,6 +21,7 @@ import {
 import {
   InMemoryVectorStore,
   type VectorMetadataFilter,
+  type VectorSearchQuery,
   type VectorSearchResult,
   type VectorStore,
 } from "./vector-store";
@@ -189,7 +190,7 @@ async function retrieveInternal(
   }
 
   if (mode === "dense") {
-    const results = index.store.search({
+    const results = await searchStore(index.store, {
       embedding: queryEmbedding,
       topK: options.topK,
       filter: options.filter,
@@ -205,7 +206,7 @@ async function retrieveInternal(
   const sparseWeight = 1 - denseWeight;
   const candidateTopK = resolveCandidateTopK(options.hybridCandidateTopK, topK);
 
-  const denseCandidates = index.store.search({
+  const denseCandidates = await searchStore(index.store, {
     embedding: queryEmbedding,
     topK: candidateTopK,
     filter: options.filter,
@@ -268,6 +269,22 @@ async function retrieveInternal(
       })),
     },
   };
+}
+
+type AsyncSearchCapableStore = VectorStore & {
+  searchAsync?: (query: VectorSearchQuery) => Promise<VectorSearchResult[]>;
+};
+
+async function searchStore(
+  store: VectorStore,
+  query: VectorSearchQuery
+): Promise<VectorSearchResult[]> {
+  const asyncStore = store as AsyncSearchCapableStore;
+  if (typeof asyncStore.searchAsync === "function") {
+    return asyncStore.searchAsync(query);
+  }
+
+  return store.search(query);
 }
 
 export function createRetrievalDevOutput(

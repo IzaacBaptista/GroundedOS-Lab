@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ingest } from "@groundedos/etl";
 
 import {
   DeterministicEmbeddingProvider,
+  type EmbeddedChunk,
   type EmbeddingProvider,
   type EmbeddingVector,
 } from "./embeddings";
@@ -167,6 +168,49 @@ describe("retrieval flow", () => {
 
     expect(index.store).toBe(store);
     expect(store.size).toBe(1);
+  });
+
+  it("uses asynchronous search when the store exposes searchAsync", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Alpha note.\n\nBeta retrieval note.",
+      metadata: {
+        documentId: "doc-async-store",
+      },
+    });
+
+    const innerStore = new InMemoryVectorStore();
+    const syncSearch = vi.fn(() => {
+      throw new Error("sync search should not run when searchAsync is available");
+    });
+    const asyncSearch = vi.fn((query: Parameters<InMemoryVectorStore["search"]>[0]) =>
+      innerStore.search(query)
+    );
+
+    const store = {
+      get size() {
+        return innerStore.size;
+      },
+      insert(chunks: EmbeddedChunk[]) {
+        innerStore.insert(chunks);
+      },
+      search: syncSearch,
+      clear() {
+        innerStore.clear();
+      },
+      searchAsync: async (query: Parameters<InMemoryVectorStore["search"]>[0]) =>
+        asyncSearch(query),
+    };
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      store,
+    });
+
+    const results = await retrieveFromIndex(index, "beta question", { topK: 1 });
+    expect(results[0]?.chunk.sectionId).toBe("section-2");
+    expect(asyncSearch).toHaveBeenCalledTimes(1);
+    expect(syncSearch).toHaveBeenCalledTimes(0);
   });
 
   it("returns an empty retrieval result for documents without chunks", async () => {

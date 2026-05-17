@@ -241,10 +241,12 @@ function camelToSnake(str: string): string {
  * Resolve the active vector store backend.
  *
  * VECTOR_BACKEND=pgvector → attempt pgvector, fall back to in-memory on failure.
+ * VECTOR_BACKEND=qdrant   → enable qdrant backend selection by callers.
  * VECTOR_BACKEND=memory   → always use in-memory (default).
  */
-export function resolveVectorBackend(): "pgvector" | "memory" {
+export function resolveVectorBackend(): "pgvector" | "qdrant" | "memory" {
   const backend = process.env.VECTOR_BACKEND?.toLowerCase().trim();
   if (backend === "pgvector") return "pgvector";
+  if (backend === "qdrant") return "qdrant";
   return "memory";
 }
