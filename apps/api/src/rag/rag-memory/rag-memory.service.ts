@@ -9,8 +9,9 @@ export class RagMemoryService {
   async listSession(
     sessionId: string,
     ownerId?: string,
+    tenantId?: string,
     limit?: number
   ): Promise<RagSessionMemoryResponse> {
-    return getRagSessionMemory(sessionId, limit, ownerId);
+    return getRagSessionMemory(sessionId, limit, ownerId, tenantId);
   }
 }

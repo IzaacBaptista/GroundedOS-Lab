@@ -23,7 +23,11 @@ export class AdminService {
     return getRagAdminCostSummary();
   }
 
-  createApiKey(input: { label?: string; user: AuthUser }): Promise<CreatedApiKey> {
+  createApiKey(input: {
+    label?: string;
+    user: AuthUser;
+    scopes?: string[];
+  }): Promise<CreatedApiKey> {
     return this.authService.createApiKey(input);
   }
 

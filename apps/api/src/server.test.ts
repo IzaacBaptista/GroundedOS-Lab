@@ -778,6 +778,69 @@ describe("api server", () => {
     }
   });
 
+  it("enforces API key scopes for ingestion endpoints", async () => {
+    const previousEnforcement = process.env.AUTH_ENFORCEMENT;
+    process.env.AUTH_ENFORCEMENT = "true";
+
+    try {
+      const app = await createTestServer();
+      const loginResponse = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          username: process.env.ADMIN_USERNAME ?? "admin",
+          password: process.env.ADMIN_PASSWORD ?? "admin-password",
+        },
+      });
+      const loginBody = loginResponse.json() as { accessToken: string };
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/admin/api-keys",
+        headers: {
+          authorization: `Bearer ${loginBody.accessToken}`,
+        },
+        payload: {
+          label: "read-only",
+          scopes: ["rag:read"],
+        },
+      });
+      const created = createResponse.json() as { apiKey: string };
+
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/rag/indexes",
+        headers: {
+          "x-api-key": created.apiKey,
+        },
+      });
+      expect(listResponse.statusCode).toBe(200);
+
+      const ingestResponse = await app.inject({
+        method: "POST",
+        url: "/rag/index",
+        headers: {
+          "x-api-key": created.apiKey,
+        },
+        payload: {
+          type: "text",
+          content: "Scoped API key ingestion should fail.",
+          title: "read-only-key",
+          documentId: "read-only-key-doc",
+        },
+      });
+
+      expect(ingestResponse.statusCode).toBe(403);
+      expect(ingestResponse.json()).toMatchObject({
+        error: {
+          message: "API key does not have permission for this operation.",
+        },
+      });
+    } finally {
+      process.env.AUTH_ENFORCEMENT = previousEnforcement;
+    }
+  });
+
   it("rejects expired API keys", async () => {
     const previousEnforcement = process.env.AUTH_ENFORCEMENT;
     const previousApiKeyTtl = process.env.API_KEY_TTL;

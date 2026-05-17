@@ -5,7 +5,7 @@ import type {
   RagIndexDeleteResponse,
   RagIndexListResponse,
 } from "../../rag-service";
-import { getRequestUserId } from "../../common/auth-context";
+import { getRequestTenantId, getRequestUserId } from "../../common/auth-context";
 import { RagIndexService } from "./rag-index.service";
 
 @Controller("rag/indexes")
@@ -14,7 +14,7 @@ export class RagIndexController {
 
   @Get()
   list(@Req() request: FastifyRequest): Promise<RagIndexListResponse> {
-    return this.ragIndex.list(getRequestUserId(request));
+    return this.ragIndex.list(getRequestUserId(request), getRequestTenantId(request));
   }
 
   @Get(":documentId/embedding-map")
@@ -22,7 +22,11 @@ export class RagIndexController {
     @Req() request: FastifyRequest,
     @Param("documentId") documentId: string
   ): Promise<RagEmbeddingMapResponse> {
-    return this.ragIndex.embeddingMap(documentId ?? "", getRequestUserId(request));
+    return this.ragIndex.embeddingMap(
+      documentId ?? "",
+      getRequestUserId(request),
+      getRequestTenantId(request)
+    );
   }
 
   @Delete(":documentId")
@@ -30,6 +34,10 @@ export class RagIndexController {
     @Req() request: FastifyRequest,
     @Param("documentId") documentId: string
   ): Promise<RagIndexDeleteResponse> {
-    return this.ragIndex.delete(documentId ?? "", getRequestUserId(request));
+    return this.ragIndex.delete(
+      documentId ?? "",
+      getRequestUserId(request),
+      getRequestTenantId(request)
+    );
   }
 }

@@ -584,24 +584,25 @@ Start here:
 
 ### Authentication & Authorization
 
-Authentication and authorization have an implemented Phase 6 baseline for local and staged environments:
+Authentication and authorization include a multi-tenant isolation baseline for local and staged environments:
 
 * **JWT + refresh flow** via `POST /auth/login`, `POST /auth/refresh` and `POST /auth/logout`
-* **API key management** for scoped API access
-* **Owner scoping** for indexes and memory access boundaries
-* **Rate limiting and audit hooks** on protected paths
+* **API key management** with tenant/user binding and scope-based policies
+* **Ownership scoping** for indexes and session memory (`tenantId`, `userId`, `createdBy`)
+* **Deny-by-default access checks** for cross-tenant/cross-owner retrieval and CRUD operations
+* **Structured audit hooks** for denied access, cross-tenant attempts and API key usage
+* **Rate limiting** on protected paths
 
 Auth enforcement behavior:
 
 * **Local development**: opt-in (`AUTH_ENFORCEMENT=true`)
 * **Non-dev/non-test**: enabled by default when `AUTH_ENFORCEMENT` is unset
 
-Before public deployment or multi-tenant production usage, the following must still be completed:
+Current limitations / next steps:
 
-* **API authentication** — all API endpoints require a bearer token or session cookie. No anonymous access to indexes or agent state.
-* **Index ownership** — persisted indexes are scoped to a user or session identifier; one user cannot read or delete another user's indexes.
-* **Role boundaries** — Lab Mode features (Jailbreak Playground, prompt A/B tests) are restricted to authenticated users with explicit opt-in.
+* **RBAC/ABAC expansion** — API key scopes are intentionally simple (`rag:*`, `jobs:*`, `admin:*`) and can evolve into richer role/policy engines.
 * **External identity providers** — OAuth/OIDC provider integration and production-grade identity lifecycle.
+* **Production hardening** — distributed key management, advanced observability and additional tenancy controls for external vector backends.
 
 This strategy is tracked as a Phase 6 success criterion. Implementation decisions will be recorded in [`docs/adr/`](./docs/adr/).
 

@@ -8,9 +8,11 @@ export type StoredApiKey = {
   keyHash: string;
   keyPrefix: string;
   label?: string;
+  tenantId: string;
   userId: string;
   username: string;
   roles: string[];
+  scopes: string[];
   createdAt: string;
   expiresAt?: string;
   revokedAt?: string;
@@ -231,9 +233,16 @@ function parseStoredApiKey(value: string | null): StoredApiKey | null {
       keyHash: parsed.keyHash,
       keyPrefix: parsed.keyPrefix,
       label: typeof parsed.label === "string" ? parsed.label : undefined,
+      tenantId:
+        typeof parsed.tenantId === "string" && parsed.tenantId.trim().length > 0
+          ? parsed.tenantId
+          : parsed.userId,
       userId: parsed.userId,
       username: parsed.username,
       roles: parsed.roles.filter((role): role is string => typeof role === "string"),
+      scopes: Array.isArray(parsed.scopes)
+        ? parsed.scopes.filter((scope): scope is string => typeof scope === "string")
+        : ["*"],
       createdAt: parsed.createdAt,
       expiresAt: typeof parsed.expiresAt === "string" ? parsed.expiresAt : undefined,
       revokedAt: typeof parsed.revokedAt === "string" ? parsed.revokedAt : undefined,

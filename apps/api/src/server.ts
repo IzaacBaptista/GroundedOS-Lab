@@ -16,6 +16,11 @@ import type { ApiConfig } from "./config/api-config";
 import { AuthService } from "./auth/auth.service";
 import { createUserRateLimiter } from "./auth/rate-limit-store";
 import { AuditService } from "./audit/audit.service";
+import {
+  ensureApiKeyScopes,
+  resolveRequiredApiKeyScopes,
+} from "./common/access-control";
+import type { AuthenticatedRequestUser } from "./common/auth-context";
 
 const DEFAULT_PORT = 3001;
 
@@ -81,17 +86,27 @@ export async function createApiServer(
     const cookieToken = extractCookieValue(request.headers.cookie, "groundedos-session");
     const token = bearerToken ?? cookieToken;
     const apiKey = extractApiKey(request.headers["x-api-key"]);
+    const requestId = String(request.id);
+    const operationPath = request.url.split("?")[0] ?? "/";
 
     let user = null;
 
     if (token) {
       user = await authService.verifyAccessToken(token);
       if (!user) {
+        await auditService.record({
+          action: "access.denied.invalid_token",
+          resource: path,
+          metadata: {
+            method: request.method,
+            requestId,
+          },
+        });
         reply.status(401).send({
           error: {
             message: "Invalid or expired token.",
             errorCode: "UNAUTHORIZED",
-            requestId: String(request.id),
+            requestId,
           },
         });
         return;
@@ -99,24 +114,88 @@ export async function createApiServer(
     } else if (apiKey) {
       user = await authService.verifyApiKey(apiKey);
       if (!user) {
+        await auditService.record({
+          action: "access.denied.invalid_api_key",
+          resource: path,
+          metadata: {
+            method: request.method,
+            requestId,
+          },
+        });
         reply.status(401).send({
           error: {
             message: "Invalid API key.",
             errorCode: "UNAUTHORIZED",
-            requestId: String(request.id),
+            requestId,
           },
         });
         return;
       }
     } else {
+      await auditService.record({
+        action: "access.denied.unauthenticated",
+        resource: path,
+        metadata: {
+          method: request.method,
+          requestId,
+        },
+      });
       reply.status(401).send({
         error: {
           message: "Authentication required.",
           errorCode: "UNAUTHORIZED",
-          requestId: String(request.id),
+          requestId,
         },
       });
       return;
+    }
+
+    const requestUser: AuthenticatedRequestUser = {
+      ...user,
+      requestId,
+    };
+
+    if (requestUser.authType === "api_key") {
+      const requiredScopes = resolveRequiredApiKeyScopes(request.method, operationPath);
+      try {
+        ensureApiKeyScopes(requestUser, requiredScopes, `${request.method} ${operationPath}`);
+      } catch {
+        await auditService.record({
+          userId: requestUser.userId,
+          username: requestUser.username,
+          action: "access.denied.api_key_scope",
+          resource: path,
+          metadata: {
+            tenantId: requestUser.tenantId,
+            apiKeyId: requestUser.apiKeyId,
+            requiredScopes,
+            grantedScopes: requestUser.apiKeyScopes ?? [],
+            requestId,
+          },
+        });
+        reply.status(403).send({
+          error: {
+            message: "API key does not have permission for this operation.",
+            errorCode: "FORBIDDEN",
+            requestId,
+          },
+        });
+        return;
+      }
+
+      await auditService.record({
+        userId: requestUser.userId,
+        username: requestUser.username,
+        action: "auth.api_key.used",
+        resource: path,
+        metadata: {
+          tenantId: requestUser.tenantId,
+          apiKeyId: requestUser.apiKeyId,
+          scopes: requestUser.apiKeyScopes ?? [],
+          method: request.method,
+          requestId,
+        },
+      });
     }
 
     if (requestsPerHour > 0) {
@@ -160,11 +239,22 @@ export async function createApiServer(
     }
 
     if (path.startsWith("/admin") && !user.roles.includes("admin")) {
+      await auditService.record({
+        userId: requestUser.userId,
+        username: requestUser.username,
+        action: "access.denied.admin_role_required",
+        resource: path,
+        metadata: {
+          tenantId: requestUser.tenantId,
+          apiKeyId: requestUser.apiKeyId,
+          requestId,
+        },
+      });
       reply.status(403).send({
         error: {
           message: "Admin role required.",
           errorCode: "FORBIDDEN",
-          requestId: String(request.id),
+          requestId,
         },
       });
       return;
@@ -175,18 +265,29 @@ export async function createApiServer(
       const hasLabRole = user.roles.some((role) => allowedLabRoles.includes(role));
 
       if (!hasLabRole) {
+        await auditService.record({
+          userId: requestUser.userId,
+          username: requestUser.username,
+          action: "access.denied.lab_role_required",
+          resource: path,
+          metadata: {
+            tenantId: requestUser.tenantId,
+            apiKeyId: requestUser.apiKeyId,
+            requestId,
+          },
+        });
         reply.status(403).send({
           error: {
             message: `Lab Mode features require one of: ${allowedLabRoles.join(", ")}.`,
             errorCode: "FORBIDDEN",
-            requestId: String(request.id),
+            requestId,
           },
         });
         return;
       }
     }
 
-    (request as unknown as { user?: unknown }).user = user;
+    (request as unknown as { user?: unknown }).user = requestUser;
   });
 
   fastify.addHook("onSend", (request, reply, payload, done) => {

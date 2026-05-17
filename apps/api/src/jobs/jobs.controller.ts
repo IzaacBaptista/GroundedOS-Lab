@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from "@nestjs/common";
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { getRequestUserId } from "../common/auth-context";
+import { getRequestUser } from "../common/auth-context";
 import { ApiRequestError } from "../errors";
 import { JobsService, type EnqueuedJobResponse, type JobStatusResponse } from "./jobs.service";
 import type { Phase5ExperimentTrack } from "./job-queue";
@@ -122,7 +122,7 @@ export class JobsController {
       throw new ApiRequestError("dlqJobId is required.", 400);
     }
 
-    const redrivenBy = getRequestUserId(request);
+    const redrivenBy = getRequestUser(request)?.userId;
     return this.jobs.redriveDlqJob(normalized, body.dryRun ?? false, redrivenBy);
   }
 
@@ -141,14 +141,14 @@ function normalizeCorrelation(
   body: EnqueuePhase5Request | EnqueueModelBenchmarkRequest,
   request: FastifyRequest
 ) {
-  const requestUserId = getRequestUserId(request);
+  const requestUser = getRequestUser(request);
 
   return {
-    requestId: normalizeOptionalString(body.requestId),
+    requestId: normalizeOptionalString(body.requestId) ?? String(request.id),
     jobId: normalizeOptionalString(body.jobId),
     sessionId: normalizeOptionalString(body.sessionId),
-    tenantId: normalizeOptionalString(body.tenantId),
-    userId: normalizeOptionalString(body.userId) ?? requestUserId,
+    tenantId: normalizeOptionalString(body.tenantId) ?? requestUser?.tenantId,
+    userId: normalizeOptionalString(body.userId) ?? requestUser?.userId,
     indexId: normalizeOptionalString(body.indexId),
   };
 }

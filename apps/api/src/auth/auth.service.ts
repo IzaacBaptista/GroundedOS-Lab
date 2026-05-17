@@ -15,18 +15,24 @@ import { createAuthSessionStore, type AuthSessionStore } from "./session-store";
 import { verifyPassword } from "./password";
 
 export type AuthUser = {
+  tenantId: string;
   userId: string;
   username: string;
   roles: string[];
+  authType?: "access_token" | "api_key";
+  apiKeyId?: string;
+  apiKeyScopes?: string[];
 };
 
 export type ApiKeySummary = {
   id: string;
   keyPrefix: string;
   label?: string;
+  tenantId: string;
   userId: string;
   username: string;
   roles: string[];
+  scopes: string[];
   createdAt: string;
   expiresAt?: string;
   revokedAt?: string;
@@ -39,6 +45,7 @@ export type CreatedApiKey = {
 
 type TokenClaims = {
   sub: string;
+  tenantId?: string;
   username: string;
   roles: string[];
   tokenType: "access" | "refresh";
@@ -74,6 +81,7 @@ export class AuthService {
 
     const roles = user.roles.length > 0 ? user.roles : ["user"];
     return this.issueTokenPair({
+      tenantId: user.id,
       userId: user.id,
       username: user.username,
       roles,
@@ -102,7 +110,7 @@ export class AuthService {
     const roles = ["user"];
     const userId = `ext-${shortHash(`${provider}:${externalId}`)}`;
 
-    return this.issueTokenPair({ userId, username, roles });
+    return this.issueTokenPair({ tenantId: userId, userId, username, roles });
   }
 
   async refreshAccessToken(
@@ -135,6 +143,7 @@ export class AuthService {
     const refreshExpiresIn = Math.floor(this.refreshTokenExpiryMs / 1000);
     const accessClaims: TokenClaims = {
       sub: claims.sub,
+      tenantId: claims.tenantId ?? claims.sub,
       username: claims.username,
       roles: claims.roles,
       tokenType: "access",
@@ -144,6 +153,7 @@ export class AuthService {
     };
     const nextRefreshClaims: TokenClaims = {
       sub: claims.sub,
+      tenantId: claims.tenantId ?? claims.sub,
       username: claims.username,
       roles: claims.roles,
       tokenType: "refresh",
@@ -165,9 +175,11 @@ export class AuthService {
       refreshToken: this.signToken(nextRefreshClaims),
       expiresIn,
       user: {
+        tenantId: accessClaims.tenantId ?? accessClaims.sub,
         userId: accessClaims.sub,
         username: accessClaims.username,
         roles: accessClaims.roles,
+        authType: "access_token",
       },
     };
   }
@@ -193,9 +205,11 @@ export class AuthService {
     }
 
     return {
+      tenantId: claims.tenantId ?? claims.sub,
       userId: claims.sub,
       username: claims.username,
       roles: claims.roles,
+      authType: "access_token",
     };
   }
 
@@ -215,15 +229,20 @@ export class AuthService {
     }
 
     return {
+      tenantId: current.tenantId,
       userId: current.userId,
       username: current.username,
       roles: current.roles,
+      authType: "api_key",
+      apiKeyId: current.id,
+      apiKeyScopes: current.scopes,
     };
   }
 
   async createApiKey(input: {
     label?: string;
     user: AuthUser;
+    scopes?: string[];
   }): Promise<CreatedApiKey> {
     const id = randomUUID();
     const secret = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
@@ -236,9 +255,11 @@ export class AuthService {
       keyHash: hashApiKey(key),
       keyPrefix,
       label: normalizeOptionalLabel(input.label),
+      tenantId: input.user.tenantId,
       userId: input.user.userId,
       username: input.user.username,
       roles: input.user.roles,
+      scopes: normalizeApiKeyScopes(input.scopes, input.user.roles),
       createdAt,
       expiresAt,
     };
@@ -286,10 +307,12 @@ export class AuthService {
     return this.createApiKey({
       label: current.label,
       user: {
+        tenantId: current.tenantId,
         userId: current.userId,
         username: current.username,
         roles: current.roles,
       },
+      scopes: current.scopes,
     });
   }
 
@@ -349,6 +372,7 @@ export class AuthService {
   }
 
   private async issueTokenPair(input: {
+    tenantId: string;
     userId: string;
     username: string;
     roles: string[];
@@ -360,6 +384,7 @@ export class AuthService {
 
     const accessClaims: TokenClaims = {
       sub: input.userId,
+      tenantId: input.tenantId,
       username: input.username,
       roles,
       tokenType: "access",
@@ -387,9 +412,11 @@ export class AuthService {
       refreshToken: this.signToken(refreshClaims),
       expiresIn,
       user: {
+        tenantId: accessClaims.tenantId ?? accessClaims.sub,
         userId: accessClaims.sub,
         username: accessClaims.username,
         roles: accessClaims.roles,
+        authType: "access_token",
       },
     };
   }
@@ -453,9 +480,11 @@ function toApiKeySummary(record: StoredApiKey): ApiKeySummary {
     id: record.id,
     keyPrefix: record.keyPrefix,
     label: record.label,
+    tenantId: record.tenantId,
     userId: record.userId,
     username: record.username,
     roles: record.roles,
+    scopes: record.scopes,
     createdAt: record.createdAt,
     expiresAt: record.expiresAt,
     revokedAt: record.revokedAt,
@@ -469,6 +498,28 @@ function normalizeOptionalLabel(value: string | undefined): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeApiKeyScopes(scopes: string[] | undefined, roles: string[]): string[] {
+  const normalized =
+    scopes
+      ?.filter((scope): scope is string => typeof scope === "string")
+      .map((scope) => scope.trim())
+      .filter((scope) => scope.length > 0) ?? [];
+
+  if (normalized.includes("*")) {
+    return ["*"];
+  }
+
+  if (normalized.length > 0) {
+    return Array.from(new Set(normalized));
+  }
+
+  if (roles.includes("admin")) {
+    return ["*"];
+  }
+
+  return ["rag:read", "rag:ingest", "rag:delete", "jobs:enqueue", "jobs:read"];
 }
 
 function isExpired(expiresAt: string | undefined): boolean {
