@@ -551,6 +551,42 @@ describe("persisted RAG indexes", () => {
       await rm(indexDir, { recursive: true, force: true });
     }
   });
+
+  it("isolates persisted retrieval by tenant and user ownership", async () => {
+    const indexDir = await createTempIndexDir();
+
+    try {
+      await indexRag({
+        type: "text",
+        content: "Tenant A private document.",
+        title: "Tenant A",
+        documentId: "tenant-a-doc",
+        indexDir,
+        ownerId: "user-a",
+        tenantId: "tenant-a",
+      });
+
+      await expect(
+        askRag({
+          documentId: "tenant-a-doc",
+          query: "What is private?",
+          indexDir,
+          ownerId: "user-a",
+          tenantId: "tenant-b",
+        })
+      ).rejects.toMatchObject({
+        statusCode: 404,
+      });
+
+      await expect(
+        listPersistedRagIndexes(indexDir, "user-a", "tenant-b")
+      ).resolves.toMatchObject({
+        count: 0,
+      });
+    } finally {
+      await rm(indexDir, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createTempIndexDir(): Promise<string> {

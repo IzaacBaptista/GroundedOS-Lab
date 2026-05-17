@@ -30,7 +30,7 @@ import {
   parsePositiveInteger,
   withTempUpload,
 } from "../common/multipart";
-import { getRequestUserId } from "../common/auth-context";
+import { getRequestUser } from "../common/auth-context";
 import { RagService } from "./rag.service";
 
 type FastifyMultipartRequest = FastifyRequest & {
@@ -48,10 +48,10 @@ export class RagController {
     @Headers("content-type") contentType: string | undefined,
     @Body() body: unknown
   ): Promise<RagAskResponse> {
-    const ownerId = getRequestUserId(request);
+    const requestUser = getRequestUser(request);
 
     if (request.isMultipart()) {
-      return await this.handleMultipartAsk(request, ownerId);
+      return await this.handleMultipartAsk(request, requestUser);
     }
 
     if (!contentType?.includes("application/json")) {
@@ -71,7 +71,10 @@ export class RagController {
 
     return await this.rag.ask({
       ...(validated as RagAskRequest),
-      ownerId,
+      ownerId: requestUser?.userId,
+      tenantId: requestUser?.tenantId,
+      requestId: String(request.id),
+      apiKeyId: requestUser?.apiKeyId,
     });
   }
 
@@ -82,10 +85,10 @@ export class RagController {
     @Headers("content-type") contentType: string | undefined,
     @Body() body: unknown
   ): Promise<RagIndexResponse> {
-    const ownerId = getRequestUserId(request);
+    const requestUser = getRequestUser(request);
 
     if (request.isMultipart()) {
-      return await this.handleMultipartIndex(request, ownerId);
+      return await this.handleMultipartIndex(request, requestUser);
     }
 
     if (!contentType?.includes("application/json")) {
@@ -104,14 +107,14 @@ export class RagController {
 
     return await this.rag.index({
       ...(validated as RagIndexRequest),
-      ownerId,
+      ownerId: requestUser?.userId,
+      tenantId: requestUser?.tenantId,
+      requestId: String(request.id),
+      apiKeyId: requestUser?.apiKeyId,
     });
   }
 
-  private async handleMultipartAsk(
-    request: FastifyRequest,
-    ownerId?: string
-  ): Promise<RagAskResponse> {
+  private async handleMultipartAsk(request: FastifyRequest, user?: ReturnType<typeof getRequestUser>): Promise<RagAskResponse> {
     const { fields, upload } = await extractMultipart(request);
 
     return await withTempUpload(upload, (tempFilePath) =>
@@ -135,14 +138,17 @@ export class RagController {
           fields.enableShadowRetrieval,
           "enableShadowRetrieval"
         ),
-        ownerId,
+        ownerId: user?.userId,
+        tenantId: user?.tenantId,
+        requestId: String(request.id),
+        apiKeyId: user?.apiKeyId,
       })
     );
   }
 
   private async handleMultipartIndex(
     request: FastifyRequest,
-    ownerId?: string
+    user?: ReturnType<typeof getRequestUser>
   ): Promise<RagIndexResponse> {
     const { fields, upload } = await extractMultipart(request);
 
@@ -155,7 +161,10 @@ export class RagController {
         documentId: fields.documentId,
         metadata: parseMetadata(fields.metadata),
         embeddingProvider: fields.embeddingProvider as RagIndexFileRequest["embeddingProvider"],
-        ownerId,
+        ownerId: user?.userId,
+        tenantId: user?.tenantId,
+        requestId: String(request.id),
+        apiKeyId: user?.apiKeyId,
       })
     );
   }

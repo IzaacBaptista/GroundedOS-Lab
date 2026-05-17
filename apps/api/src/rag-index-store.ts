@@ -12,6 +12,14 @@ const DEFAULT_INDEX_DIR = ".groundedos/indexes";
 export type PersistedRagIndex = {
   schemaVersion: typeof SCHEMA_VERSION;
   createdAt: string;
+  ownership: {
+    tenantId: string;
+    userId: string;
+    createdBy: string;
+  };
+  /**
+   * @deprecated Backward compatibility alias. Use ownership.userId.
+   */
   resourceOwner?: string;
   document: RagDocumentSummary;
   index: RagIndexSummary;
@@ -26,6 +34,11 @@ export type SavedRagIndex = {
 
 export type PersistedRagIndexListItem = {
   createdAt: string;
+  ownership: {
+    tenantId: string;
+    userId: string;
+    createdBy: string;
+  };
   resourceOwner?: string;
   document: RagDocumentSummary;
   index: RagIndexSummary;
@@ -64,7 +77,10 @@ export async function saveRagIndex(
 export async function loadRagIndex(
   documentId: string,
   indexDir?: string,
-  ownerId?: string
+  ownership?: {
+    tenantId: string;
+    userId: string;
+  }
 ): Promise<SavedRagIndex> {
   const resolvedIndexDir = resolveIndexDir(indexDir);
   const indexPath = createIndexPath(documentId, resolvedIndexDir);
@@ -74,7 +90,7 @@ export async function loadRagIndex(
     const record = JSON.parse(raw) as PersistedRagIndex;
 
     validatePersistedRagIndex(record, documentId);
-    validateResourceOwnership(record, ownerId, documentId);
+    validateResourceOwnership(record, ownership, documentId);
 
     return {
       record,
@@ -99,7 +115,10 @@ export async function loadRagIndex(
 
 export async function listRagIndexes(
   indexDir?: string,
-  ownerId?: string
+  ownership?: {
+    tenantId: string;
+    userId: string;
+  }
 ): Promise<PersistedRagIndexListItem[]> {
   const resolvedIndexDir = resolveIndexDir(indexDir);
 
@@ -113,9 +132,13 @@ export async function listRagIndexes(
     const items = await Promise.all(indexFiles.map(readIndexListItem));
 
     const scopedItems =
-      ownerId === undefined
+      ownership === undefined
         ? items
-        : items.filter((item) => item.resourceOwner === ownerId);
+        : items.filter(
+            (item) =>
+              item.ownership.tenantId === ownership.tenantId &&
+              item.ownership.userId === ownership.userId
+          );
 
     return scopedItems.sort((left, right) => {
       const createdAtOrder = right.createdAt.localeCompare(left.createdAt);
@@ -142,9 +165,12 @@ export async function listRagIndexes(
 export async function deleteRagIndex(
   documentId: string,
   indexDir?: string,
-  ownerId?: string
+  ownership?: {
+    tenantId: string;
+    userId: string;
+  }
 ): Promise<PersistedRagIndexListItem> {
-  const saved = await loadRagIndex(documentId, indexDir, ownerId);
+  const saved = await loadRagIndex(documentId, indexDir, ownership);
 
   try {
     await unlink(saved.indexPath);
@@ -180,9 +206,11 @@ function hashDocumentId(documentId: string): string {
 }
 
 function toListItem(record: PersistedRagIndex, indexPath: string): PersistedRagIndexListItem {
+  const normalizedOwnership = normalizeOwnership(record);
   return {
     createdAt: record.createdAt,
-    resourceOwner: record.resourceOwner,
+    ownership: normalizedOwnership,
+    resourceOwner: normalizedOwnership.userId,
     document: record.document,
     index: record.index,
     storage: {
@@ -211,25 +239,41 @@ function validatePersistedRagIndex(record: PersistedRagIndex, documentId: string
   if (!record.index || !Array.isArray(record.embeddedChunks)) {
     throw new ApiRequestError(`Persisted RAG index "${documentId}" is incomplete.`, 500);
   }
+
+  normalizeOwnership(record);
 }
 
 function validateResourceOwnership(
   record: PersistedRagIndex,
-  ownerId: string | undefined,
+  ownership:
+    | {
+        tenantId: string;
+        userId: string;
+      }
+    | undefined,
   documentId: string
 ): void {
-  if (!ownerId) {
+  if (!ownership) {
     return;
   }
 
-  if (!record.resourceOwner) {
-    throw new ApiRequestError(
-      `No persisted RAG index found for documentId "${documentId}".`,
-      404
+  const normalizedOwnership = normalizeOwnership(record);
+  if (
+    normalizedOwnership.tenantId !== ownership.tenantId ||
+    normalizedOwnership.userId !== ownership.userId
+  ) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        event: "access.cross_tenant_attempt",
+        resourceType: "rag_index",
+        documentId,
+        expectedTenantId: ownership.tenantId,
+        expectedUserId: ownership.userId,
+        actualTenantId: normalizedOwnership.tenantId,
+        actualUserId: normalizedOwnership.userId,
+      })
     );
-  }
-
-  if (record.resourceOwner !== ownerId) {
     throw new ApiRequestError(
       `No persisted RAG index found for documentId "${documentId}".`,
       404
@@ -239,4 +283,44 @@ function validateResourceOwnership(
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function normalizeOwnership(record: PersistedRagIndex): {
+  tenantId: string;
+  userId: string;
+  createdBy: string;
+} {
+  if (
+    record.ownership &&
+    typeof record.ownership.tenantId === "string" &&
+    record.ownership.tenantId.trim().length > 0 &&
+    typeof record.ownership.userId === "string" &&
+    record.ownership.userId.trim().length > 0 &&
+    typeof record.ownership.createdBy === "string" &&
+    record.ownership.createdBy.trim().length > 0
+  ) {
+    return {
+      tenantId: record.ownership.tenantId,
+      userId: record.ownership.userId,
+      createdBy: record.ownership.createdBy,
+    };
+  }
+
+  if (typeof record.resourceOwner === "string" && record.resourceOwner.trim().length > 0) {
+    return {
+      tenantId: record.resourceOwner,
+      userId: record.resourceOwner,
+      createdBy: record.resourceOwner,
+    };
+  }
+
+  console.warn(
+    JSON.stringify({
+      level: "warn",
+      event: "access.ownership_validation_failed",
+      resourceType: "rag_index",
+      documentId: record.document?.documentId,
+    })
+  );
+  throw new ApiRequestError("Persisted RAG index ownership metadata is missing.", 500);
 }

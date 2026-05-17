@@ -12,6 +12,7 @@ import { AdminService } from "./admin.service";
 
 type CreateApiKeyRequest = {
   label?: string;
+  scopes?: string[];
 };
 
 @Controller("admin")
@@ -103,16 +104,18 @@ export class AdminController {
     @Body() body: CreateApiKeyRequest
   ): Promise<{
     apiKey: string;
-    key: {
-      id: string;
-      keyPrefix: string;
-      label?: string;
-      userId: string;
-      username: string;
-      roles: string[];
-      createdAt: string;
-      expiresAt?: string;
-      revokedAt?: string;
+      key: {
+        id: string;
+        keyPrefix: string;
+        label?: string;
+        tenantId: string;
+        userId: string;
+        username: string;
+        roles: string[];
+        scopes: string[];
+        createdAt: string;
+        expiresAt?: string;
+        revokedAt?: string;
     };
   }> {
     const requestUser = getRequestUser(request);
@@ -123,6 +126,7 @@ export class AdminController {
     const created = await this.admin.createApiKey({
       label: typeof body?.label === "string" ? body.label : undefined,
       user: requestUser,
+      scopes: Array.isArray(body?.scopes) ? body.scopes : undefined,
     });
 
     await this.audit.record({
@@ -150,16 +154,18 @@ export class AdminController {
   ): Promise<{
     count: number;
     nextCursor?: string;
-    keys: Array<{
-      id: string;
-      keyPrefix: string;
-      label?: string;
-      userId: string;
-      username: string;
-      roles: string[];
-      createdAt: string;
-      expiresAt?: string;
-      revokedAt?: string;
+      keys: Array<{
+        id: string;
+        keyPrefix: string;
+        label?: string;
+        tenantId: string;
+        userId: string;
+        username: string;
+        roles: string[];
+        scopes: string[];
+        createdAt: string;
+        expiresAt?: string;
+        revokedAt?: string;
     }>;
   }> {
     const limit = parseLimit(limitValue);
@@ -227,16 +233,18 @@ export class AdminController {
     rotated: true;
     replacedId: string;
     apiKey: string;
-    key: {
-      id: string;
-      keyPrefix: string;
-      label?: string;
-      userId: string;
-      username: string;
-      roles: string[];
-      createdAt: string;
-      expiresAt?: string;
-      revokedAt?: string;
+      key: {
+        id: string;
+        keyPrefix: string;
+        label?: string;
+        tenantId: string;
+        userId: string;
+        username: string;
+        roles: string[];
+        scopes: string[];
+        createdAt: string;
+        expiresAt?: string;
+        revokedAt?: string;
     };
   }> {
     const rotated = await this.admin.rotateApiKey(id);
