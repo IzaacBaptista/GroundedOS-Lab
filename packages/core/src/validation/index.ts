@@ -186,15 +186,15 @@ export class ZodValidationError extends Error {
  * The `schema` parameter accepts any Zod schema (ZodTypeAny) without
  * requiring the caller to import directly from `zod`.
  */
-export function validateApiInput<T>(
+export function validateApiInput<TSchema extends ZodTypeAny>(
   _contractName: string,
-  schema: ZodTypeAny,
+  schema: TSchema,
   input: unknown
-): T {
+): z.infer<TSchema> {
   const result = schema.safeParse(input);
 
   if (result.success) {
-    return result.data as T;
+    return result.data;
   }
 
   const errors = result.error.issues.flatMap((issue) => {
