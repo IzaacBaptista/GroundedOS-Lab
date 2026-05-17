@@ -31,11 +31,15 @@ import {
 } from "@groundedos/observability";
 import {
   buildRetrievalIndex,
+  createVectorStoreForDualWrite,
   InMemoryVectorStore,
+  isVectorDualWriteEnabled,
   LocalHashEmbeddingsProvider,
   OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
+  QdrantVectorStore,
   SemanticCache,
+  resolveVectorBackend,
   retrieveForDevMode,
   selectAdaptiveCacheThreshold,
   semanticToEmbeddingProvider,
@@ -45,6 +49,7 @@ import {
   type EmbeddingVector,
   type RetrievalIndex,
   type RetrievalDevModeOutput,
+  type VectorStore,
 } from "@groundedos/rag";
 import { processQuery } from "@groundedos/query-understanding";
 import {
@@ -76,6 +81,8 @@ const DEFAULT_OPENAI_EMBEDDING_DIMENSIONS = 1536;
 const DEFAULT_MEMORY_RECALL_LIMIT = 3;
 const DEFAULT_RETRIEVAL_MODE = "hybrid" as const;
 const DEFAULT_RERANK_CANDIDATE_MULTIPLIER = 3;
+const DEFAULT_QDRANT_COLLECTION = "rag_chunks";
+const DEFAULT_QDRANT_TIMEOUT_MS = 5_000;
 const semanticCache = new SemanticCache();
 const costLedger = new CostLedger();
 const tradeoffMetricsStore = new TradeoffMetricsStore();
@@ -811,6 +818,7 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
   const provider = createApiEmbeddingProvider(normalizedRequest.embeddingProvider);
   const index = await buildRetrievalIndex(document, {
     embeddingProvider: provider,
+    store: createApiVectorStore(),
   });
   const documentSummary: RagDocumentSummary = {
     documentId,
@@ -869,6 +877,7 @@ export async function indexRagFromFile(
   const provider = createApiEmbeddingProvider(normalizedRequest.embeddingProvider);
   const index = await buildRetrievalIndex(document, {
     embeddingProvider: provider,
+    store: createApiVectorStore(),
   });
   const documentSummary: RagDocumentSummary = {
     documentId,
@@ -928,7 +937,7 @@ export async function askPersistedRag(
     normalizedRequest.documentId
   );
 
-  const store = new InMemoryVectorStore();
+  const store = createApiVectorStore();
   store.insert(saved.record.embeddedChunks);
 
   const ragOutput = await runPersistedRag(
@@ -1565,6 +1574,7 @@ async function runLocalRag(
 
         const index = await buildRetrievalIndex(input.document, {
           embeddingProvider: input.provider,
+          store: createApiVectorStore(),
         });
 
         const chunkUnits = index.embeddedChunks.length;
@@ -3033,6 +3043,40 @@ function buildCostBreakdown(costSummary?: RequestCostSummary): {
   };
 }
 
+function createApiVectorStore(): VectorStore {
+  const backend = resolveVectorBackend();
+  if (backend === "qdrant") {
+    const baseUrl = process.env.QDRANT_URL?.trim();
+    if (!baseUrl) {
+      console.warn(
+        "[api/rag-service] VECTOR_BACKEND=qdrant ignored because QDRANT_URL is not configured. Falling back to in-memory."
+      );
+      return new InMemoryVectorStore();
+    }
+
+    const qdrantStore = new QdrantVectorStore({
+      baseUrl,
+      collectionName: process.env.QDRANT_COLLECTION?.trim() ?? DEFAULT_QDRANT_COLLECTION,
+      apiKey: process.env.QDRANT_API_KEY,
+      timeoutMs: parsePositiveIntegerOrDefault(process.env.QDRANT_TIMEOUT_MS, DEFAULT_QDRANT_TIMEOUT_MS),
+    });
+
+    if (isVectorDualWriteEnabled()) {
+      return createVectorStoreForDualWrite(new InMemoryVectorStore(), qdrantStore);
+    }
+
+    return qdrantStore;
+  }
+
+  if (backend === "pgvector") {
+    console.warn(
+      "[api/rag-service] VECTOR_BACKEND=pgvector is not wired in this API service yet. Falling back to in-memory."
+    );
+  }
+
+  return new InMemoryVectorStore();
+}
+
 function createApiEmbeddingProvider(
   providerId: ApiEmbeddingProviderId,
   modelInfo?: EmbeddingModelInfo
@@ -3104,6 +3148,19 @@ function parseStoredEmbeddingProvider(
     `Persisted RAG index "${documentId}" uses unsupported embedding provider "${providerId}".`,
     500
   );
+}
+
+function parsePositiveIntegerOrDefault(rawValue: string | undefined, defaultValue: number): number {
+  if (!rawValue) {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return defaultValue;
+  }
+
+  return parsed;
 }
 
 function createOllamaEmbeddingsProvider(modelInfo?: EmbeddingModelInfo): OllamaEmbeddingsProvider {

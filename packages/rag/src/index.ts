@@ -48,10 +48,23 @@ export {
 export {
   PgvectorVectorStore,
   createVectorStore,
-  resolveVectorBackend,
   type PgClient,
   type PgvectorStoreOptions,
 } from "./pgvector-store";
+
+export {
+  QdrantVectorStore,
+  type QdrantStoreOptions,
+} from "./qdrant-store";
+
+export {
+  DualWriteVectorStore,
+  createDefaultVectorStore,
+  createVectorStoreForDualWrite,
+  isVectorDualWriteEnabled,
+  resolveVectorBackend,
+  type VectorBackend,
+} from "./vector-backend";
 
 export {
   buildRetrievalIndex,
