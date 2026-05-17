@@ -157,8 +157,8 @@ export type ApiValidationErrorItem = z.infer<typeof ApiValidationErrorItemSchema
 export const ApiErrorEnvelopeSchema = z.object({
   error: z.object({
     message: z.string(),
-    errorCode: z.string().optional(),
-    requestId: z.string().optional(),
+    errorCode: z.string(),
+    requestId: z.string(),
     details: z.string().optional(),
     validationErrors: z.array(ApiValidationErrorItemSchema).optional(),
   }),
