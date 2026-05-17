@@ -65,7 +65,6 @@ export interface ObservabilityMetricsSummary {
   recent: ObservabilityMetricsSample[];
 }
 
-const DEFAULT_DIR = process.env.GROUNDEDOS_OBSERVABILITY_DIR ?? ".groundedos/observability";
 const DEFAULT_TRACE_FILE = "traces.jsonl";
 const DEFAULT_METRICS_FILE = "metrics-history.jsonl";
 
@@ -73,7 +72,7 @@ export class TraceStore {
   private readonly tracePath: string;
   private readonly metricsPath: string;
 
-  constructor(baseDir = DEFAULT_DIR) {
+  constructor(baseDir = getDefaultObservabilityDir()) {
     this.tracePath = join(baseDir, DEFAULT_TRACE_FILE);
     this.metricsPath = join(baseDir, DEFAULT_METRICS_FILE);
   }
@@ -102,6 +101,32 @@ export class TraceStore {
     const entries = await readJsonl(this.tracePath);
     const traces = entries.filter(isTraceRecord);
     return traces.slice(-Math.max(1, Math.floor(limit))).reverse();
+  }
+
+  async findLatestTrace(filters: {
+    traceId?: string;
+    requestId?: string;
+    operation?: string;
+    component?: StructuredTraceRecord["component"];
+  }): Promise<StructuredTraceRecord | undefined> {
+    const entries = await readJsonl(this.tracePath);
+    const traces = entries.filter(isTraceRecord).reverse();
+
+    return traces.find((trace) => {
+      if (filters.traceId && trace.correlation.traceId !== filters.traceId) {
+        return false;
+      }
+      if (filters.requestId && trace.correlation.requestId !== filters.requestId) {
+        return false;
+      }
+      if (filters.operation && trace.operation !== filters.operation) {
+        return false;
+      }
+      if (filters.component && trace.component !== filters.component) {
+        return false;
+      }
+      return true;
+    });
   }
 
   async getMetricsSummary(limit = 500): Promise<ObservabilityMetricsSummary> {
@@ -192,6 +217,10 @@ function sanitizeOptionalNumber(value: unknown): number | undefined {
 
 function round(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
+}
+
+function getDefaultObservabilityDir(): string {
+  return process.env.GROUNDEDOS_OBSERVABILITY_DIR ?? ".groundedos/observability";
 }
 
 async function ensureDir(path: string): Promise<void> {

@@ -110,8 +110,23 @@ type RetrievalDevModeOutput = {
     command: string;
     snapshot: {
       version: "v1";
+      capturedAt: string;
       mode: "inline" | "persisted";
       query: string;
+      correlation: {
+        requestId?: string;
+        sessionId?: string;
+        traceId?: string;
+      };
+      indexRef: {
+        indexId: string;
+        indexVersion?: string;
+        snapshotId?: string;
+      };
+      generation: {
+        strategy: "extractive-grounded";
+        deterministic: boolean;
+      };
     };
   };
   reportReferences?: {
@@ -224,6 +239,9 @@ quality/diagnostic fields.
 - `costBreakdown` provides per-request cost attribution by stage.
 - `retrievalDiagnostics` summarizes evidence breadth, consistency and conflict risk.
 - `replay` provides a reproducible snapshot/command for deterministic replay.
+- `replay.snapshot` now captures correlation IDs, index references, retrieved chunk
+  text/hash/score, prompt/policy inputs, original grounded answer metadata and
+  environment details so historical replay can be created from stored traces.
 - `reportReferences` links the latest drift/diff summaries when those artifacts exist.
 
 ## Non-goals

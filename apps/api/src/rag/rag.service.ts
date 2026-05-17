@@ -168,6 +168,14 @@ export class RagService {
 
     (response.devMode as unknown as Record<string, unknown>).correlation = correlation;
     (response.devMode as unknown as Record<string, unknown>).executionChain = workflowSteps;
+    if (response.devMode.replay?.snapshot) {
+      response.devMode.replay.snapshot.correlation = {
+        ...response.devMode.replay.snapshot.correlation,
+        requestId: typeof correlation.requestId === "string" ? correlation.requestId : response.devMode.replay.snapshot.correlation.requestId,
+        traceId: typeof correlation.traceId === "string" ? correlation.traceId : response.devMode.replay.snapshot.correlation.traceId,
+        sessionId: typeof correlation.sessionId === "string" ? correlation.sessionId : response.devMode.replay.snapshot.correlation.sessionId,
+      };
+    }
     return response;
   }
 }

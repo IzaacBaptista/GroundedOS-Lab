@@ -17,6 +17,7 @@ without replacing the current pipeline.
   - `confidenceReasoning`
 - **Deterministic Replay**
   - versioned replay snapshots in Dev Mode
+  - historical replay creation from stored traces
   - structured replay comparison report
 - **Corpus Drift Detection**
   - golden-query snapshot + temporal comparison report
@@ -70,6 +71,31 @@ npm run rag:replay -- \
   --query "What does this command verify?"
 ```
 
+Create a replay snapshot from a historical trace:
+
+```bash
+npm run rag:replay -- \
+  --trace-id <original-trace-id> \
+  --create-only \
+  --snapshot-out /tmp/replay-snapshot.json
+```
+
+Execute replay from a stored snapshot:
+
+```bash
+npm run rag:replay -- \
+  --snapshot-file /tmp/replay-snapshot.json \
+  --output /tmp/replay-report.json
+```
+
+Inline snapshots still need the original file path at execution time:
+
+```bash
+npm run rag:replay -- \
+  --snapshot-file /tmp/inline-replay-snapshot.json \
+  --content-file datasets/samples/phase-0-smoke.txt
+```
+
 ### Corpus drift
 
 ```bash
@@ -120,9 +146,13 @@ Replay reports compare:
 
 - response changes
 - retrieval changes
+- chunk ordering changes
+- score deltas
 - groundedness changes
 - cost deltas
 - latency deltas
+- model/provider drift
+- replay errors when the snapshot is incomplete
 
 ### Drift report
 
@@ -187,10 +217,32 @@ Diff reports compare:
 }
 ```
 
+### Example replay metadata
+
+```json
+{
+  "correlation": {
+    "requestId": "req-123",
+    "traceId": "trace-123"
+  },
+  "indexRef": {
+    "indexId": "doc-1",
+    "indexVersion": "1",
+    "snapshotId": "2026-05-17T23:00:00.000Z"
+  },
+  "generation": {
+    "strategy": "extractive-grounded",
+    "deterministic": true
+  }
+}
+```
+
 ## Current limitations
 
 - Taxonomy is heuristic and intentionally explainable rather than opaque.
-- Replay is fully reproducible for persisted indexes; inline replay still needs the original file.
+- Replay is fully reproducible for persisted indexes when the recorded index path is still available.
+- Inline replay still needs the original file path because the snapshot does not persist raw content by default.
+- Session-scoped memory can still affect replays when the original request depended on evolving session state.
 - Drift detection is driven by the versioned golden dataset; sparse golden coverage limits sensitivity.
 - Prompt/policy diff cost is zero for deterministic local variants because no external model is invoked.
 

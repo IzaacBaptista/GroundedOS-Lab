@@ -96,9 +96,18 @@ describe("trace-builders", () => {
               capturedAt: "2026-01-01T00:00:00.000Z",
               mode: "persisted",
               query: "what is grounded ai?",
+              correlation: {
+                requestId: "req-1",
+                traceId: "trace-1",
+              },
               document: {
                 documentId: "doc-1",
                 persisted: true,
+              },
+              indexRef: {
+                indexId: "doc-1",
+                indexVersion: "1",
+                snapshotId: "2026-01-01T00:00:00.000Z",
               },
               parameters: {
                 topK: 3,
@@ -115,6 +124,14 @@ describe("trace-builders", () => {
               providers: {
                 embeddingProvider: "api-lexical",
               },
+              generation: {
+                strategy: "extractive-grounded",
+                deterministic: true,
+                config: {
+                  temperature: 0,
+                  topP: 1,
+                },
+              },
               prompts: {
                 systemPrompt: "grounded",
                 answerPolicy: "answer from evidence",
@@ -124,8 +141,26 @@ describe("trace-builders", () => {
                 refusalPolicy: "avoid fabricated certainty",
                 citationPolicy: "carry chunk identifiers",
               },
+              rerankingConfig: {
+                applied: false,
+                candidateCount: 1,
+                returnedCount: 1,
+              },
               chunks: [],
               reranking: [],
+              original: {
+                answer: {
+                  text: "answer",
+                  grounded: true,
+                  citations: [],
+                },
+              },
+              environment: {
+                runtime: "node",
+                nodeVersion: process.version,
+                platform: process.platform,
+                nodeEnv: process.env.NODE_ENV,
+              },
             },
             reproducible: true,
             command: "npm run rag:replay -- --document-id 'doc-1'",

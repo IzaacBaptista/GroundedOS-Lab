@@ -76,4 +76,42 @@ describe("TraceStore", () => {
     expect(summary.totals.retries).toBe(1);
     expect(summary.byComponent.some((item) => item.component === "retrieval")).toBe(true);
   });
+
+  it("finds the latest trace by correlation identifiers", async () => {
+    const store = await createStore();
+
+    await store.append({
+      version: "v1",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      component: "retrieval",
+      operation: "rag.pipeline",
+      status: "success",
+      durationMs: 10,
+      correlation: {
+        requestId: "req-1",
+        traceId: "trace-1",
+      },
+    });
+    await store.append({
+      version: "v1",
+      timestamp: "2026-01-02T00:00:00.000Z",
+      component: "retrieval",
+      operation: "rag.pipeline",
+      status: "success",
+      durationMs: 20,
+      correlation: {
+        requestId: "req-1",
+        traceId: "trace-1",
+      },
+    });
+
+    const trace = await store.findLatestTrace({
+      traceId: "trace-1",
+      operation: "rag.pipeline",
+      component: "retrieval",
+    });
+
+    expect(trace?.durationMs).toBe(20);
+    expect(trace?.correlation.requestId).toBe("req-1");
+  });
 });

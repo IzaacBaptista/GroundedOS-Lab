@@ -281,6 +281,45 @@ Response includes `document`, `index`, and `storage.indexPath`. `index`
 contains `embeddingProvider`, `embeddingDimensions`, and, for new indexes,
 `embeddingModel` with provider/model/dimension metadata.
 
+### Deterministic replay
+
+Each successful RAG response now carries `devMode.replay.snapshot`, and the API
+stores the full snapshot in structured observability traces. That snapshot
+captures:
+
+- correlation IDs (`requestId`, `sessionId`, `traceId`)
+- index reference metadata (`indexId`, `indexVersion`, `snapshotId` when available)
+- retrieved chunks, scores, ordering and reranking output
+- prompt/policy inputs
+- model/provider and embedding provider selection
+- original grounded answer, cost and latency metadata
+
+Create a replay snapshot from a historical trace:
+
+```bash
+npm run rag:replay -- \
+  --trace-id <original-trace-id> \
+  --create-only \
+  --snapshot-out /tmp/replay-snapshot.json
+```
+
+Execute replay from that stored snapshot:
+
+```bash
+npm run rag:replay -- \
+  --snapshot-file /tmp/replay-snapshot.json \
+  --output /tmp/replay-report.json
+```
+
+Inline snapshots are supported for comparison, but replaying them still needs
+the original file path:
+
+```bash
+npm run rag:replay -- \
+  --snapshot-file /tmp/replay-snapshot.json \
+  --content-file datasets/samples/phase-0-smoke.txt
+```
+
 ### Ollama embeddings
 
 `embeddingProvider: "ollama"` uses a local Ollama server and calls

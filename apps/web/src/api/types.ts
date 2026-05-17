@@ -338,12 +338,23 @@ export interface DevModeOutput {
       capturedAt: string;
       mode: "inline" | "persisted";
       query: string;
+      correlation: {
+        requestId?: string;
+        sessionId?: string;
+        traceId?: string;
+      };
       document: {
         documentId: string;
         title?: string;
         checksum?: string;
         persisted: boolean;
         indexPath?: string;
+        originalFilename?: string;
+      };
+      indexRef: {
+        indexId: string;
+        indexVersion?: string;
+        snapshotId?: string;
       };
       parameters: {
         topK: number;
@@ -363,6 +374,15 @@ export interface DevModeOutput {
         selectedModel?: string;
         selectedProvider?: string;
       };
+      generation: {
+        strategy: "extractive-grounded";
+        deterministic: boolean;
+        config: {
+          temperature: 0;
+          topP: 1;
+          maxTokens?: number;
+        };
+      };
       prompts: {
         systemPrompt: string;
         answerPolicy: string;
@@ -371,6 +391,46 @@ export interface DevModeOutput {
         groundingPolicy: string;
         refusalPolicy: string;
         citationPolicy: string;
+      };
+      chunks: Array<{
+        chunkId: string;
+        sectionId: string;
+        rank: number;
+        score: number;
+        text: string;
+        textHash: string;
+        textPreview: string;
+      }>;
+      rerankingConfig: {
+        applied: boolean;
+        candidateCount: number;
+        returnedCount: number;
+      };
+      reranking: Array<{
+        chunkId: string;
+        beforeRank: number;
+        afterRank: number;
+        finalScore: number;
+      }>;
+      original: {
+        answer: {
+          text: string;
+          grounded: boolean;
+          citations: Array<{
+            chunkId: string;
+            documentId: string;
+            sectionId: string;
+          }>;
+        };
+        costUsd?: number;
+        latencyMs?: number;
+        groundedness?: number;
+      };
+      environment: {
+        runtime: "node";
+        nodeVersion: string;
+        platform: string;
+        nodeEnv?: string;
       };
     };
     reproducible: boolean;

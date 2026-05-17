@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { readFile } from "fs/promises";
-import { basename, extname } from "path";
+import { basename, dirname, extname, resolve } from "path";
 import {
   validateNormalizedDocument,
   validateProcessedQuery,
@@ -58,12 +58,15 @@ import {
   RecallEvaluator,
 } from "@groundedos/evals";
 import {
+  assertReplaySnapshotComplete,
   buildRetrievalDiagnostics,
   buildReplaySnapshot,
   calibrateConfidence,
   classifyRetrievalFailure,
+  compareReplaySnapshots,
   loadReliabilityReportSummaries,
   type ConfidenceCalibration,
+  type ReplayComparisonReport,
   type ReplaySnapshot,
   type ReliabilityReportSummaries,
   type RetrievalDiagnostics,
@@ -757,6 +760,16 @@ export async function askRag(request: RagAskRequest): Promise<RagAskResponse> {
     query: normalizedRequest.query,
     ...ragOutput,
   };
+  hydrateReplaySnapshot(response, {
+    correlation: {
+      requestId: request.requestId,
+      sessionId: normalizedRequest.sessionId,
+    },
+    indexRef: {
+      indexId: documentId,
+      snapshotId: checksum,
+    },
+  });
 
   validateRagAskResponse(response);
 
@@ -812,6 +825,16 @@ export async function askRagFromFile(
     query: normalizedRequest.query,
     ...ragOutput,
   };
+  hydrateReplaySnapshot(response, {
+    correlation: {
+      requestId: request.requestId,
+      sessionId: normalizedRequest.sessionId,
+    },
+    indexRef: {
+      indexId: documentId,
+      snapshotId: checksum,
+    },
+  });
 
   validateRagAskResponse(response);
 
@@ -941,10 +964,11 @@ export async function askPersistedRag(
     | "indexDir"
     | "sessionId"
     | "ownerId"
-    | "tenantId"
-    | "useMultiModelOrchestration"
-    | "reasoningEnabled"
-    | "enableShadowRetrieval"
+      | "tenantId"
+      | "requestId"
+      | "useMultiModelOrchestration"
+      | "reasoningEnabled"
+      | "enableShadowRetrieval"
   >
 ): Promise<RagAskResponse> {
   const normalizedRequest = normalizePersistedAskRequest(request);
@@ -988,6 +1012,23 @@ export async function askPersistedRag(
     },
     ...ragOutput,
   };
+  hydrateReplaySnapshot(response, {
+    correlation: {
+      requestId: normalizedRequest.requestId,
+      sessionId: normalizedRequest.sessionId,
+    },
+    document: {
+      title: saved.record.document.title,
+      checksum: saved.record.document.checksum,
+      originalFilename: saved.record.document.originalFilename,
+      indexPath: saved.relativeIndexPath,
+    },
+    indexRef: {
+      indexId: normalizedRequest.documentId,
+      indexVersion: String(saved.record.schemaVersion),
+      snapshotId: saved.record.createdAt,
+    },
+  });
 
   validateRagAskResponse(response);
 
@@ -1409,11 +1450,12 @@ function normalizePersistedAskRequest(
     | "topK"
     | "indexDir"
     | "sessionId"
-    | "ownerId"
-    | "tenantId"
-    | "useMultiModelOrchestration"
-    | "reasoningEnabled"
-    | "enableShadowRetrieval"
+      | "ownerId"
+      | "tenantId"
+      | "requestId"
+      | "useMultiModelOrchestration"
+      | "reasoningEnabled"
+      | "enableShadowRetrieval"
   >
 ): Required<
   Pick<
@@ -1426,7 +1468,7 @@ function normalizePersistedAskRequest(
     | "enableShadowRetrieval"
   >
 > &
-  Pick<RagAskRequest, "indexDir" | "sessionId" | "ownerId" | "tenantId"> {
+  Pick<RagAskRequest, "indexDir" | "sessionId" | "ownerId" | "tenantId" | "requestId"> {
   if (!request || typeof request !== "object") {
     throw new ApiRequestError("Request body must be a JSON object.");
   }
@@ -1464,6 +1506,7 @@ function normalizePersistedAskRequest(
     sessionId: request.sessionId,
     ownerId: request.ownerId,
     tenantId: request.tenantId,
+    requestId: request.requestId,
   };
 }
 async function runLocalRag(
@@ -2009,10 +2052,13 @@ async function runLocalRag(
       title: document.metadata?.title as string,
       modality: "text",
       checksum: String(document.metadata?.checksum ?? ""),
+      originalFilename: document.metadata?.originalFilename as string | undefined,
     },
     index: resolvedIndexSummary,
     processedQuery: result.output!.processedQuery,
     routingDecision: result.output!.routingDecision,
+    costUsd: result.output!.costSummary?.totalCostUsd,
+    latencyMs: result.totalDurationMs,
     options,
   });
 
@@ -2688,6 +2734,8 @@ async function runPersistedRag(
     index: indexSummary,
     processedQuery: result.output!.processedQuery,
     routingDecision: result.output!.routingDecision,
+    costUsd: result.output!.costSummary?.totalCostUsd,
+    latencyMs: result.totalDurationMs,
     options,
   });
 
@@ -2979,6 +3027,8 @@ async function buildReliabilityAugmentation(input: {
   index: RagIndexSummary;
   processedQuery?: ProcessedQuery;
   routingDecision?: ReturnType<typeof routeModel>;
+  costUsd?: number;
+  latencyMs?: number;
   options?: {
     reasoningEnabled?: boolean;
     useMultiModelOrchestration?: boolean;
@@ -3030,6 +3080,11 @@ async function buildReliabilityAugmentation(input: {
       checksum: input.document.checksum,
       persisted: Boolean(input.storage?.persisted),
       indexPath: input.storage?.indexPath,
+      originalFilename: input.document.originalFilename,
+    },
+    indexRef: {
+      indexId: input.document.documentId,
+      snapshotId: input.document.checksum,
     },
     parameters: {
       topK: input.topK,
@@ -3049,6 +3104,12 @@ async function buildReliabilityAugmentation(input: {
       selectedModel: input.routingDecision?.selectedModel,
       selectedProvider: input.routingDecision?.selectedProvider,
     },
+    rerankingConfig: {
+      applied: Boolean(input.rerankingCandidates?.length),
+      candidateCount:
+        input.rerankingCandidates?.length ?? input.devMode.hybrid?.candidateCount ?? input.devMode.resultCount,
+      returnedCount: input.devMode.resultCount,
+    },
     results: input.devMode.results.map((item) => ({
       chunkId: item.chunkId,
       sectionId: item.sectionId,
@@ -3062,6 +3123,20 @@ async function buildReliabilityAugmentation(input: {
       afterRank: candidate.afterRank,
       finalScore: candidate.finalScore,
     })),
+    original: {
+      answer: {
+        text: input.answer.text,
+        grounded: input.answer.grounded,
+        citations: input.answer.citations.map((citation) => ({
+          chunkId: citation.chunkId,
+          documentId: citation.documentId,
+          sectionId: citation.sectionId,
+        })),
+      },
+      costUsd: input.costUsd,
+      latencyMs: input.latencyMs,
+      groundedness: input.evals?.groundedness,
+    },
   });
   const replayCommand = input.storage?.persisted
     ? `npm run rag:replay -- --document-id ${shellQuote(input.document.documentId)} --query ${shellQuote(input.query)} --top-k ${input.topK}`
@@ -3078,6 +3153,101 @@ async function buildReliabilityAugmentation(input: {
     },
     reportReferences: await loadReliabilityReportSummaries(),
   };
+}
+
+export async function replayRagFromSnapshot(
+  snapshot: ReplaySnapshot,
+  options?: {
+    contentFilePath?: string;
+  }
+): Promise<{
+  response: RagAskResponse;
+  report: ReplayComparisonReport;
+}> {
+  if (snapshot.mode === "persisted") {
+    assertReplaySnapshotComplete(snapshot);
+  } else if (!options?.contentFilePath) {
+    throw new Error(
+      "Replay snapshot is incomplete: inline replay requires the original content file path or a persisted index."
+    );
+  }
+
+  const response =
+    snapshot.mode === "persisted"
+      ? await askPersistedRag({
+          documentId: snapshot.document.documentId,
+          query: snapshot.query,
+          topK: snapshot.parameters.topK,
+          indexDir: snapshot.document.indexPath
+            ? dirname(resolve(process.cwd(), snapshot.document.indexPath))
+            : undefined,
+          sessionId: snapshot.correlation.sessionId,
+          useMultiModelOrchestration: snapshot.parameters.useMultiModelOrchestration,
+          reasoningEnabled: snapshot.parameters.reasoningEnabled,
+          enableShadowRetrieval: snapshot.parameters.enableShadowRetrieval,
+        })
+      : await askRagFromFile({
+          filePath: options!.contentFilePath!,
+          originalFilename: snapshot.document.originalFilename ?? basename(options!.contentFilePath!),
+          type: extname(options!.contentFilePath!).toLowerCase() === ".pdf" ? "pdf" : "text",
+          query: snapshot.query,
+          topK: snapshot.parameters.topK,
+          sessionId: snapshot.correlation.sessionId,
+          useMultiModelOrchestration: snapshot.parameters.useMultiModelOrchestration,
+          reasoningEnabled: snapshot.parameters.reasoningEnabled,
+          enableShadowRetrieval: snapshot.parameters.enableShadowRetrieval,
+        });
+
+  const report = compareReplaySnapshots({
+    original: snapshot,
+    replay: response.devMode.replay!.snapshot,
+    originalAnswer: {
+      text: snapshot.original.answer.text,
+      grounded: snapshot.original.answer.grounded,
+    },
+    replayAnswer: response.answer,
+    originalCostUsd: snapshot.original.costUsd,
+    replayCostUsd: response.devMode.cost?.totalCostUsd,
+    originalLatencyMs: snapshot.original.latencyMs,
+    replayLatencyMs: sumStageDuration(response),
+  });
+
+  return {
+    response,
+    report,
+  };
+}
+
+function hydrateReplaySnapshot(
+  response: RagAskResponse,
+  input: {
+    correlation?: ReplaySnapshot["correlation"];
+    document?: Partial<ReplaySnapshot["document"]>;
+    indexRef?: ReplaySnapshot["indexRef"];
+  }
+): void {
+  const snapshot = response.devMode.replay?.snapshot;
+
+  if (!snapshot) {
+    return;
+  }
+
+  snapshot.correlation = {
+    ...snapshot.correlation,
+    ...input.correlation,
+  };
+  snapshot.document = {
+    ...snapshot.document,
+    ...input.document,
+  };
+  snapshot.indexRef = {
+    ...snapshot.indexRef,
+    ...input.indexRef,
+  };
+}
+
+function sumStageDuration(response?: RagAskResponse): number {
+  return response?.devMode.stageMetrics?.reduce((sum, stage) => sum + stage.durationMs, 0) ?? 0;
 }
 
 function buildReasoningSummary(
