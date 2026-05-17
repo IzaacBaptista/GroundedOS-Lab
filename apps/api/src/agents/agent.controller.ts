@@ -20,7 +20,7 @@ export class AgentsController {
   @Post('execute')
   @HttpCode(200)
   async execute(
-    @Body(new ZodValidationPipe<AgentExecuteRequest>('AgentExecuteRequest', AgentExecuteRequestSchema))
+    @Body(new ZodValidationPipe('AgentExecuteRequest', AgentExecuteRequestSchema))
     request: AgentExecuteRequest
   ): Promise<AgentExecuteResponse> {
     return await this.agentService.executeAgent(request);

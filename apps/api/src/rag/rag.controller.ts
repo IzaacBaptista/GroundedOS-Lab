@@ -63,14 +63,14 @@ export class RagController {
 
     // Strict schema validation for JSON body — rejects unknown fields and
     // enforces required fields before reaching service logic.
-    const validated = validateApiInput<RagAskRequest>(
+    const validated = validateApiInput(
       "RagAskRequest",
       RagAskRequestBodySchema,
       body
     );
 
     return await this.rag.ask({
-      ...validated,
+      ...(validated as RagAskRequest),
       ownerId,
     });
   }
@@ -96,14 +96,14 @@ export class RagController {
     }
 
     // Strict schema validation for JSON body.
-    const validated = validateApiInput<RagIndexRequest>(
+    const validated = validateApiInput(
       "RagIndexRequest",
       RagIndexRequestBodySchema,
       body
     );
 
     return await this.rag.index({
-      ...validated,
+      ...(validated as RagIndexRequest),
       ownerId,
     });
   }

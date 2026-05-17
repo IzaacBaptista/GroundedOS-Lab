@@ -16,23 +16,19 @@
 
 import { Injectable, PipeTransform } from "@nestjs/common";
 import { ZodValidationError, validateApiInput } from "@groundedos/core";
-
-// Re-use the Zod schema type already available through @groundedos/core
-// without creating a hard dependency on the zod package in this workspace member.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyZodSchema = { safeParse: (input: unknown) => any };
+import type { ZodTypeAny } from "zod";
 
 @Injectable()
-export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
+export class ZodValidationPipe<TSchema extends ZodTypeAny>
+  implements PipeTransform<unknown, unknown>
+{
   constructor(
     private readonly contractName: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private readonly schema: AnyZodSchema
+    private readonly schema: TSchema
   ) {}
 
-  transform(value: unknown): T {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return validateApiInput<T>(this.contractName, this.schema as any, value);
+  transform(value: unknown): unknown {
+    return validateApiInput(this.contractName, this.schema, value);
   }
 }
 

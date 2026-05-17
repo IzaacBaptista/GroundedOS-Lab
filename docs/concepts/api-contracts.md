@@ -223,7 +223,7 @@ import {
 
 @Post("my-endpoint")
 async handle(
-  @Body(new ZodValidationPipe<MyEndpointRequest>("MyEndpointRequest", MyEndpointRequestSchema))
+  @Body(new ZodValidationPipe("MyEndpointRequest", MyEndpointRequestSchema))
   body: MyEndpointRequest
 ): Promise<MyEndpointResponse> {
   ...
