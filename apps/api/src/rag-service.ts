@@ -57,6 +57,18 @@ import {
   RelevanceEvaluator,
   RecallEvaluator,
 } from "@groundedos/evals";
+import {
+  buildRetrievalDiagnostics,
+  buildReplaySnapshot,
+  calibrateConfidence,
+  classifyRetrievalFailure,
+  loadReliabilityReportSummaries,
+  type ConfidenceCalibration,
+  type ReplaySnapshot,
+  type ReliabilityReportSummaries,
+  type RetrievalDiagnostics,
+  type RetrievalFailureClassification,
+} from "./retrieval-reliability";
 import { ApiRequestError } from "./errors";
 import {
   recordEvalHistory,
@@ -312,6 +324,8 @@ export type RagAskResponse = {
           scorerResults?: { averageScore: number; passedCount: number };
         }>;
       };
+      taxonomy?: RetrievalFailureClassification;
+      confidence?: ConfidenceCalibration;
     };
     costBreakdown?: {
       embeddingsUsd: number;
@@ -399,6 +413,13 @@ export type RagAskResponse = {
         durationMs?: number;
       }>;
     };
+    retrievalDiagnostics?: RetrievalDiagnostics;
+    replay?: {
+      snapshot: ReplaySnapshot;
+      reproducible: boolean;
+      command: string;
+    };
+    reportReferences?: ReliabilityReportSummaries;
   };
 };
 
@@ -1975,6 +1996,25 @@ async function runLocalRag(
   const cacheMetrics = semanticCache.getMetrics();
   const resolvedIndexSummary = result.output!.indexSummary ?? createIndexSummary(result.output!.index!);
   const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
+  const rerankingCandidates = getRerankingCandidates(result.output!.devMode!);
+  const reliability = await buildReliabilityAugmentation({
+    query,
+    topK,
+    answer: finalAnswer,
+    devMode: result.output!.devMode!,
+    rerankingCandidates,
+    evals: result.output!.evals,
+    document: {
+      documentId: document.documentId,
+      title: document.metadata?.title as string,
+      modality: "text",
+      checksum: String(document.metadata?.checksum ?? ""),
+    },
+    index: resolvedIndexSummary,
+    processedQuery: result.output!.processedQuery,
+    routingDecision: result.output!.routingDecision,
+    options,
+  });
 
   const response = {
     answer: finalAnswer,
@@ -2043,7 +2083,13 @@ async function runLocalRag(
         summary: result.output!.reasoningSummary ?? [],
         decisionSteps: result.output!.decisionSteps ?? [],
       },
-      evals: result.output!.evals,
+      evals: result.output!.evals
+        ? {
+            ...result.output!.evals,
+            taxonomy: reliability.taxonomy,
+            confidence: reliability.confidence,
+          }
+        : undefined,
       cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
       costBreakdown: buildCostBreakdown(result.output!.costSummary),
       cost: result.output!.costSummary,
@@ -2062,7 +2108,7 @@ async function runLocalRag(
         applied: true,
         candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
         returnedCount: result.output!.devMode!.resultCount,
-        candidates: getRerankingCandidates(result.output!.devMode!),
+        candidates: rerankingCandidates,
       },
       stageMetrics: buildStageMetrics(result.context, {
         rawQuery: result.output!.rawQuery,
@@ -2101,6 +2147,9 @@ async function runLocalRag(
         },
         finalAnswer
       ),
+      retrievalDiagnostics: reliability.retrievalDiagnostics,
+      replay: reliability.replay,
+      reportReferences: reliability.reportReferences,
     },
   };
 
@@ -2618,6 +2667,29 @@ async function runPersistedRag(
   const cacheMetrics = semanticCache.getMetrics();
   const indexSummary = result.output!.indexSummary ?? createIndexSummary(index);
   const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
+  const rerankingCandidates = getRerankingCandidates(result.output!.devMode!);
+  const reliability = await buildReliabilityAugmentation({
+    query,
+    topK,
+    answer: finalAnswer,
+    devMode: result.output!.devMode!,
+    rerankingCandidates,
+    evals: result.output!.evals,
+    document: {
+      documentId: persistedDocumentId,
+      title: persistedDocumentId,
+      modality: "text",
+      checksum: persistedDocumentId,
+    },
+    storage: {
+      persisted: true,
+      indexPath: undefined,
+    },
+    index: indexSummary,
+    processedQuery: result.output!.processedQuery,
+    routingDecision: result.output!.routingDecision,
+    options,
+  });
 
   const response = {
     answer: finalAnswer,
@@ -2686,7 +2758,13 @@ async function runPersistedRag(
         summary: result.output!.reasoningSummary ?? [],
         decisionSteps: result.output!.decisionSteps ?? [],
       },
-      evals: result.output!.evals,
+      evals: result.output!.evals
+        ? {
+            ...result.output!.evals,
+            taxonomy: reliability.taxonomy,
+            confidence: reliability.confidence,
+          }
+        : undefined,
       cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
       costBreakdown: buildCostBreakdown(result.output!.costSummary),
       cost: result.output!.costSummary,
@@ -2705,7 +2783,7 @@ async function runPersistedRag(
         applied: true,
         candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
         returnedCount: result.output!.devMode!.resultCount,
-        candidates: getRerankingCandidates(result.output!.devMode!),
+        candidates: rerankingCandidates,
       },
       stageMetrics: buildStageMetrics(result.context, {
         rawQuery: result.output!.rawQuery,
@@ -2744,6 +2822,9 @@ async function runPersistedRag(
         },
         finalAnswer
       ),
+      retrievalDiagnostics: reliability.retrievalDiagnostics,
+      replay: reliability.replay,
+      reportReferences: reliability.reportReferences,
     },
   };
 
@@ -2883,6 +2964,119 @@ function evaluateRagQuality(input: {
     retrievalAccuracy,
     pipelineScore,
     modelScore,
+  };
+}
+
+async function buildReliabilityAugmentation(input: {
+  query: string;
+  topK: number;
+  answer: GroundedAnswer;
+  devMode: RetrievalDevModeOutput;
+  rerankingCandidates?: NonNullable<RagAskResponse["devMode"]["reranking"]>["candidates"];
+  evals?: NonNullable<RagAskResponse["devMode"]["evals"]>;
+  document: RagDocumentSummary;
+  storage?: RagAskResponse["storage"];
+  index: RagIndexSummary;
+  processedQuery?: ProcessedQuery;
+  routingDecision?: ReturnType<typeof routeModel>;
+  options?: {
+    reasoningEnabled?: boolean;
+    useMultiModelOrchestration?: boolean;
+    enableShadowRetrieval?: boolean;
+  };
+}): Promise<{
+  taxonomy: RetrievalFailureClassification;
+  confidence: ConfidenceCalibration;
+  retrievalDiagnostics: RetrievalDiagnostics;
+  replay: NonNullable<RagAskResponse["devMode"]["replay"]>;
+  reportReferences: ReliabilityReportSummaries;
+}> {
+  const retrievalDiagnostics = buildRetrievalDiagnostics({
+    results: input.devMode.results.map((item) => ({
+      chunkId: item.chunkId,
+      documentId: item.documentId,
+      sectionId: item.sectionId,
+      score: item.score,
+      text: item.text,
+    })),
+    candidateCount:
+      input.rerankingCandidates?.length ?? input.devMode.hybrid?.candidateCount ?? input.devMode.resultCount,
+    citations: input.answer.citations.map((citation) => ({ chunkId: citation.chunkId })),
+    evals: {
+      groundedness: input.evals?.groundedness,
+      answerOverlap: input.evals?.answerOverlap,
+    },
+    retrievalMode: input.devMode.hybrid?.mode ?? DEFAULT_RETRIEVAL_MODE,
+    rerankingApplied: Boolean(input.rerankingCandidates?.length),
+    provider: input.index.embeddingProvider,
+    model: input.index.embeddingModel?.model,
+    queryIntent: input.processedQuery?.intent,
+  });
+  const taxonomy = classifyRetrievalFailure({
+    diagnostics: retrievalDiagnostics,
+    answerGrounded: input.answer.grounded,
+    answerText: input.answer.text,
+    evals: input.evals,
+  });
+  const confidence = calibrateConfidence({
+    diagnostics: retrievalDiagnostics,
+    evals: input.evals,
+  });
+  const replaySnapshot = buildReplaySnapshot({
+    query: input.query,
+    document: {
+      documentId: input.document.documentId,
+      title: input.document.title,
+      checksum: input.document.checksum,
+      persisted: Boolean(input.storage?.persisted),
+      indexPath: input.storage?.indexPath,
+    },
+    parameters: {
+      topK: input.topK,
+      reasoningEnabled: input.options?.reasoningEnabled ?? false,
+      useMultiModelOrchestration: input.options?.useMultiModelOrchestration ?? true,
+      enableShadowRetrieval: input.options?.enableShadowRetrieval ?? true,
+    },
+    retrievalConfig: {
+      mode: input.devMode.hybrid?.mode ?? DEFAULT_RETRIEVAL_MODE,
+      candidateCount: input.devMode.hybrid?.candidateCount ?? input.devMode.resultCount,
+      returnedCount: input.devMode.resultCount,
+      rerankingApplied: Boolean(input.rerankingCandidates?.length),
+    },
+    providers: {
+      embeddingProvider: input.index.embeddingProvider,
+      embeddingModel: input.index.embeddingModel?.model,
+      selectedModel: input.routingDecision?.selectedModel,
+      selectedProvider: input.routingDecision?.selectedProvider,
+    },
+    results: input.devMode.results.map((item) => ({
+      chunkId: item.chunkId,
+      sectionId: item.sectionId,
+      rank: item.rank,
+      score: item.score,
+      text: item.text,
+    })),
+    reranking: (input.rerankingCandidates ?? []).map((candidate) => ({
+      chunkId: candidate.chunkId,
+      beforeRank: candidate.beforeRank,
+      afterRank: candidate.afterRank,
+      finalScore: candidate.finalScore,
+    })),
+  });
+  const replayCommand = input.storage?.persisted
+    ? `npm run rag:replay -- --document-id ${shellQuote(input.document.documentId)} --query ${shellQuote(input.query)} --top-k ${input.topK}`
+    : `npm run rag:replay -- --content-file <path> --query ${shellQuote(input.query)} --top-k ${input.topK}`;
+
+  return {
+    taxonomy,
+    confidence,
+    retrievalDiagnostics,
+    replay: {
+      snapshot: replaySnapshot,
+      reproducible: Boolean(input.storage?.persisted),
+      command: replayCommand,
+    },
+    reportReferences: await loadReliabilityReportSummaries(),
   };
 }
 
@@ -3628,4 +3822,8 @@ function isCachedRagPayload(value: unknown): value is Pick<RagAskResponse, "answ
   const maybe = value as Partial<Pick<RagAskResponse, "answer" | "index" | "devMode">>;
 
   return Boolean(maybe.answer && maybe.index && maybe.devMode);
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }

@@ -171,6 +171,13 @@ hybrid retrieval improvement signal.
 - Phase 4 model/provider benchmarks record skipped providers explicitly when
   required local model or cloud credentials are not configured.
 
+### Retrieval reliability layer
+
+- Every request should expose a structured retrieval taxonomy and calibrated confidence signal in Dev Mode
+- Replay reports should compare original vs replayed retrieval, response, groundedness, latency and cost
+- Drift reports should detect recall/ranking regressions across golden queries over time
+- Prompt/policy diff reports should compare quality, groundedness, recall, latency, cost, refusal rate and response changes under the same conditions
+
 ---
 
 ## Running evals
@@ -235,6 +242,27 @@ The current A/B artifact reports a winner and confidence interval, but the
 result is not statistically conclusive while the golden dataset contains only
 one query. Add more golden entries before using the winner as a product
 decision.
+
+### Retrieval reliability reports
+
+```bash
+# Prompt / policy / retrieval diff report
+npm run experiment:prompts:diff -- --dataset phase-5-retrieval-text
+
+# Drift snapshot + report
+npm run benchmark:drift -- --dataset phase-5-retrieval-text
+
+# Replay report
+npm run rag:replay -- --content-file datasets/samples/phase-0-smoke.txt \
+  --query "What does this command verify?"
+```
+
+Outputs:
+
+- `datasets/golden/baselines/prompt-policy-diff-report.json`
+- `datasets/golden/baselines/retrieval-drift-snapshot.json`
+- `datasets/golden/baselines/retrieval-drift-report.json`
+- `datasets/golden/baselines/replay-report.json`
 
 ---
 

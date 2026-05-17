@@ -1,0 +1,98 @@
+{
+  "version": "v1",
+  "createdAt": "2026-05-17T20:56:21.437Z",
+  "dataset": "phase-5-retrieval-text",
+  "topK": 3,
+  "queries": [
+    {
+      "id": "p5-gd-001",
+      "question": "Which pipeline records offsets and preserves lineage metadata?",
+      "expectedChunkIds": [
+        "phase-5-retrieval-001:section-2:chunk-1"
+      ],
+      "retrievedChunkIds": [
+        "phase-5-retrieval-001:section-2:chunk-1",
+        "phase-5-retrieval-001:section-6:chunk-1",
+        "phase-5-retrieval-001:section-5:chunk-1"
+      ],
+      "recallAtK": 1,
+      "rankOfExpected": 1,
+      "topScore": 0.496
+    },
+    {
+      "id": "p5-gd-002",
+      "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+      "expectedChunkIds": [
+        "phase-5-retrieval-001:section-3:chunk-1"
+      ],
+      "retrievedChunkIds": [
+        "phase-5-retrieval-001:section-3:chunk-1",
+        "phase-5-retrieval-001:section-1:chunk-1",
+        "phase-5-retrieval-001:section-2:chunk-1"
+      ],
+      "recallAtK": 1,
+      "rankOfExpected": 1,
+      "topScore": 0.454
+    },
+    {
+      "id": "p5-gd-003",
+      "question": "Which stage reorders candidate chunks after initial retrieval?",
+      "expectedChunkIds": [
+        "phase-5-retrieval-001:section-4:chunk-1"
+      ],
+      "retrievedChunkIds": [
+        "phase-5-retrieval-001:section-4:chunk-1",
+        "phase-5-retrieval-001:section-1:chunk-1",
+        "phase-5-retrieval-001:section-7:chunk-1"
+      ],
+      "recallAtK": 1,
+      "rankOfExpected": 1,
+      "topScore": 0.547
+    },
+    {
+      "id": "p5-gd-004",
+      "question": "How is session memory isolated?",
+      "expectedChunkIds": [
+        "phase-5-retrieval-001:section-5:chunk-1"
+      ],
+      "retrievedChunkIds": [
+        "phase-5-retrieval-001:section-5:chunk-1",
+        "phase-5-retrieval-001:section-7:chunk-1",
+        "phase-5-retrieval-001:section-3:chunk-1"
+      ],
+      "recallAtK": 1,
+      "rankOfExpected": 1,
+      "topScore": 0.357
+    },
+    {
+      "id": "p5-gd-005",
+      "question": "Which request metrics feed the trade-offs dashboard?",
+      "expectedChunkIds": [
+        "phase-5-retrieval-001:section-6:chunk-1"
+      ],
+      "retrievedChunkIds": [
+        "phase-5-retrieval-001:section-6:chunk-1",
+        "phase-5-retrieval-001:section-2:chunk-1",
+        "phase-5-retrieval-001:section-3:chunk-1"
+      ],
+      "recallAtK": 1,
+      "rankOfExpected": 1,
+      "topScore": 0.548
+    },
+    {
+      "id": "p5-gd-006",
+      "question": "What should a good quantized retrieval path preserve?",
+      "expectedChunkIds": [
+        "phase-5-retrieval-001:section-7:chunk-1"
+      ],
+      "retrievedChunkIds": [
+        "phase-5-retrieval-001:section-7:chunk-1",
+        "phase-5-retrieval-001:section-1:chunk-1",
+        "phase-5-retrieval-001:section-2:chunk-1"
+      ],
+      "recallAtK": 1,
+      "rankOfExpected": 1,
+      "topScore": 0.432
+    }
+  ]
+}

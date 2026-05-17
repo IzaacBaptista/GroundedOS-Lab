@@ -1,0 +1,93 @@
+{
+  "version": "v1",
+  "createdAt": "2026-05-17T20:56:21.450Z",
+  "dataset": "phase-5-retrieval-text",
+  "currentCreatedAt": "2026-05-17T20:56:21.437Z",
+  "summary": {
+    "degraded": false,
+    "queriesEvaluated": 6,
+    "regressions": 0,
+    "improvements": 0,
+    "missingRelevantChunks": 0
+  },
+  "queries": [
+    {
+      "id": "p5-gd-001",
+      "question": "Which pipeline records offsets and preserves lineage metadata?",
+      "recallPrevious": 1,
+      "recallCurrent": 1,
+      "difference": 0,
+      "rankPrevious": null,
+      "rankCurrent": 1,
+      "missingRelevantChunks": [],
+      "possibleResponsibleDocuments": [],
+      "timestamp": "2026-05-17T20:56:21.437Z",
+      "status": "stable"
+    },
+    {
+      "id": "p5-gd-002",
+      "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+      "recallPrevious": 1,
+      "recallCurrent": 1,
+      "difference": 0,
+      "rankPrevious": null,
+      "rankCurrent": 1,
+      "missingRelevantChunks": [],
+      "possibleResponsibleDocuments": [],
+      "timestamp": "2026-05-17T20:56:21.437Z",
+      "status": "stable"
+    },
+    {
+      "id": "p5-gd-003",
+      "question": "Which stage reorders candidate chunks after initial retrieval?",
+      "recallPrevious": 1,
+      "recallCurrent": 1,
+      "difference": 0,
+      "rankPrevious": null,
+      "rankCurrent": 1,
+      "missingRelevantChunks": [],
+      "possibleResponsibleDocuments": [],
+      "timestamp": "2026-05-17T20:56:21.437Z",
+      "status": "stable"
+    },
+    {
+      "id": "p5-gd-004",
+      "question": "How is session memory isolated?",
+      "recallPrevious": 1,
+      "recallCurrent": 1,
+      "difference": 0,
+      "rankPrevious": null,
+      "rankCurrent": 1,
+      "missingRelevantChunks": [],
+      "possibleResponsibleDocuments": [],
+      "timestamp": "2026-05-17T20:56:21.437Z",
+      "status": "stable"
+    },
+    {
+      "id": "p5-gd-005",
+      "question": "Which request metrics feed the trade-offs dashboard?",
+      "recallPrevious": 1,
+      "recallCurrent": 1,
+      "difference": 0,
+      "rankPrevious": null,
+      "rankCurrent": 1,
+      "missingRelevantChunks": [],
+      "possibleResponsibleDocuments": [],
+      "timestamp": "2026-05-17T20:56:21.437Z",
+      "status": "stable"
+    },
+    {
+      "id": "p5-gd-006",
+      "question": "What should a good quantized retrieval path preserve?",
+      "recallPrevious": 1,
+      "recallCurrent": 1,
+      "difference": 0,
+      "rankPrevious": null,
+      "rankCurrent": 1,
+      "missingRelevantChunks": [],
+      "possibleResponsibleDocuments": [],
+      "timestamp": "2026-05-17T20:56:21.437Z",
+      "status": "stable"
+    }
+  ]
+}

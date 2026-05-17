@@ -1,0 +1,160 @@
+{
+  "version": "v1",
+  "createdAt": "2026-05-17T20:56:23.568Z",
+  "original": {
+    "version": "v1",
+    "capturedAt": "2026-05-17T20:56:23.565Z",
+    "mode": "inline",
+    "query": "What does this command verify?",
+    "document": {
+      "documentId": "upload-0681e6b0b774e058",
+      "title": "phase-0-smoke.txt",
+      "checksum": "0681e6b0b774e05817630d61e19268d1b5284f7e4065e0387cf8852ab514355a",
+      "persisted": false
+    },
+    "parameters": {
+      "topK": 3,
+      "reasoningEnabled": false,
+      "useMultiModelOrchestration": true,
+      "enableShadowRetrieval": true
+    },
+    "retrievalConfig": {
+      "mode": "hybrid",
+      "candidateCount": 2,
+      "returnedCount": 2,
+      "rerankingApplied": true
+    },
+    "providers": {
+      "embeddingProvider": "api-lexical",
+      "embeddingModel": "api-lexical-v1",
+      "selectedModel": "groq",
+      "selectedProvider": "cloud"
+    },
+    "prompts": {
+      "systemPrompt": "Answer only from retrieved evidence. Preserve grounding. Do not invent missing facts.",
+      "answerPolicy": "Prefer extractive grounded answers, cite retrieved chunks, and degrade confidence when evidence is weak."
+    },
+    "policies": {
+      "groundingPolicy": "support answer claims with retrieved chunks only",
+      "refusalPolicy": "when evidence is insufficient, keep confidence low and avoid fabricated certainty",
+      "citationPolicy": "carry chunk identifiers and section metadata into the answer trace"
+    },
+    "chunks": [
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-2:chunk-1",
+        "sectionId": "section-2",
+        "rank": 1,
+        "score": 0.34,
+        "textHash": "2f501bf7f4573514f1843ffc75c40d00460f22c8a031efe99a0c9cf8ec4d7007",
+        "textPreview": "This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument."
+      },
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-1:chunk-1",
+        "sectionId": "section-1",
+        "rank": 2,
+        "score": 0,
+        "textHash": "48a459760bd54bb74db4376279eeeb382476bef13aa1908cc8d0e619bb9b8514",
+        "textPreview": "GroundedOS Lab smoke test."
+      }
+    ],
+    "reranking": [
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-2:chunk-1",
+        "beforeRank": 1,
+        "afterRank": 1,
+        "finalScore": 0.339504785707
+      },
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-1:chunk-1",
+        "beforeRank": 2,
+        "afterRank": 2,
+        "finalScore": 0
+      }
+    ]
+  },
+  "replay": {
+    "version": "v1",
+    "capturedAt": "2026-05-17T20:56:23.565Z",
+    "mode": "inline",
+    "query": "What does this command verify?",
+    "document": {
+      "documentId": "upload-0681e6b0b774e058",
+      "title": "phase-0-smoke.txt",
+      "checksum": "0681e6b0b774e05817630d61e19268d1b5284f7e4065e0387cf8852ab514355a",
+      "persisted": false
+    },
+    "parameters": {
+      "topK": 3,
+      "reasoningEnabled": false,
+      "useMultiModelOrchestration": true,
+      "enableShadowRetrieval": true
+    },
+    "retrievalConfig": {
+      "mode": "hybrid",
+      "candidateCount": 2,
+      "returnedCount": 2,
+      "rerankingApplied": true
+    },
+    "providers": {
+      "embeddingProvider": "api-lexical",
+      "embeddingModel": "api-lexical-v1",
+      "selectedModel": "groq",
+      "selectedProvider": "cloud"
+    },
+    "prompts": {
+      "systemPrompt": "Answer only from retrieved evidence. Preserve grounding. Do not invent missing facts.",
+      "answerPolicy": "Prefer extractive grounded answers, cite retrieved chunks, and degrade confidence when evidence is weak."
+    },
+    "policies": {
+      "groundingPolicy": "support answer claims with retrieved chunks only",
+      "refusalPolicy": "when evidence is insufficient, keep confidence low and avoid fabricated certainty",
+      "citationPolicy": "carry chunk identifiers and section metadata into the answer trace"
+    },
+    "chunks": [
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-2:chunk-1",
+        "sectionId": "section-2",
+        "rank": 1,
+        "score": 0.34,
+        "textHash": "2f501bf7f4573514f1843ffc75c40d00460f22c8a031efe99a0c9cf8ec4d7007",
+        "textPreview": "This command verifies that the ETL dispatcher can route plain text input from a registered sample dataset and return a NormalizedDocument."
+      },
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-1:chunk-1",
+        "sectionId": "section-1",
+        "rank": 2,
+        "score": 0,
+        "textHash": "48a459760bd54bb74db4376279eeeb382476bef13aa1908cc8d0e619bb9b8514",
+        "textPreview": "GroundedOS Lab smoke test."
+      }
+    ],
+    "reranking": [
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-2:chunk-1",
+        "beforeRank": 1,
+        "afterRank": 1,
+        "finalScore": 0.339504785707
+      },
+      {
+        "chunkId": "upload-0681e6b0b774e058:section-1:chunk-1",
+        "beforeRank": 2,
+        "afterRank": 2,
+        "finalScore": 0
+      }
+    ]
+  },
+  "differences": {
+    "responseChanged": false,
+    "retrievalChanged": false,
+    "groundednessChanged": false,
+    "costDeltaUsd": 0,
+    "latencyDeltaMs": 4,
+    "addedChunkIds": [],
+    "removedChunkIds": []
+  },
+  "summary": [
+    "Answer text remained stable.",
+    "Retrieved evidence remained stable.",
+    "Groundedness remained stable."
+  ]
+}
