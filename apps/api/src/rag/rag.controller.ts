@@ -19,6 +19,11 @@ import type {
   RagIndexResponse,
 } from "../rag-service";
 import {
+  RagAskRequestBodySchema,
+  RagIndexRequestBodySchema,
+  validateApiInput,
+} from "@groundedos/core";
+import {
   extractMultipart,
   parseBoolean,
   parseMetadata,
@@ -56,8 +61,16 @@ export class RagController {
       );
     }
 
+    // Strict schema validation for JSON body — rejects unknown fields and
+    // enforces required fields before reaching service logic.
+    const validated = validateApiInput<RagAskRequest>(
+      "RagAskRequest",
+      RagAskRequestBodySchema,
+      body
+    );
+
     return await this.rag.ask({
-      ...(body as RagAskRequest),
+      ...validated,
       ownerId,
     });
   }
@@ -82,8 +95,15 @@ export class RagController {
       );
     }
 
+    // Strict schema validation for JSON body.
+    const validated = validateApiInput<RagIndexRequest>(
+      "RagIndexRequest",
+      RagIndexRequestBodySchema,
+      body
+    );
+
     return await this.rag.index({
-      ...(body as RagIndexRequest),
+      ...validated,
       ownerId,
     });
   }

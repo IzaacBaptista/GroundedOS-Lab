@@ -153,3 +153,54 @@ export function validateEmbeddedChunks(input: unknown): unknown[] {
 export function validateVectorSearchResults(input: unknown): unknown[] {
   return validateArray("VectorSearchResult", VectorSearchResultSchema, input);
 }
+
+// ---------------------------------------------------------------------------
+// ZodValidationError — used by the HTTP validation layer
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when an incoming API request payload fails Zod schema validation.
+ *
+ * Unlike {@link ContractViolationError}, which surfaces a single primary
+ * violation, `ZodValidationError` carries the full list of field-level
+ * errors so that callers receive actionable feedback for every failing field
+ * in one response.
+ */
+export class ZodValidationError extends Error {
+  readonly validationErrors: Array<{ field: string; message: string }>;
+
+  constructor(errors: Array<{ field: string; message: string }>) {
+    super("Validation failed.");
+    this.name = "ZodValidationError";
+    this.validationErrors = errors;
+  }
+}
+
+/**
+ * Validates `input` against `schema` and returns the parsed, type-safe value.
+ *
+ * Throws a {@link ZodValidationError} with all field-level issues when
+ * validation fails.  Pass the `contractName` string to identify the schema
+ * in logs and error messages.
+ *
+ * The `schema` parameter accepts any Zod schema (ZodTypeAny) without
+ * requiring the caller to import directly from `zod`.
+ */
+export function validateApiInput<T>(
+  _contractName: string,
+  schema: ZodTypeAny,
+  input: unknown
+): T {
+  const result = schema.safeParse(input);
+
+  if (result.success) {
+    return result.data as T;
+  }
+
+  const errors = result.error.issues.map((issue) => ({
+    field: issue.path.join(".") || "(root)",
+    message: issue.message,
+  }));
+
+  throw new ZodValidationError(errors);
+}

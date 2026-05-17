@@ -5,8 +5,13 @@
  * POST /agents/execute - Run an agent with given parameters
  */
 
-import { Controller, Post, Body, HttpCode, BadRequestException, Inject } from '@nestjs/common';
-import { AgentService, type AgentExecuteRequest, type AgentExecuteResponse } from './agent.service';
+import { Controller, Post, Body, HttpCode, Inject } from '@nestjs/common';
+import {
+  AgentExecuteRequestSchema,
+  type AgentExecuteRequest,
+} from '@groundedos/core';
+import { AgentService, type AgentExecuteResponse } from './agent.service';
+import { ZodValidationPipe } from '../common/zod-validation.pipe';
 
 @Controller('agents')
 export class AgentsController {
@@ -14,25 +19,10 @@ export class AgentsController {
 
   @Post('execute')
   @HttpCode(200)
-  async execute(@Body() request: AgentExecuteRequest): Promise<AgentExecuteResponse> {
-    try {
-      if (!request.query || typeof request.query !== 'string') {
-        throw new BadRequestException('Missing or invalid query');
-      }
-
-      if (!request.agentType || typeof request.agentType !== 'string') {
-        throw new BadRequestException('Missing or invalid agentType');
-      }
-
-      return await this.agentService.executeAgent(request);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        success: false,
-        sources: [],
-        reasoning: [message],
-        error: message,
-      };
-    }
+  async execute(
+    @Body(new ZodValidationPipe<AgentExecuteRequest>('AgentExecuteRequest', AgentExecuteRequestSchema))
+    request: AgentExecuteRequest
+  ): Promise<AgentExecuteResponse> {
+    return await this.agentService.executeAgent(request);
   }
 }
