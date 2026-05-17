@@ -142,3 +142,61 @@ groups:
         annotations:
           summary: "Disk space is running low on {{ $labels.device }}"
           description: "Available disk space is {{ $value | humanizePercentage }} of total"
+
+  - name: groundedos_queue_hardening
+    interval: 30s
+    rules:
+      # Alert if DLQ has accumulated jobs
+      - alert: DLQAccumulation
+        expr: queue_jobs_dlq_total > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: queue
+        annotations:
+          summary: "DLQ has accumulated jobs ({{ $value }})"
+          description: "Dead-letter queue for {{ $labels.job_type }} has {{ $value }} failed jobs"
+
+      # Alert if job success rate is low
+      - alert: LowJobSuccessRate
+        expr: |
+          (
+            sum(rate(queue_jobs_succeeded_total[5m]))
+            /
+            (sum(rate(queue_jobs_succeeded_total[5m])) + sum(rate(queue_jobs_failed_total[5m])))
+          ) < 0.95
+        for: 10m
+        labels:
+          severity: warning
+          service: queue
+        annotations:
+          summary: "Job success rate is low (<95%)"
+          description: "Queue success rate is {{ $value | humanizePercentage }}"
+
+      # Alert if job duration is high (p95)
+      - alert: HighJobDurationP95
+        expr: queue_duration_ms_p95 > 5000
+        for: 5m
+        labels:
+          severity: warning
+          service: queue
+        annotations:
+          summary: "P95 job duration is high ({{ $value }}ms)"
+          description: "95th percentile job duration for {{ $labels.job_type }} is {{ $value | humanizeDuration }}"
+
+      # Alert if jobs are retrying frequently
+      - alert: HighRetryRate
+        expr: |
+          (
+            sum(rate(queue_jobs_retrying_total[5m]))
+            /
+            sum(rate(queue_attempts_total[5m]))
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          service: queue
+        annotations:
+          summary: "Job retry rate is high (>20%)"
+          description: "Queue has {{ $value | humanizePercentage }} of attempts being retried"
+

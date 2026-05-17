@@ -80,13 +80,24 @@ enforcement is enabled and the authenticated user has the `admin` role.
 Async execution endpoints are available through a BullMQ queue when Redis is
 configured (`REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`).
 
-Canonical operational guide: [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
+**Queue Hardening Baseline (Phase 6):**
+- Centralized retry policy per job type with fixed/exponential backoff
+- Dead-letter queue (DLQ) for exhausted jobs with full metadata envelope
+- Structured lifecycle event logging (created, started, completed, failed, retry, dlq)
+- Per-queue/job-type metrics: success rate, failure rate, retry rate, DLQ depth, duration percentiles
 
-- `POST /jobs/phase5` enqueues a Phase 5 experiment run.
-- `POST /jobs/model-benchmark` enqueues a model benchmark run.
-- `GET /jobs/:jobId` returns queue job status/result metadata.
+**Available Endpoints:**
+- `POST /jobs/phase5` — Enqueue a Phase 5 experiment run
+- `POST /jobs/model-benchmark` — Enqueue a model benchmark run
+- `GET /jobs/:jobId` — Get job status (waiting, active, completed, failed, delayed)
+- `GET /jobs/metrics` — View queue metrics (JSON) or `?format=prometheus` for OpenMetrics text
+- `GET /jobs/dlq/list` — List all dead-letter queue entries with optional filters
+- `GET /jobs/dlq/entry/:dlqJobId` — Inspect a specific DLQ entry
+- `GET /jobs/dlq/history` — View re-drive audit history with pagination
+- `GET /jobs/dlq/history/:jobType` — Filter re-drive history by job type
+- `POST /jobs/dlq/:dlqJobId/redrive` — Re-drive a DLQ entry (supports dry-run with `{"dryRun": true}`)
 
-Start the API worker from repository root:
+**Start the API worker from repository root:**
 
 ```bash
 npm run api:jobs:worker
@@ -98,19 +109,69 @@ Or from API workspace:
 npm --workspace @groundedos/api run jobs:worker
 ```
 
+**Monitoring with Prometheus & Grafana:**
+
+Start observability stack (requires Docker):
+```bash
+docker compose --profile observability up -d
+```
+
+Access dashboards:
+- **Prometheus** (metrics/queries): http://localhost:9090
+- **Grafana** (visualization): http://localhost:3100
+- **Queue Dashboard**: Automatically imported with queue hardening metrics
+
+Query queue metrics:
+```bash
+# View as JSON
+curl http://localhost:3001/jobs/metrics | jq
+
+# View as Prometheus text format (for scraping)
+curl "http://localhost:3001/jobs/metrics?format=prometheus"
+```
+
+**DLQ Operations Example:**
+
+Inspect failed jobs and re-drive:
+```bash
+# List all DLQ entries
+curl http://localhost:3001/jobs/dlq/list | jq '.entries'
+
+# Inspect specific entry
+curl http://localhost:3001/jobs/dlq/entry/dlq:job-abc123 | jq '.envelope'
+
+# Dry-run re-drive (validate without action)
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"dryRun": true}' \
+  http://localhost:3001/jobs/dlq/dlq:job-abc123/redrive | jq
+
+# Real re-drive (re-enqueue the job)
+curl -X POST -H 'Content-Type: application/json' \
+  -d '{"dryRun": false}' \
+  http://localhost:3001/jobs/dlq/dlq:job-abc123/redrive | jq
+
+# Check audit history
+curl "http://localhost:3001/jobs/dlq/history?limit=10" | jq '.entries'
+```
+
+**Recommended flow:**
+
+- Enqueue via `POST /jobs/phase5` or `POST /jobs/model-benchmark`
+- Poll via `GET /jobs/:jobId`
+- Monitor via `GET /jobs/metrics`
+- Manage failed jobs via `/jobs/dlq/*` endpoints
+
+**Authentication:**
+
 These endpoints are protected when auth enforcement is active. Provide a
 bearer token or API key in requests.
-
-Recommended flow:
-
-- enqueue via `POST /jobs/phase5` or `POST /jobs/model-benchmark`
-- poll via `GET /jobs/:jobId`
 
 If Redis is not configured, `/jobs/*` returns `503` and worker startup fails
 with a queue configuration error.
 
 For full request examples (bearer/API key), `jobId` capture and troubleshooting,
-use [`docs/operational-runbook.md`](../../docs/operational-runbook.md).
+see [`docs/operational-runbook.md`](../../docs/operational-runbook.md) and
+[`docs/prometheus-grafana-setup.md`](../../docs/prometheus-grafana-setup.md).
 
 #### `POST /rag/ask`
 

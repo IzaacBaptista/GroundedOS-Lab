@@ -61,12 +61,22 @@ describe("JobsService Integration", () => {
       expect(fetchedJob?.data.providers).toContain("anthropic");
     });
 
-    it("should apply retry config when enqueueing", async () => {
+    it("should apply exponential retry policy for phase5 jobs", async () => {
       const response = await jobsService.enqueuePhase5Experiment("lora");
 
       expect(response.jobId).toBeDefined();
       const job = await queue.getJob(response.jobId);
-      expect(job?.opts.attempts).toBeGreaterThanOrEqual(1);
+      expect(job?.opts.attempts).toBe(5);
+      expect(job?.opts.backoff).toMatchObject({ type: "exponential", delay: 2000 });
+    });
+
+    it("should apply fixed retry policy for model-benchmark jobs", async () => {
+      const response = await jobsService.enqueueModelBenchmark(["openai"]);
+
+      expect(response.jobId).toBeDefined();
+      const job = await queue.getJob(response.jobId);
+      expect(job?.opts.attempts).toBe(4);
+      expect(job?.opts.backoff).toMatchObject({ type: "fixed", delay: 3000 });
     });
 
     it("should inject trace context if available", async () => {
@@ -79,6 +89,23 @@ describe("JobsService Integration", () => {
       if (data?._otel_context) {
         expect(data._otel_context).toMatch(/^00-[a-f0-9]{32}-[a-f0-9]{16}-[01]{2}$/);
       }
+    });
+
+    it("should preserve correlation IDs in job payload", async () => {
+      const response = await jobsService.enqueuePhase5Experiment("quantization", {
+        requestId: "req-123",
+        sessionId: "sess-9",
+        tenantId: "tenant-a",
+        userId: "user-7",
+        indexId: "idx-42",
+      });
+
+      const job = await queue.getJob(response.jobId);
+      expect(job?.data.requestId).toBe("req-123");
+      expect(job?.data.sessionId).toBe("sess-9");
+      expect(job?.data.tenantId).toBe("tenant-a");
+      expect(job?.data.userId).toBe("user-7");
+      expect(job?.data.indexId).toBe("idx-42");
     });
 
     it("should reject empty provider list", async () => {

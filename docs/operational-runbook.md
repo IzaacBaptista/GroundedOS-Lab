@@ -52,6 +52,7 @@ Queue-backed endpoints:
 - `POST /jobs/phase5`
 - `POST /jobs/model-benchmark`
 - `GET /jobs/:jobId`
+- `GET /jobs/metrics`
 
 Start API and worker in separate terminals:
 
@@ -93,6 +94,21 @@ Poll job status:
 curl "http://localhost:3001/jobs/${JOB_ID}" \
   -H 'x-api-key: <api-key>'
 ```
+
+Read queue metrics snapshot:
+
+```bash
+curl "http://localhost:3001/jobs/metrics" \
+  -H 'x-api-key: <api-key>'
+```
+
+## Queue Hardening Behavior
+
+- Retry policy is configured per job type (centralized in code).
+- Supported backoff types: fixed and exponential.
+- Exhausted jobs are copied to DLQ with envelope metadata for triage/re-drive.
+- Correlation IDs are accepted in enqueue payload and logged when present.
+- Lifecycle logs are structured (created, started, completed, failed, retry, dlq).
 
 ## Required Queue Configuration
 

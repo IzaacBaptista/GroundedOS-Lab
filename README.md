@@ -90,29 +90,52 @@
 
 ### Phase 6 — Infra/Auth Baseline ✅ In Progress
 
+**Authentication & Authorization:**
 - JWT login/refresh/logout, API keys, admin-gated routes, audit logging and
    per-user rate limiting are implemented in API.
 - Auth enforcement is opt-in in local dev and defaults to enabled in
    non-dev/non-test environments when `AUTH_ENFORCEMENT` is unset.
 - Optional PostgreSQL-backed auth users/sessions are available with memory
    fallback (`AUTH_USER_BACKEND=postgres`, `AUTH_SESSION_BACKEND=postgres`).
-- Async jobs are exposed via `/jobs/*` and processed by a BullMQ worker
-   (`npm run api:jobs:worker`) when Redis is configured.
 
-Quick async jobs flow:
+**Queue Hardening & Observability:**
+- ✅ Async jobs via BullMQ (`/jobs/*`) with centralized retry policies per job type
+- ✅ Queue hardening: fixed/exponential backoff, DLQ envelope with full metadata, structured lifecycle logging
+- ✅ Prometheus-compatible metrics export: success rate, failure rate, retry rate, DLQ depth, duration percentiles
+- ✅ DLQ operations: list, inspect, re-drive with audit trail and dry-run validation
+- ✅ Grafana dashboard auto-imported with queue hardening visualizations
+- ✅ Alert rules for DLQ accumulation, low success rate, high latency, high retry rate
 
-Canonical operational guide: [docs/operational-runbook.md](./docs/operational-runbook.md).
+**Operational Guides:**
+- [Async jobs & queue operations](./docs/operational-runbook.md)
+- [Prometheus & Grafana setup](./docs/prometheus-grafana-setup.md)
+
+**Quick Start:**
 
 ```bash
 # 1) Start API and worker in separate terminals
 npm run api:dev
 npm run api:jobs:worker
+
+# 2) Enqueue async jobs
+JOB_ID=$(curl -s -X POST http://localhost:3001/jobs/phase5 \
+  -H 'content-type: application/json' \
+  -d '{"track": "quantization"}' | jq -r '.jobId')
+
+# 3) Poll job status
+curl "http://localhost:3001/jobs/${JOB_ID}"
+
+# 4) View queue metrics
+curl "http://localhost:3001/jobs/metrics?format=prometheus"
+
+# 5) Start observability stack for Grafana/Prometheus
+docker compose --profile observability up -d
+# Grafana: http://localhost:3100
 ```
 
-Then use `POST /jobs/phase5` (or `POST /jobs/model-benchmark`) and poll with
-`GET /jobs/:jobId`. Full request examples (bearer token + API key), `jobId`
-capture, and troubleshooting are documented in
-[docs/operational-runbook.md](./docs/operational-runbook.md).
+Full operational examples and troubleshooting in
+[docs/operational-runbook.md](./docs/operational-runbook.md) and
+[docs/prometheus-grafana-setup.md](./docs/prometheus-grafana-setup.md).
 
 ### Phase 7 — Conceitos Lab UX ✅ Complete (Frontend Scope)
 
@@ -139,7 +162,8 @@ Reference docs:
 |---|---|
 | OAuth / external identity providers | Phase 6+ |
 | Production-grade vector database deployment (Qdrant) | Phase 6+ |
-| Queue observability, retries and multi-worker orchestration | Phase 6+ |
+| Redis DLQ persistence (in-process memory working) | Phase 6+ |
+| Multi-worker distributed coordination | Phase 6+ |
 | Long-term trace storage and retention | Phase 7+ |
 | Streaming responses and WebSockets | Phase 7+ |
 | Multimodal (complete image + audio extraction) | Phase 7+ |
@@ -889,8 +913,11 @@ Phases 0, 1, 2, 2b, 3, 4 and 5 are complete. Phase 6 Infrastructure & Deploy is 
    - OTEL trace export enabled (API and worker export to Jaeger)
    - Prometheus scrape config for all services
    - Grafana auto-provisioning with Prometheus + Jaeger datasources
-   - Alert rules defined (API, worker, infrastructure)
+   - Queue hardening metrics: success/failure/retry rates, DLQ depth, duration percentiles
+   - Queue hardening dashboard: auto-imported with queue operational visualizations
+   - Alert rules: API/worker/infrastructure + Queue Hardening alerts (DLQ accumulation, low success rate, high latency, high retry rate)
    - Validation guide: [docs/PHASE-6-OBSERVABILITY-VALIDATION.md](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md)
+   - Setup guide: [docs/prometheus-grafana-setup.md](./docs/prometheus-grafana-setup.md)
 - Phase 6 baseline infra already landed:
    `docker-compose.yml` with observability profile, `Dockerfile`, `Dockerfile.web`,
    `apps/worker/Dockerfile`, `.github/workflows/ci.yml`.
@@ -943,7 +970,7 @@ docker-compose ps | grep -E "otelcol|jaeger|prometheus|grafana"
 **Access the observability UIs:**
 - **Jaeger UI** (distributed traces): http://localhost:16686
 - **Prometheus UI** (metrics, PromQL queries): http://localhost:9090
-- **Grafana UI** (dashboards, alerts): http://localhost:3002 (default: admin/admin)
+- **Grafana UI** (dashboards, alerts): http://localhost:3100 (default: admin/admin)
 
 **Trace export is automatically enabled:**
 - API service: `OTEL_EXPORT_ENABLED=true` → sends traces to OTEL Collector (http://otelcol:4318)
@@ -999,12 +1026,12 @@ rate(cache_hits_total[5m]) / rate(cache_requests_total[5m])
 **Configure alerts:**
 - Alert rules are defined in [config/prometheus-alert-rules.yml](./config/prometheus-alert-rules.yml)
 - Pre-configured alerts:
-  - APIDown (API unavailable > 1 min)
-  - APIHighErrorRate (> 5% error rate over 5 min)
-  - APIHighLatency (p99 latency > 1 sec over 5 min)
-  - WorkerDown, QueueDepthHigh, JobFailureRate
-  - Infrastructure alerts (database, cache, memory, disk)
+  - **API Alerts:** APIDown (unavailable > 1 min), APIHighErrorRate (> 5% over 5 min), APIHighLatency (p99 > 1 sec over 5 min)
+  - **Worker Alerts:** WorkerDown, QueueDepthHigh, JobFailureRate
+  - **Queue Hardening Alerts:** DLQAccumulation (> 10 jobs in DLQ), LowJobSuccessRate (< 95% over 10 min), HighJobDurationP95 (> 5000ms over 5 min), HighRetryRate (> 20% over 5 min)
+  - **Infrastructure Alerts:** Database, cache, memory, disk
 - To enable notifications, configure Alertmanager (future work)
+- For queue-specific metrics and alerts, see [docs/prometheus-grafana-setup.md](./docs/prometheus-grafana-setup.md)
 
 See [docs/PHASE-6-OBSERVABILITY-VALIDATION.md](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md) for complete validation guide, troubleshooting, and performance tuning.
 

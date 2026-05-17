@@ -1,14 +1,28 @@
-import { Body, Controller, Get, Inject, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from "@nestjs/common";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { getRequestUserId } from "../common/auth-context";
 import { ApiRequestError } from "../errors";
 import { JobsService, type EnqueuedJobResponse, type JobStatusResponse } from "./jobs.service";
 import type { Phase5ExperimentTrack } from "./job-queue";
 
 type EnqueuePhase5Request = {
   track?: unknown;
+  requestId?: unknown;
+  jobId?: unknown;
+  sessionId?: unknown;
+  tenantId?: unknown;
+  userId?: unknown;
+  indexId?: unknown;
 };
 
 type EnqueueModelBenchmarkRequest = {
   providers?: unknown;
+  requestId?: unknown;
+  jobId?: unknown;
+  sessionId?: unknown;
+  tenantId?: unknown;
+  userId?: unknown;
+  indexId?: unknown;
 };
 
 @Controller("jobs")
@@ -16,17 +30,100 @@ export class JobsController {
   constructor(@Inject(JobsService) private readonly jobs: JobsService) {}
 
   @Post("phase5")
-  enqueuePhase5(@Body() body: EnqueuePhase5Request): Promise<EnqueuedJobResponse> {
+  enqueuePhase5(
+    @Body() body: EnqueuePhase5Request,
+    @Req() request: FastifyRequest
+  ): Promise<EnqueuedJobResponse> {
     const track = normalizeTrack(body.track);
-    return this.jobs.enqueuePhase5Experiment(track);
+    return this.jobs.enqueuePhase5Experiment(track, normalizeCorrelation(body, request));
   }
 
   @Post("model-benchmark")
   enqueueModelBenchmark(
-    @Body() body: EnqueueModelBenchmarkRequest
+    @Body() body: EnqueueModelBenchmarkRequest,
+    @Req() request: FastifyRequest
   ): Promise<EnqueuedJobResponse> {
     const providers = normalizeProviders(body.providers);
-    return this.jobs.enqueueModelBenchmark(providers);
+    return this.jobs.enqueueModelBenchmark(providers, normalizeCorrelation(body, request));
+  }
+
+  @Get("metrics")
+  async getMetrics(
+    @Query("format") format?: string,
+    @Res({ passthrough: true }) response?: FastifyReply
+  ) {
+    if (format === "prometheus") {
+      const prometheusText = this.jobs.getQueueMetricsPrometheus();
+      if (response) {
+        response.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+      }
+      return prometheusText;
+    }
+
+    // Default JSON format
+    return this.jobs.getQueueMetrics();
+  }
+
+  @Get("dlq/list")
+  listDlq() {
+    return this.jobs.listDlqEntries();
+  }
+
+  @Get("dlq/history")
+  getDlqRedriveHistory(@Query("limit") limit?: string, @Query("offset") offset?: string) {
+    return this.jobs.getRedriveHistory(
+      limit ? Math.min(parseInt(limit, 10), 100) : 100,
+      offset ? parseInt(offset, 10) : 0
+    );
+  }
+
+  @Get("dlq/history/:jobType")
+  getDlqRedriveHistoryByJobType(
+    @Param("jobType") jobType: string,
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string
+  ) {
+    if (jobType !== "phase5-experiment" && jobType !== "model-benchmark") {
+      throw new ApiRequestError(
+        `Invalid jobType: ${jobType}. Must be 'phase5-experiment' or 'model-benchmark'.`,
+        400
+      );
+    }
+    return this.jobs.getRedriveHistoryByJobType(
+      jobType,
+      limit ? Math.min(parseInt(limit, 10), 100) : 100,
+      offset ? parseInt(offset, 10) : 0
+    );
+  }
+
+  @Get("dlq/entry/:dlqJobId")
+  getDlqEntry(@Param("dlqJobId") dlqJobId: string) {
+    const normalized = dlqJobId.trim();
+    if (!normalized) {
+      throw new ApiRequestError("dlqJobId is required.", 400);
+    }
+
+    const entry = this.jobs.getDlqEntry(normalized);
+    if (!entry) {
+      throw new ApiRequestError(`DLQ entry ${normalized} not found.`, 404);
+    }
+
+    return entry;
+  }
+
+  @Post("dlq/:dlqJobId/redrive")
+  async redriveDlq(
+    @Param("dlqJobId") dlqJobId: string,
+    @Body() body: { dryRun?: boolean },
+    @Req() request: FastifyRequest
+  ) {
+    const normalized = dlqJobId.trim();
+    if (!normalized) {
+      throw new ApiRequestError("dlqJobId is required.", 400);
+    }
+
+    const redrivenBy = getRequestUserId(request);
+    return this.jobs.redriveDlqJob(normalized, body.dryRun ?? false, redrivenBy);
   }
 
   @Get(":jobId")
@@ -38,6 +135,31 @@ export class JobsController {
 
     return this.jobs.getJobStatus(normalized);
   }
+}
+
+function normalizeCorrelation(
+  body: EnqueuePhase5Request | EnqueueModelBenchmarkRequest,
+  request: FastifyRequest
+) {
+  const requestUserId = getRequestUserId(request);
+
+  return {
+    requestId: normalizeOptionalString(body.requestId),
+    jobId: normalizeOptionalString(body.jobId),
+    sessionId: normalizeOptionalString(body.sessionId),
+    tenantId: normalizeOptionalString(body.tenantId),
+    userId: normalizeOptionalString(body.userId) ?? requestUserId,
+    indexId: normalizeOptionalString(body.indexId),
+  };
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length === 0 ? undefined : normalized;
 }
 
 function normalizeTrack(value: unknown): Phase5ExperimentTrack {

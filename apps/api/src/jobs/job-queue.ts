@@ -7,19 +7,46 @@ export type Phase6JobType = "phase5-experiment" | "model-benchmark";
 
 export type Phase5ExperimentTrack = "quantization" | "lora" | "fine-tuning" | "distillation";
 
+export interface JobCorrelationIds {
+  requestId?: string;
+  jobId?: string;
+  sessionId?: string;
+  tenantId?: string;
+  userId?: string;
+  indexId?: string;
+}
+
+type BaseJobPayload = JobCorrelationIds & {
+  /** W3C traceparent for OTel context propagation (see ADR-012). */
+  _otel_context?: string;
+};
+
 export type Phase6JobPayload =
-  | {
+  | (BaseJobPayload & {
       type: "phase5-experiment";
       track: Phase5ExperimentTrack;
-      /** W3C traceparent for OTel context propagation (see ADR-012). */
-      _otel_context?: string;
-    }
-  | {
+    })
+  | (BaseJobPayload & {
       type: "model-benchmark";
       providers: string[];
-      /** W3C traceparent for OTel context propagation (see ADR-012). */
-      _otel_context?: string;
-    };
+    });
+
+export interface Phase6DlqEnvelope {
+  payload: Phase6JobPayload;
+  jobType: Phase6JobType;
+  queueName: string;
+  attempts: number;
+  maxAttempts: number;
+  createdAt: string;
+  failedAt: string;
+  error: string;
+  correlation: JobCorrelationIds;
+}
+
+export interface Phase6DlqPayload {
+  type: "dlq-envelope";
+  envelope: Phase6DlqEnvelope;
+}
 
 export function resolveQueueConnection(): ConnectionOptions | null {
   const explicitUrl = process.env.REDIS_URL?.trim();

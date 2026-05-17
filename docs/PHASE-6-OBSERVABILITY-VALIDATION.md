@@ -86,7 +86,7 @@ NAME                  COMMAND                   STATUS              PORTS
 groundedos-otelcol    /otelcontribcol --conf... Up (healthy)       4317/tcp, 4318/tcp, 8888/tcp, 13133/tcp
 groundedos-jaeger     /go/bin/all-in-one -c... Up (healthy)       9411/tcp, 14317/tcp, 14318/tcp, 16686/tcp
 groundedos-prometheus /bin/prometheus --conf... Up (healthy)       9090/tcp
-groundedos-grafana    /run.sh                  Up (healthy)       3002/tcp
+groundedos-grafana    /run.sh                  Up (healthy)       3100/tcp
 ```
 
 ### 3. Verify Trace Export (10 min)
@@ -161,7 +161,7 @@ http_request_duration_seconds{job="groundedos-api"}  # Should return latency buc
 
 ```bash
 # Open Grafana
-open http://localhost:3002
+open http://localhost:3100
 
 # Login: admin / admin
 # Verify datasources are configured:

@@ -69,6 +69,14 @@ queued ──► active ──► completed
 - **Idempotency**: the Python worker must check whether a job has already been processed (by `jobId`) before performing side effects. Duplicate delivery can occur after a worker crash mid-ack.
 - **Ack/fail semantics**: the Python consumer must call `job.moveToCompleted` (or equivalent) only after all side effects are durable. On any unhandled exception it must call `job.moveToFailed` so BullMQ schedules a retry.
 
+Queue hardening baseline updates:
+
+- Retry policy is now resolved per job type via centralized policy modules in API and worker.
+- Backoff strategy supports both fixed and exponential modes.
+- DLQ entries preserve an envelope with original payload, job metadata, attempts and failure reason for future triage/re-drive.
+- Correlation IDs (`requestId`, `jobId`, `sessionId`, `tenantId`, `userId`, `indexId`) are propagated when available.
+- Lifecycle events are logged in structured format and queue metrics are exposed through `GET /jobs/metrics`.
+
 ### Status reporting back to the API
 
 The Python worker updates job progress via the BullMQ `updateProgress` API. The API's `GET /jobs/:id` endpoint reads state directly from Redis via BullMQ's `getJob` + `getState` so no additional HTTP callback is required.
