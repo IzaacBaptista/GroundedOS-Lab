@@ -124,8 +124,8 @@ export type RagAskRequestBody = z.infer<typeof RagAskRequestBodySchema>;
 
 export const RagIndexRequestBodySchema = z
   .object({
-    /** Document modality.  Use multipart/form-data for PDF/binary types. */
-    type: z.enum(["text", "pdf", "image", "audio", "csv", "markdown", "html"]).optional(),
+    /** Document modality.  Only "text" is valid for the JSON API. */
+    type: z.enum(["text"]).optional(),
     /** Full text content to index. */
     content: z.string().min(1, "content must be a non-empty string"),
     /** Human-readable document title. */
