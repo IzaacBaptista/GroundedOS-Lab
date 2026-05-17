@@ -197,10 +197,25 @@ export function validateApiInput<T>(
     return result.data as T;
   }
 
-  const errors = result.error.issues.map((issue) => ({
-    field: issue.path.join(".") || "(root)",
-    message: issue.message,
-  }));
+  const errors = result.error.issues.flatMap((issue) => {
+    if (issue.code === "unrecognized_keys") {
+      const parentPath = issue.path.join(".");
+
+      if (issue.keys.length > 0) {
+        return issue.keys.map((key) => ({
+          field: parentPath ? `${parentPath}.${key}` : key,
+          message: issue.message,
+        }));
+      }
+    }
+
+    return [
+      {
+        field: issue.path.join(".") || "(root)",
+        message: issue.message,
+      },
+    ];
+  });
 
   throw new ZodValidationError(errors);
 }
