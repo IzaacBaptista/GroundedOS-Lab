@@ -25,6 +25,7 @@ export type { RawQuery, ProcessedQuery, QueryIntent } from "./types/query";
 // Runtime validation (Phase 2 — Data Contracts & Schema Validation)
 export {
   ContractViolationError,
+  ZodValidationError,
   validateNormalizedDocument,
   validateDocumentSection,
   validateRetrievalChunk,
@@ -35,6 +36,7 @@ export {
   validateRetrievalChunks,
   validateEmbeddedChunks,
   validateVectorSearchResults,
+  validateApiInput,
 } from "./validation/index";
 
 export {
@@ -45,6 +47,27 @@ export {
   ProcessedQuerySchema,
   RagAskResponseSchema,
 } from "./validation/schemas";
+
+// API contracts (Phase 3 — Structured Contracts & Schema Validation)
+export {
+  AgentExecuteRequestSchema,
+  AgentToolCallSchema,
+  AgentExecuteResponseSchema,
+  RagAskRequestBodySchema,
+  RagIndexRequestBodySchema,
+  ApiValidationErrorItemSchema,
+  ApiErrorEnvelopeSchema,
+  ApiEmbeddingProviderIdSchema,
+} from "./contracts/index";
+
+export type {
+  AgentExecuteRequest,
+  AgentExecuteResponse,
+  RagAskRequestBody,
+  RagIndexRequestBody,
+  ApiValidationErrorItem,
+  ApiErrorEnvelope,
+} from "./contracts/index";
 
 // Workflow engine (Phase 2 — Workflow Orchestration)
 export type {

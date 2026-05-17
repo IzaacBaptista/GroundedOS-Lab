@@ -112,7 +112,7 @@ describe("api server", () => {
         },
       });
       expect(afterLogout.statusCode).toBe(401);
-      expect(afterLogout.json()).toEqual({
+      expect(afterLogout.json()).toMatchObject({
         error: {
           message: "Invalid or expired token.",
         },
@@ -181,7 +181,7 @@ describe("api server", () => {
         },
       });
       expect(reusedOldRefresh.statusCode).toBe(401);
-      expect(reusedOldRefresh.json()).toEqual({
+      expect(reusedOldRefresh.json()).toMatchObject({
         error: {
           message: "invalid refresh token.",
         },
@@ -399,7 +399,7 @@ describe("api server", () => {
       });
 
       expect(callbackResponse.statusCode).toBe(400);
-      expect(callbackResponse.json()).toEqual({
+      expect(callbackResponse.json()).toMatchObject({
         error: {
           message: "Invalid or expired OAuth state.",
         },
@@ -442,7 +442,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(401);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "Invalid or expired token.",
         },
@@ -464,7 +464,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(401);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "Authentication required.",
         },
@@ -546,7 +546,7 @@ describe("api server", () => {
 
       expect(secondProtectedCall.statusCode).toBe(429);
       expect(secondProtectedCall.headers["retry-after"]).toBeTruthy();
-      expect(secondProtectedCall.json()).toEqual({
+      expect(secondProtectedCall.json()).toMatchObject({
         error: {
           message: "Rate limit exceeded.",
         },
@@ -699,7 +699,7 @@ describe("api server", () => {
       });
 
       expect(withRevokedKey.statusCode).toBe(401);
-      expect(withRevokedKey.json()).toEqual({
+      expect(withRevokedKey.json()).toMatchObject({
         error: {
           message: "Invalid API key.",
         },
@@ -816,7 +816,7 @@ describe("api server", () => {
       });
 
       expect(withExpiredKey.statusCode).toBe(401);
-      expect(withExpiredKey.json()).toEqual({
+      expect(withExpiredKey.json()).toMatchObject({
         error: {
           message: "Invalid API key.",
         },
@@ -983,7 +983,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "Lab Mode features require one of: admin, power-user.",
         },
@@ -1047,7 +1047,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(403);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "Admin role required.",
         },
@@ -1460,9 +1460,12 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({
+    expect(response.json()).toMatchObject({
       error: {
-        message: "content must be a non-empty string.",
+        errorCode: "VALIDATION_ERROR",
+        validationErrors: expect.arrayContaining([
+          expect.objectContaining({ field: "content" }),
+        ]),
       },
     });
   });
@@ -1606,7 +1609,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "track is required and must be one of: quantization, lora, fine-tuning, distillation.",
         },
@@ -1622,7 +1625,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "track must be one of: quantization, lora, fine-tuning, distillation.",
         },
@@ -1644,7 +1647,7 @@ describe("api server", () => {
         });
 
         expect(response.statusCode).toBe(503);
-        expect(response.json()).toEqual({
+        expect(response.json()).toMatchObject({
           error: {
             message: "Async job queue is not configured. Set REDIS_URL or REDIS_HOST/PORT.",
           },
@@ -1664,7 +1667,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "providers must be an array of strings.",
         },
@@ -1680,7 +1683,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "providers must include at least one provider.",
         },
@@ -1714,7 +1717,7 @@ describe("api server", () => {
         });
 
         expect(response.statusCode).toBe(503);
-        expect(response.json()).toEqual({
+        expect(response.json()).toMatchObject({
           error: {
             message: "Async job queue is not configured. Set REDIS_URL or REDIS_HOST/PORT.",
           },
@@ -1739,7 +1742,7 @@ describe("api server", () => {
         });
 
         expect(response.statusCode).toBe(503);
-        expect(response.json()).toEqual({
+        expect(response.json()).toMatchObject({
           error: {
             message: "Async job queue is not configured. Set REDIS_URL or REDIS_HOST/PORT.",
           },
@@ -1758,7 +1761,7 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         error: {
           message: "jobId is required.",
         },

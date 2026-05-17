@@ -90,6 +90,8 @@ export async function createApiServer(
         reply.status(401).send({
           error: {
             message: "Invalid or expired token.",
+            errorCode: "UNAUTHORIZED",
+            requestId: String(request.id),
           },
         });
         return;
@@ -100,6 +102,8 @@ export async function createApiServer(
         reply.status(401).send({
           error: {
             message: "Invalid API key.",
+            errorCode: "UNAUTHORIZED",
+            requestId: String(request.id),
           },
         });
         return;
@@ -108,6 +112,8 @@ export async function createApiServer(
       reply.status(401).send({
         error: {
           message: "Authentication required.",
+          errorCode: "UNAUTHORIZED",
+          requestId: String(request.id),
         },
       });
       return;
@@ -141,6 +147,8 @@ export async function createApiServer(
           .send({
             error: {
               message: "Rate limit exceeded.",
+              errorCode: "RATE_LIMITED",
+              requestId: String(request.id),
             },
           });
         return;
@@ -155,6 +163,8 @@ export async function createApiServer(
       reply.status(403).send({
         error: {
           message: "Admin role required.",
+          errorCode: "FORBIDDEN",
+          requestId: String(request.id),
         },
       });
       return;
@@ -168,6 +178,8 @@ export async function createApiServer(
         reply.status(403).send({
           error: {
             message: `Lab Mode features require one of: ${allowedLabRoles.join(", ")}.`,
+            errorCode: "FORBIDDEN",
+            requestId: String(request.id),
           },
         });
         return;

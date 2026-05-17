@@ -1,5 +1,5 @@
 /**
- * Agent Controller
+ * Agent Service
  *
  * Exposes agent execution as API endpoints.
  * Integrates DocumentQAAgent with RAG service for document retrieval.
@@ -11,37 +11,9 @@ import {
   type AgentResult,
   type AgentExecutionContext,
 } from '@groundedos/agents';
+import type { AgentExecuteRequest, AgentExecuteResponse } from '@groundedos/core';
 
-export type AgentExecuteRequest = {
-  agentType: 'document-qa';
-  indexId?: string;
-  indexDir?: string;
-  query: string;
-  sessionId?: string;
-  maxSteps?: number;
-  devMode?: boolean;
-};
-
-export type AgentExecuteResponse = {
-  success: boolean;
-  answer?: string;
-  sources: string[];
-  reasoning: string[];
-  devMode?: {
-    toolCalls: Array<{
-      id: string;
-      toolName: string;
-      input: Record<string, unknown>;
-      output?: unknown;
-      status: string;
-      error?: string;
-      durationMs: number;
-    }>;
-    state: Record<string, unknown>;
-    durationMs: number;
-  };
-  error?: string;
-};
+export type { AgentExecuteRequest, AgentExecuteResponse };
 
 @Injectable()
 export class AgentService {
