@@ -53,7 +53,83 @@ describe("trace-builders", () => {
             { stage: "rerank-chunks", latencyMs: 6, chunkCount: 1, score: { min: 0.2, max: 0.8, avg: 0.5 } },
           ],
           cache: { hit: true },
-          evals: { groundedness: 1, answerOverlap: 1, retrievalAccuracy: 0.9, pipelineScore: 0.95, modelScore: 0.95 },
+          evals: {
+            groundedness: 1,
+            answerOverlap: 1,
+            retrievalAccuracy: 0.9,
+            pipelineScore: 0.95,
+            modelScore: 0.95,
+            confidence: {
+              confidenceScore: 0.91,
+              confidenceLevel: "HIGH",
+              confidenceReasoning: ["retrieval score=0.9"],
+              factors: {
+                retrievalScore: 0.9,
+                sourceDiversity: 0.5,
+                groundedness: 1,
+                questionCoverage: 1,
+                evidenceQuantity: 0.5,
+                answerConsistency: 1,
+                conflictPenalty: 0,
+              },
+            },
+            taxonomy: {
+              category: "LOW_CONFIDENCE",
+              confidence: 0.66,
+              probableCause: "limited evidence breadth",
+              involvedChunks: ["chunk-1"],
+              retrievalMetadata: {
+                retrievalMode: "hybrid",
+                rerankingApplied: true,
+                topScore: 0.8,
+                avgScore: 0.8,
+                sourceDiversity: 1,
+                evidenceCoverage: 0.7,
+                groundedConsistency: 1,
+                conflictCount: 0,
+              },
+            },
+          },
+          replay: {
+            snapshot: {
+              version: "v1",
+              capturedAt: "2026-01-01T00:00:00.000Z",
+              mode: "persisted",
+              query: "what is grounded ai?",
+              document: {
+                documentId: "doc-1",
+                persisted: true,
+              },
+              parameters: {
+                topK: 3,
+                reasoningEnabled: false,
+                useMultiModelOrchestration: true,
+                enableShadowRetrieval: true,
+              },
+              retrievalConfig: {
+                mode: "hybrid",
+                candidateCount: 3,
+                returnedCount: 1,
+                rerankingApplied: true,
+              },
+              providers: {
+                embeddingProvider: "api-lexical",
+              },
+              prompts: {
+                systemPrompt: "grounded",
+                answerPolicy: "answer from evidence",
+              },
+              policies: {
+                groundingPolicy: "support answer claims with retrieved chunks only",
+                refusalPolicy: "avoid fabricated certainty",
+                citationPolicy: "carry chunk identifiers",
+              },
+              chunks: [],
+              reranking: [],
+            },
+            reproducible: true,
+            command: "npm run rag:replay -- --document-id 'doc-1'",
+          },
           workflowContext: {
             workflowId: "wf-1",
             startedAt: Date.now(),
@@ -72,6 +148,8 @@ describe("trace-builders", () => {
     expect(trace.operation).toBe("rag.pipeline");
     expect(trace.correlation.requestId).toBe("req-1");
     expect(trace.metadata?.retrievalMs).toBe(12);
+    expect(trace.metadata?.confidenceLevel).toBe("HIGH");
+    expect(trace.metadata?.failureCategory).toBe("LOW_CONFIDENCE");
   });
 
   it("builds structured RAG error traces", () => {

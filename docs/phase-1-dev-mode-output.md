@@ -69,6 +69,16 @@ type RetrievalDevModeOutput = {
     retrievalAccuracy: number;
     pipelineScore: number;
     modelScore: number;
+    taxonomy?: {
+      category: string;
+      probableCause: string;
+      confidence: number;
+    };
+    confidence?: {
+      confidenceScore: number;
+      confidenceLevel: "HIGH" | "MEDIUM" | "LOW" | "UNRELIABLE";
+      confidenceReasoning: string[];
+    };
   };
   cacheAwareRetrieval?: {
     influenced: boolean;
@@ -86,6 +96,34 @@ type RetrievalDevModeOutput = {
     denseWeight: number;
     sparseWeight: number;
     candidateCount: number;
+  };
+  retrievalDiagnostics?: {
+    topScore: number;
+    avgScore: number;
+    sourceDiversity: number;
+    evidenceCoverage: number;
+    groundedConsistency: number;
+    conflictCount: number;
+  };
+  replay?: {
+    reproducible: boolean;
+    command: string;
+    snapshot: {
+      version: "v1";
+      mode: "inline" | "persisted";
+      query: string;
+    };
+  };
+  reportReferences?: {
+    drift?: {
+      degraded: boolean;
+      regressions: number;
+    };
+    diff?: {
+      winner: string;
+      regressions: number;
+      improvements: number;
+    };
   };
 };
 
@@ -181,7 +219,12 @@ quality/diagnostic fields.
 - `routing` explains model/provider selection and candidate tradeoffs.
 - `orchestration` captures multi-step generation metadata when enabled.
 - `evals` provides per-request quality indicators for lab analysis.
+- `evals.taxonomy` classifies the dominant retrieval failure mode.
+- `evals.confidence` calibrates reliability from evidence, not model score alone.
 - `costBreakdown` provides per-request cost attribution by stage.
+- `retrievalDiagnostics` summarizes evidence breadth, consistency and conflict risk.
+- `replay` provides a reproducible snapshot/command for deterministic replay.
+- `reportReferences` links the latest drift/diff summaries when those artifacts exist.
 
 ## Non-goals
 

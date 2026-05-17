@@ -56,6 +56,10 @@ export function createRagSuccessTrace(input: {
       rerankChunkCount: rerankStage?.chunkCount ?? 0,
       retrievalHitQuality: response.devMode.evals?.retrievalAccuracy,
       groundedness: response.devMode.evals?.groundedness,
+      confidenceScore: response.devMode.evals?.confidence?.confidenceScore,
+      confidenceLevel: response.devMode.evals?.confidence?.confidenceLevel,
+      failureCategory: response.devMode.evals?.taxonomy?.category,
+      failureProbableCause: response.devMode.evals?.taxonomy?.probableCause,
       costUsd: response.devMode.cost?.totalCostUsd,
       cacheHit: response.devMode.cache?.hit,
       retries: 0,
@@ -65,6 +69,15 @@ export function createRagSuccessTrace(input: {
         score: item.score,
         provider: item.embedding.provider,
       })),
+      replay: response.devMode.replay
+        ? {
+            reproducible: response.devMode.replay.reproducible,
+            command: response.devMode.replay.command,
+            mode: response.devMode.replay.snapshot.mode,
+          }
+        : undefined,
+      retrievalDiagnostics: response.devMode.retrievalDiagnostics,
+      reportReferences: response.devMode.reportReferences,
       stageSteps,
     },
   };

@@ -102,6 +102,15 @@ describe("askRag", () => {
     expect(output.devMode.cache?.hit).toBe(false);
     expect(output.devMode.cost?.withinBudget).toBe(true);
     expect(output.devMode.cost?.breakdown.some((item) => item.stage === "reranking")).toBe(true);
+    expect(output.devMode.evals?.taxonomy?.category).toBe("LOW_CONFIDENCE");
+    expect(output.devMode.evals?.confidence?.confidenceLevel).toBeDefined();
+    expect(output.devMode.retrievalDiagnostics).toMatchObject({
+      retrievalMetadata: {
+        retrievalMode: "hybrid",
+      },
+    });
+    expect(output.devMode.replay?.snapshot.query).toBe("What explains vector search?");
+    expect(output.devMode.replay?.command).toContain("npm run rag:replay");
   });
 
   it("returns a semantic cache hit on repeated equivalent requests", async () => {
@@ -196,6 +205,20 @@ describe("askRag", () => {
   it("uses typed request errors for validation failures", async () => {
     await expect(askRag(undefined as unknown as Parameters<typeof askRag>[0])).rejects
       .toBeInstanceOf(ApiRequestError);
+  });
+
+  it("classifies missing evidence as not found", async () => {
+    const output = await askRag({
+      type: "text",
+      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+      query: "What does the GPU cluster autoscaler do?",
+      title: "Missing Evidence Test",
+      documentId: "missing-evidence-doc",
+      topK: 1,
+    });
+
+    expect(output.devMode.evals?.taxonomy?.category).toBe("NOT_FOUND");
+    expect(output.devMode.evals?.confidence?.confidenceLevel).toMatch(/LOW|UNRELIABLE/);
   });
 });
 

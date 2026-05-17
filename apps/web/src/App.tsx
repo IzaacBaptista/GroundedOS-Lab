@@ -2986,6 +2986,11 @@ function EvalsView({ response }: { response: RagAskResponse | undefined }) {
 
   const scorers = evals.scorerResults;
   const history = evals.evalHistory;
+  const taxonomy = evals.taxonomy;
+  const confidence = evals.confidence;
+  const diagnostics = response.devMode.retrievalDiagnostics;
+  const replay = response.devMode.replay;
+  const reportReferences = response.devMode.reportReferences;
 
   return (
     <section className="output-section">
@@ -3033,6 +3038,66 @@ function EvalsView({ response }: { response: RagAskResponse | undefined }) {
         </section>
       )}
 
+      {(taxonomy || confidence) && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Retrieval reliability</h3>
+            {taxonomy ? <Pill variant="amber">{taxonomy.category}</Pill> : null}
+            {confidence ? <Pill variant={confidence.confidenceLevel === "HIGH" ? "green" : confidence.confidenceLevel === "MEDIUM" ? "blue" : "amber"}>{confidence.confidenceLevel}</Pill> : null}
+          </div>
+          {taxonomy ? (
+            <div className="result-list">
+              <article className="result-row">
+                <div className="result-row__meta">
+                  <Pill variant="gray">taxonomy</Pill>
+                  <span className="result-row__score">{taxonomy.confidence.toFixed(3)}</span>
+                </div>
+                <p className="chunk-text">{taxonomy.probableCause}</p>
+                <p className="chunk-text">
+                  Chunks: {taxonomy.involvedChunks.join(", ") || "none"}
+                </p>
+              </article>
+            </div>
+          ) : null}
+          {confidence ? (
+            <>
+              <div className="tradeoffs-grid">
+                <MetricCard label="Confidence score" value={confidence.confidenceScore.toFixed(3)} />
+                <MetricCard label="Retrieval" value={confidence.factors.retrievalScore.toFixed(3)} />
+                <MetricCard label="Coverage" value={confidence.factors.questionCoverage.toFixed(3)} />
+                <MetricCard label="Conflict penalty" value={confidence.factors.conflictPenalty.toFixed(3)} />
+              </div>
+              <p className="chunk-text">{confidence.confidenceReasoning.join(" · ")}</p>
+            </>
+          ) : null}
+        </section>
+      )}
+
+      {diagnostics && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Retrieval diagnostics</h3>
+            <span className="count">{diagnostics.retrievalMetadata.retrievalMode}</span>
+          </div>
+          <div className="tradeoffs-grid">
+            <MetricCard label="Top score" value={diagnostics.topScore.toFixed(3)} />
+            <MetricCard label="Avg score" value={diagnostics.avgScore.toFixed(3)} />
+            <MetricCard label="Sources" value={String(diagnostics.sourceDiversity)} />
+            <MetricCard label="Evidence" value={diagnostics.evidenceCoverage.toFixed(3)} />
+            <MetricCard label="Consistency" value={diagnostics.groundedConsistency.toFixed(3)} />
+            <MetricCard label="Conflicts" value={String(diagnostics.conflictCount)} />
+          </div>
+          <p className="chunk-text">
+            Involved chunks: {diagnostics.involvedChunkIds.join(", ") || "none"}
+          </p>
+          {diagnostics.conflictingChunkIds.length > 0 ? (
+            <p className="chunk-text">
+              Conflicting chunks: {diagnostics.conflictingChunkIds.join(", ")}
+            </p>
+          ) : null}
+        </section>
+      )}
+
       {history && history.count > 0 && (
         <section className="output-section">
           <div className="section-title">
@@ -3077,6 +3142,35 @@ function EvalsView({ response }: { response: RagAskResponse | undefined }) {
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {(replay || reportReferences?.drift || reportReferences?.diff) && (
+        <section className="output-section">
+          <div className="section-title">
+            <h3>Replay & regression context</h3>
+          </div>
+          {replay ? (
+            <>
+              <div className="tradeoffs-grid">
+                <MetricCard label="Replay mode" value={replay.snapshot.mode} />
+                <MetricCard label="Reproducible" value={replay.reproducible ? "yes" : "needs content"} />
+                <MetricCard label="topK" value={String(replay.snapshot.parameters.topK)} />
+                <MetricCard label="Candidates" value={String(replay.snapshot.retrievalConfig.candidateCount)} />
+              </div>
+              <p className="chunk-text">Command: {replay.command}</p>
+            </>
+          ) : null}
+          {reportReferences?.drift ? (
+            <p className="chunk-text">
+              Drift: {reportReferences.drift.degraded ? "regression detected" : "stable"} · {reportReferences.drift.regressions} regressions · affected {reportReferences.drift.affectedQueries.join(", ") || "none"}
+            </p>
+          ) : null}
+          {reportReferences?.diff ? (
+            <p className="chunk-text">
+              Prompt/policy diff: winner {reportReferences.diff.winner} · {reportReferences.diff.improvements} improvements · {reportReferences.diff.regressions} regressions
+            </p>
+          ) : null}
         </section>
       )}
 

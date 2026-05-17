@@ -40,6 +40,8 @@ export interface ObservabilityMetricsSample {
   retries?: number;
   cacheHit?: boolean;
   retrievalHitQuality?: number;
+  confidenceScore?: number;
+  failureCategory?: string;
   correlation: CorrelationIds;
 }
 
@@ -171,6 +173,8 @@ function toMetricSample(record: StructuredTraceRecord): ObservabilityMetricsSamp
     retries: sanitizeOptionalNumber(metadata.retries),
     cacheHit: typeof metadata.cacheHit === "boolean" ? metadata.cacheHit : undefined,
     retrievalHitQuality: sanitizeOptionalNumber(metadata.retrievalHitQuality),
+    confidenceScore: sanitizeOptionalNumber(metadata.confidenceScore),
+    failureCategory: typeof metadata.failureCategory === "string" ? metadata.failureCategory : undefined,
     correlation: record.correlation,
   };
 }

@@ -202,6 +202,39 @@ export interface DevModeOutput {
         scorerResults?: { averageScore: number; passedCount: number };
       }>;
     };
+    taxonomy?: {
+      category: "NOT_FOUND" | "WRONG_CONTEXT" | "PARTIAL_CONTEXT" | "UNGROUNDED_ANSWER" | "LOW_CONFIDENCE";
+      confidence: number;
+      probableCause: string;
+      involvedChunks: string[];
+      retrievalMetadata: {
+        retrievalMode: string;
+        rerankingApplied: boolean;
+        provider?: string;
+        model?: string;
+        queryIntent?: string;
+        topScore: number;
+        avgScore: number;
+        sourceDiversity: number;
+        evidenceCoverage: number;
+        groundedConsistency: number;
+        conflictCount: number;
+      };
+    };
+    confidence?: {
+      confidenceScore: number;
+      confidenceLevel: "HIGH" | "MEDIUM" | "LOW" | "UNRELIABLE";
+      confidenceReasoning: string[];
+      factors: {
+        retrievalScore: number;
+        sourceDiversity: number;
+        groundedness: number;
+        questionCoverage: number;
+        evidenceQuantity: number;
+        answerConsistency: number;
+        conflictPenalty: number;
+      };
+    };
   };
   cacheAwareRetrieval?: {
     influenced: boolean;
@@ -275,6 +308,87 @@ export interface DevModeOutput {
       model?: string;
       durationMs?: number;
     }>;
+  };
+  retrievalDiagnostics?: {
+    resultCount: number;
+    candidateCount: number;
+    returnedCount: number;
+    topScore: number;
+    avgScore: number;
+    scoreSpread: number;
+    sourceDiversity: number;
+    citationCount: number;
+    citationCoverage: number;
+    evidenceCoverage: number;
+    groundedConsistency: number;
+    conflictCount: number;
+    conflictingChunkIds: string[];
+    involvedChunkIds: string[];
+    retrievalMetadata: {
+      retrievalMode: string;
+      rerankingApplied: boolean;
+      provider?: string;
+      model?: string;
+      queryIntent?: string;
+    };
+  };
+  replay?: {
+    snapshot: {
+      version: "v1";
+      capturedAt: string;
+      mode: "inline" | "persisted";
+      query: string;
+      document: {
+        documentId: string;
+        title?: string;
+        checksum?: string;
+        persisted: boolean;
+        indexPath?: string;
+      };
+      parameters: {
+        topK: number;
+        reasoningEnabled: boolean;
+        useMultiModelOrchestration: boolean;
+        enableShadowRetrieval: boolean;
+      };
+      retrievalConfig: {
+        mode: string;
+        candidateCount: number;
+        returnedCount: number;
+        rerankingApplied: boolean;
+      };
+      providers: {
+        embeddingProvider: string;
+        embeddingModel?: string;
+        selectedModel?: string;
+        selectedProvider?: string;
+      };
+      prompts: {
+        systemPrompt: string;
+        answerPolicy: string;
+      };
+      policies: {
+        groundingPolicy: string;
+        refusalPolicy: string;
+        citationPolicy: string;
+      };
+    };
+    reproducible: boolean;
+    command: string;
+  };
+  reportReferences?: {
+    drift?: {
+      degraded: boolean;
+      regressions: number;
+      affectedQueries: string[];
+      generatedAt: string;
+    };
+    diff?: {
+      winner: string;
+      regressions: number;
+      improvements: number;
+      generatedAt: string;
+    };
   };
   [key: string]: unknown;
 }
