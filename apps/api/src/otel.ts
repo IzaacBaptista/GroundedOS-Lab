@@ -85,3 +85,30 @@ export function getActiveTraceparent(): string | undefined {
     return undefined;
   }
 }
+
+export function getActiveTraceContext():
+  | {
+      traceId: string;
+      spanId: string;
+      traceparent: string;
+    }
+  | undefined {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const api = require("@opentelemetry/api");
+    const span = api.trace.getActiveSpan();
+    if (!span) return undefined;
+
+    const ctx = span.spanContext();
+    if (!api.trace.isSpanContextValid(ctx)) return undefined;
+
+    const flags = ctx.traceFlags.toString(16).padStart(2, "0");
+    return {
+      traceId: ctx.traceId,
+      spanId: ctx.spanId,
+      traceparent: `00-${ctx.traceId}-${ctx.spanId}-${flags}`,
+    };
+  } catch {
+    return undefined;
+  }
+}

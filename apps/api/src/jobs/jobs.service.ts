@@ -543,10 +543,12 @@ function computeDurationMs(job: Job<Phase6JobPayload>): number {
 function extractCorrelation(payload: Phase6JobPayload): JobCorrelationIds {
   return {
     requestId: payload.requestId,
+    traceId: payload.traceId,
     jobId: payload.jobId,
     sessionId: payload.sessionId,
     tenantId: payload.tenantId,
     userId: payload.userId,
     indexId: payload.indexId,
+    agentExecutionId: payload.agentExecutionId,
   };
 }

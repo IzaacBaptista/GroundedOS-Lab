@@ -2,6 +2,7 @@ import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from "@ne
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { getRequestUser } from "../common/auth-context";
 import { ApiRequestError } from "../errors";
+import { getActiveTraceContext } from "../otel";
 import { JobsService, type EnqueuedJobResponse, type JobStatusResponse } from "./jobs.service";
 import type { Phase5ExperimentTrack } from "./job-queue";
 
@@ -13,6 +14,8 @@ type EnqueuePhase5Request = {
   tenantId?: unknown;
   userId?: unknown;
   indexId?: unknown;
+  traceId?: unknown;
+  agentExecutionId?: unknown;
 };
 
 type EnqueueModelBenchmarkRequest = {
@@ -23,6 +26,8 @@ type EnqueueModelBenchmarkRequest = {
   tenantId?: unknown;
   userId?: unknown;
   indexId?: unknown;
+  traceId?: unknown;
+  agentExecutionId?: unknown;
 };
 
 @Controller("jobs")
@@ -142,14 +147,17 @@ function normalizeCorrelation(
   request: FastifyRequest
 ) {
   const requestUser = getRequestUser(request);
+  const activeTrace = getActiveTraceContext();
 
   return {
     requestId: normalizeOptionalString(body.requestId) ?? String(request.id),
+    traceId: normalizeOptionalString(body.traceId) ?? activeTrace?.traceId,
     jobId: normalizeOptionalString(body.jobId),
     sessionId: normalizeOptionalString(body.sessionId),
     tenantId: normalizeOptionalString(body.tenantId) ?? requestUser?.tenantId,
     userId: normalizeOptionalString(body.userId) ?? requestUser?.userId,
     indexId: normalizeOptionalString(body.indexId),
+    agentExecutionId: normalizeOptionalString(body.agentExecutionId),
   };
 }
 

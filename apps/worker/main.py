@@ -505,7 +505,16 @@ def main() -> None:
 
 
 def extract_correlation(payload: dict) -> dict[str, str]:
-    correlation_keys = ["requestId", "jobId", "sessionId", "tenantId", "userId", "indexId"]
+    correlation_keys = [
+        "requestId",
+        "traceId",
+        "jobId",
+        "sessionId",
+        "tenantId",
+        "userId",
+        "indexId",
+        "agentExecutionId",
+    ]
     return {
         key: str(payload[key])
         for key in correlation_keys
