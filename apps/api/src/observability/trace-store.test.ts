@@ -1,0 +1,79 @@
+import { mkdtemp, rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { afterEach, describe, expect, it } from "vitest";
+import { TraceStore } from "./trace-store";
+
+const tempDirs: string[] = [];
+
+async function createStore(): Promise<TraceStore> {
+  const dir = await mkdtemp(join(tmpdir(), "groundedos-observability-"));
+  tempDirs.push(dir);
+  return new TraceStore(dir);
+}
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+describe("TraceStore", () => {
+  it("persists structured traces and reads them back", async () => {
+    const store = await createStore();
+
+    await store.append({
+      version: "v1",
+      timestamp: new Date().toISOString(),
+      component: "retrieval",
+      operation: "rag.pipeline",
+      status: "success",
+      durationMs: 42,
+      correlation: {
+        requestId: "req-1",
+        traceId: "trace-1",
+      },
+      metadata: {
+        groundedness: 1,
+        costUsd: 0.01,
+        cacheHit: true,
+      },
+    });
+
+    const traces = await store.readRecent(10);
+    expect(traces).toHaveLength(1);
+    expect(traces[0].correlation.requestId).toBe("req-1");
+    expect(traces[0].operation).toBe("rag.pipeline");
+  });
+
+  it("aggregates historical metrics for dashboard-ready summaries", async () => {
+    const store = await createStore();
+
+    await store.append({
+      version: "v1",
+      timestamp: new Date().toISOString(),
+      component: "retrieval",
+      operation: "rag.pipeline",
+      status: "success",
+      durationMs: 100,
+      correlation: { requestId: "req-a" },
+      metadata: { groundedness: 0.8, costUsd: 0.02, cacheHit: true, retries: 0 },
+    });
+
+    await store.append({
+      version: "v1",
+      timestamp: new Date().toISOString(),
+      component: "job",
+      operation: "job_retry",
+      status: "error",
+      durationMs: 30,
+      correlation: { requestId: "req-b" },
+      metadata: { retries: 1 },
+      error: { message: "retry" },
+    });
+
+    const summary = await store.getMetricsSummary();
+    expect(summary.totals.requests).toBe(2);
+    expect(summary.totals.failures).toBe(1);
+    expect(summary.totals.retries).toBe(1);
+    expect(summary.byComponent.some((item) => item.component === "retrieval")).toBe(true);
+  });
+});

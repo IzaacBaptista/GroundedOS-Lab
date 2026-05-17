@@ -16,6 +16,7 @@ Grounded AI systems involve many stages. Observability makes it possible to unde
 | [`packages/model-routing`](../../packages/model-routing/README.md) | Uses cost and latency data to inform routing policies. |
 | [`packages/rag`](../../packages/rag/README.md) | Exposes retrieval, reranking and context assembly stages. |
 | [`apps/api/src/rag-service.ts`](../../apps/api/src/rag-service.ts) | Emits Dev Mode retrieval spans (chunk count, score stats, latency) and per-stage token/latency metrics. |
+| [`apps/api/src/observability/trace-store.ts`](../../apps/api/src/observability/trace-store.ts) | Persists structured traces/metrics in local JSONL for long-term retention and regression analysis. |
 | [`packages/agents`](../../packages/agents/README.md) | Traces tool calls and multi-step execution. |
 | [`packages/safety`](../../packages/safety/README.md) | Logs guardrail decisions for auditing. |
 
@@ -26,3 +27,26 @@ Grounded AI systems involve many stages. Observability makes it possible to unde
 | **Visibility vs overhead** | Detailed telemetry can add storage, latency and instrumentation cost. |
 | **Debugging vs privacy** | Logs must avoid storing sensitive prompts or documents unnecessarily. |
 | **Signal vs noise** | Too many metrics can hide the few that matter for reliability. |
+
+## Current trace correlation model
+
+All structured traces now carry correlation IDs when available:
+
+- `requestId`
+- `traceId`
+- `sessionId`
+- `jobId`
+- `tenantId`
+- `userId`
+- `indexId`
+- `agentExecutionId`
+
+The IDs are propagated between HTTP handlers, RAG/Agent execution, queue logs, worker payload correlation and observability retention records.
+
+## Local retention and dashboard preparation
+
+- Traces: `.groundedos/observability/traces.jsonl`
+- Historical metrics: `.groundedos/observability/metrics-history.jsonl`
+- API endpoints:
+  - `GET /rag/metrics/observability` (aggregated historical metrics)
+  - `GET /rag/metrics/traces` (recent structured traces)

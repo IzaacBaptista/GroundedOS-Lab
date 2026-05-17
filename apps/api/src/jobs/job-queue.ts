@@ -9,11 +9,13 @@ export type Phase5ExperimentTrack = "quantization" | "lora" | "fine-tuning" | "d
 
 export interface JobCorrelationIds {
   requestId?: string;
+  traceId?: string;
   jobId?: string;
   sessionId?: string;
   tenantId?: string;
   userId?: string;
   indexId?: string;
+  agentExecutionId?: string;
 }
 
 type BaseJobPayload = JobCorrelationIds & {

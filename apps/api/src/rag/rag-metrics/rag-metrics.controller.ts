@@ -6,6 +6,10 @@ import type {
   RagTradeoffMetricsResponse,
 } from "../../rag-service";
 import { RagMetricsService } from "./rag-metrics.service";
+import type {
+  ObservabilityMetricsSummary,
+  StructuredTraceRecord,
+} from "../../observability/trace-store";
 
 @Controller("rag/metrics")
 export class RagMetricsController {
@@ -14,6 +18,16 @@ export class RagMetricsController {
   @Get("tradeoffs")
   getTradeoffs(): RagTradeoffMetricsResponse {
     return this.ragMetrics.getTradeoffs();
+  }
+
+  @Get("observability")
+  getObservabilitySummary(@Query("limit") limit?: string): Promise<ObservabilityMetricsSummary> {
+    return this.ragMetrics.getObservabilitySummary(limit ? Number(limit) : undefined);
+  }
+
+  @Get("traces")
+  getRecentTraces(@Query("limit") limit?: string): Promise<StructuredTraceRecord[]> {
+    return this.ragMetrics.getRecentTraces(limit ? Number(limit) : undefined);
   }
 
   @Get("model-benchmark")

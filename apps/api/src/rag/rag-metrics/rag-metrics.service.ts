@@ -12,6 +12,11 @@ import {
   type RagModelBenchmarkRunResponse,
   type RagTradeoffMetricsResponse,
 } from "../../rag-service";
+import {
+  TraceStore,
+  type ObservabilityMetricsSummary,
+  type StructuredTraceRecord,
+} from "../../observability/trace-store";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
@@ -27,8 +32,18 @@ const execFileAsync = promisify(execFile);
 
 @Injectable()
 export class RagMetricsService {
+  private readonly traceStore = new TraceStore();
+
   getTradeoffs(): RagTradeoffMetricsResponse {
     return getRagTradeoffMetrics();
+  }
+
+  getObservabilitySummary(limit?: number): Promise<ObservabilityMetricsSummary> {
+    return this.traceStore.getMetricsSummary(limit);
+  }
+
+  getRecentTraces(limit?: number): Promise<StructuredTraceRecord[]> {
+    return this.traceStore.readRecent(limit);
   }
 
   async getModelBenchmark(): Promise<RagModelBenchmarkResponse> {

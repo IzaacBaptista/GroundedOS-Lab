@@ -24,6 +24,18 @@ docker-compose logs -f otelcol jaeger prometheus grafana
 ## Architecture
 
 ```
+
+## Long-term local trace retention
+
+In addition to OTEL exporters, API structured traces are retained locally in versioned JSONL files:
+
+- `.groundedos/observability/traces.jsonl`
+- `.groundedos/observability/metrics-history.jsonl`
+
+Useful endpoints for regression/debug flows:
+
+- `GET /rag/metrics/traces?limit=100`
+- `GET /rag/metrics/observability?limit=500`
 ┌─────────────────────────────────────────────────────┐
 │  GroundedOS Lab Services                             │
 ├─────────────────────────────────────────────────────┤
