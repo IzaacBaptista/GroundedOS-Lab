@@ -21,6 +21,7 @@ export interface RetrievalEvidenceChunk {
 
 export interface RetrievalDiagnostics {
   resultCount: number;
+  relevantEvidenceCount: number;
   candidateCount: number;
   returnedCount: number;
   topScore: number;
@@ -62,6 +63,22 @@ export interface ConfidenceCalibration {
   confidenceScore: number;
   confidenceLevel: ConfidenceLevel;
   confidenceReasoning: string[];
+  evidenceSignals: {
+    retrievalScore: number;
+    sourceDiversity: number;
+    questionCoverage: number;
+    groundedness: number;
+    answerConsistency: number;
+    citationCoverage: number;
+    relevantEvidenceCount: number;
+    conflictCount: number;
+    insufficientEvidence: boolean;
+    contradictoryContext: boolean;
+    missingCitations: boolean;
+    lowGroundedness: boolean;
+    partialCoverage: boolean;
+    inconsistentAnswer: boolean;
+  };
   factors: {
     retrievalScore: number;
     sourceDiversity: number;
@@ -368,6 +385,7 @@ export function buildRetrievalDiagnostics(input: {
 
   return {
     resultCount: input.results.length,
+    relevantEvidenceCount: input.results.filter((item) => item.score >= 0.2).length,
     candidateCount: input.candidateCount ?? input.results.length,
     returnedCount: input.results.length,
     topScore: round(topScore, 3),
@@ -481,68 +499,117 @@ export function calibrateConfidence(input: {
     };
   };
 }): ConfidenceCalibration {
-  const groundedness = input.evals?.groundedness ?? 0;
-  const answerConsistency =
-    input.evals?.scorerResults?.faithfulness?.score ?? groundedness;
-  const questionCoverage =
-    input.evals?.answerOverlap ??
-    input.evals?.scorerResults?.relevance?.score ??
-    input.diagnostics.evidenceCoverage;
-  const retrievalScore =
-    normalizeScore(input.diagnostics.topScore) * 0.6 +
-    normalizeScore(input.diagnostics.avgScore) * 0.4;
-  const sourceDiversity = Math.min(1, input.diagnostics.sourceDiversity / 3);
-  const evidenceQuantity = Math.min(1, input.diagnostics.resultCount / 3);
-  const conflictPenalty = Math.min(1, input.diagnostics.conflictCount / 3);
-  const confidenceScore = round(
-    Math.max(
-      0,
-      Math.min(
-        1,
-        retrievalScore * 0.22 +
-          sourceDiversity * 0.1 +
-          groundedness * 0.2 +
-          questionCoverage * 0.16 +
-          evidenceQuantity * 0.1 +
-          answerConsistency * 0.16 +
-          input.diagnostics.citationCoverage * 0.1 -
-          conflictPenalty * 0.18
-      )
-    ),
-    3
-  );
+  return defaultConfidenceCalibrationService.calibrate(input);
+}
 
-  const confidenceLevel: ConfidenceLevel =
-    confidenceScore >= 0.8
-      ? "HIGH"
-      : confidenceScore >= 0.6
-        ? "MEDIUM"
-        : confidenceScore >= 0.4
-          ? "LOW"
-          : "UNRELIABLE";
+export class ConfidenceCalibrationService {
+  calibrate(input: {
+    diagnostics: RetrievalDiagnostics;
+    evals?: {
+      groundedness?: number;
+      answerOverlap?: number;
+      retrievalAccuracy?: number;
+      scorerResults?: {
+        faithfulness?: { score: number };
+        relevance?: { score: number };
+        recall?: { score: number };
+      };
+    };
+  }): ConfidenceCalibration {
+    const groundedness = input.evals?.groundedness ?? 0;
+    const answerConsistency = input.evals?.scorerResults?.faithfulness?.score ?? groundedness;
+    const questionCoverage =
+      input.evals?.answerOverlap ??
+      input.evals?.scorerResults?.relevance?.score ??
+      input.diagnostics.evidenceCoverage;
+    const retrievalScore =
+      normalizeScore(input.diagnostics.topScore) * 0.6 + normalizeScore(input.diagnostics.avgScore) * 0.4;
+    const sourceDiversity = Math.min(1, input.diagnostics.sourceDiversity / 3);
+    const evidenceQuantity = Math.min(1, input.diagnostics.relevantEvidenceCount / 3);
+    const conflictPenalty = Math.min(1, input.diagnostics.conflictCount / 3);
 
-  const confidenceReasoning = [
-    `retrieval score=${round(retrievalScore, 3)}`,
-    `coverage=${round(questionCoverage, 3)}`,
-    `groundedness=${round(groundedness, 3)}`,
-    `source diversity=${input.diagnostics.sourceDiversity}`,
-    `conflicts=${input.diagnostics.conflictCount}`,
-  ];
-
-  return {
-    confidenceScore,
-    confidenceLevel,
-    confidenceReasoning,
-    factors: {
+    const evidenceSignals = {
       retrievalScore: round(retrievalScore, 3),
       sourceDiversity: round(sourceDiversity, 3),
-      groundedness: round(groundedness, 3),
       questionCoverage: round(questionCoverage, 3),
-      evidenceQuantity: round(evidenceQuantity, 3),
+      groundedness: round(groundedness, 3),
       answerConsistency: round(answerConsistency, 3),
-      conflictPenalty: round(conflictPenalty, 3),
-    },
-  };
+      citationCoverage: round(input.diagnostics.citationCoverage, 3),
+      relevantEvidenceCount: input.diagnostics.relevantEvidenceCount,
+      conflictCount: input.diagnostics.conflictCount,
+      insufficientEvidence: input.diagnostics.relevantEvidenceCount === 0 || retrievalScore < 0.25,
+      contradictoryContext: input.diagnostics.conflictCount > 0,
+      missingCitations: input.diagnostics.citationCount === 0,
+      lowGroundedness: groundedness < 0.55,
+      partialCoverage: questionCoverage < 0.5,
+      inconsistentAnswer: answerConsistency < 0.5,
+    };
+
+    const fragilityPenalty =
+      (evidenceSignals.insufficientEvidence ? 0.18 : 0) +
+      (evidenceSignals.contradictoryContext ? 0.16 : 0) +
+      (evidenceSignals.missingCitations ? 0.08 : 0) +
+      (evidenceSignals.lowGroundedness ? 0.12 : 0) +
+      (evidenceSignals.partialCoverage ? 0.08 : 0) +
+      (evidenceSignals.inconsistentAnswer ? 0.12 : 0);
+
+    const confidenceScore = round(
+      Math.max(
+        0,
+        Math.min(
+          1,
+          retrievalScore * 0.22 +
+            sourceDiversity * 0.1 +
+            groundedness * 0.2 +
+            questionCoverage * 0.16 +
+            evidenceQuantity * 0.1 +
+            answerConsistency * 0.16 +
+            input.diagnostics.citationCoverage * 0.1 -
+            conflictPenalty * 0.12 -
+            fragilityPenalty
+        )
+      ),
+      3
+    );
+
+    const confidenceLevel: ConfidenceLevel =
+      confidenceScore >= 0.8
+        ? "HIGH"
+        : confidenceScore >= 0.6
+          ? "MEDIUM"
+          : confidenceScore >= 0.4
+            ? "LOW"
+            : "UNRELIABLE";
+
+    const confidenceReasoning = [
+      `RETRIEVAL score=${evidenceSignals.retrievalScore} evidence=${evidenceSignals.relevantEvidenceCount}`,
+      `COVERAGE question=${evidenceSignals.questionCoverage} groundedness=${evidenceSignals.groundedness}`,
+      `CITATIONS coverage=${evidenceSignals.citationCoverage} count=${input.diagnostics.citationCount}`,
+      `CONFLICTS count=${evidenceSignals.conflictCount}`,
+      ...(evidenceSignals.insufficientEvidence ? ["FLAG low-evidence"] : []),
+      ...(evidenceSignals.contradictoryContext ? ["FLAG contradictory-context"] : []),
+      ...(evidenceSignals.missingCitations ? ["FLAG missing-citations"] : []),
+      ...(evidenceSignals.lowGroundedness ? ["FLAG low-groundedness"] : []),
+      ...(evidenceSignals.partialCoverage ? ["FLAG partial-coverage"] : []),
+      ...(evidenceSignals.inconsistentAnswer ? ["FLAG answer-context-inconsistency"] : []),
+    ];
+
+    return {
+      confidenceScore,
+      confidenceLevel,
+      confidenceReasoning,
+      evidenceSignals,
+      factors: {
+        retrievalScore: evidenceSignals.retrievalScore,
+        sourceDiversity: evidenceSignals.sourceDiversity,
+        groundedness: evidenceSignals.groundedness,
+        questionCoverage: evidenceSignals.questionCoverage,
+        evidenceQuantity: round(evidenceQuantity, 3),
+        answerConsistency: evidenceSignals.answerConsistency,
+        conflictPenalty: round(conflictPenalty, 3),
+      },
+    };
+  }
 }
 
 export function buildReplaySnapshot(input: {
@@ -912,15 +979,38 @@ export async function loadReliabilityReportSummaries(
 }
 
 function detectConflictingChunks(results: RetrievalEvidenceChunk[]): string[] {
-  const normalized = new Map<string, string[]>();
-  for (const result of results) {
-    const key = result.text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-    const bucket = normalized.get(key) ?? [];
-    bucket.push(result.chunkId);
-    normalized.set(key, bucket);
+  const conflictingChunkIds = new Set<string>();
+
+  for (let leftIndex = 0; leftIndex < results.length; leftIndex += 1) {
+    const left = results[leftIndex];
+    if (!left) {
+      continue;
+    }
+    const leftText = normalizeWhitespace(left.text.toLowerCase());
+    const leftHasNegation = hasNegation(leftText);
+    const leftKeywords = extractConflictKeywords(leftText);
+
+    for (let rightIndex = leftIndex + 1; rightIndex < results.length; rightIndex += 1) {
+      const right = results[rightIndex];
+      if (!right) {
+        continue;
+      }
+      const rightText = normalizeWhitespace(right.text.toLowerCase());
+      const rightHasNegation = hasNegation(rightText);
+      if (leftHasNegation === rightHasNegation) {
+        continue;
+      }
+
+      const rightKeywords = extractConflictKeywords(rightText);
+      const sharedKeywords = [...leftKeywords].filter((token) => rightKeywords.has(token));
+      if (sharedKeywords.length >= 3) {
+        conflictingChunkIds.add(left.chunkId);
+        conflictingChunkIds.add(right.chunkId);
+      }
+    }
   }
 
-  return [...normalized.values()].filter((bucket) => bucket.length > 1).flat();
+  return [...conflictingChunkIds];
 }
 
 function normalizeScore(score: number): number {
@@ -934,9 +1024,47 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function hasNegation(value: string): boolean {
+  return /\b(no|not|never|without|none|cannot|can't|isn't|aren't|wasn't|weren't|doesn't|don't|didn't)\b/.test(
+    value
+  );
+}
+
+function extractConflictKeywords(value: string): Set<string> {
+  const stopwords = new Set([
+    "that",
+    "this",
+    "with",
+    "from",
+    "into",
+    "your",
+    "have",
+    "will",
+    "were",
+    "they",
+    "them",
+    "their",
+    "about",
+    "what",
+    "when",
+    "where",
+    "which",
+    "only",
+    "does",
+    "doing",
+    "done",
+    "using",
+    "used",
+  ]);
+  const tokens = value.match(/[a-z0-9]{4,}/g) ?? [];
+  return new Set(tokens.filter((token) => !stopwords.has(token)));
+}
+
 function round(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
 }
+
+const defaultConfidenceCalibrationService = new ConfidenceCalibrationService();
 
 async function tryReadJson<T>(path: string): Promise<T | undefined> {
   try {
