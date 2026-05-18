@@ -15,6 +15,7 @@ without replacing the current pipeline.
   - `confidenceScore`
   - `confidenceLevel`
   - `confidenceReasoning`
+  - `evidenceSignals`
 - **Deterministic Replay**
   - versioned replay snapshots in Dev Mode
   - historical replay creation from stored traces
@@ -140,6 +141,9 @@ Output:
 
 It is intentionally not based on a model score alone.
 
+Confidence is calibrated by `ConfidenceCalibrationService`, which combines the
+retrieval/reranking diagnostics with post-answer eval signals.
+
 ### Replay report
 
 Replay reports compare:
@@ -194,7 +198,19 @@ Diff reports compare:
 ```json
 {
   "confidenceScore": 0.842,
-  "confidenceLevel": "HIGH"
+  "confidenceLevel": "HIGH",
+  "confidenceReasoning": [
+    "RETRIEVAL score=0.91 evidence=3",
+    "COVERAGE question=0.88 groundedness=1",
+    "CITATIONS coverage=1 count=2"
+  ],
+  "evidenceSignals": {
+    "insufficientEvidence": false,
+    "contradictoryContext": false,
+    "missingCitations": false,
+    "lowGroundedness": false,
+    "partialCoverage": false
+  }
 }
 ```
 

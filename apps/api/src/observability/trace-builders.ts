@@ -58,6 +58,8 @@ export function createRagSuccessTrace(input: {
       groundedness: response.devMode.evals?.groundedness,
       confidenceScore: response.devMode.evals?.confidence?.confidenceScore,
       confidenceLevel: response.devMode.evals?.confidence?.confidenceLevel,
+      confidenceReasoning: response.devMode.evals?.confidence?.confidenceReasoning,
+      confidenceEvidenceSignals: response.devMode.evals?.confidence?.evidenceSignals,
       failureCategory: response.devMode.evals?.taxonomy?.category,
       failureProbableCause: response.devMode.evals?.taxonomy?.probableCause,
       costUsd: response.devMode.cost?.totalCostUsd,

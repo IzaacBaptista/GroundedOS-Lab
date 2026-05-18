@@ -225,6 +225,22 @@ export interface DevModeOutput {
       confidenceScore: number;
       confidenceLevel: "HIGH" | "MEDIUM" | "LOW" | "UNRELIABLE";
       confidenceReasoning: string[];
+      evidenceSignals: {
+        retrievalScore: number;
+        sourceDiversity: number;
+        questionCoverage: number;
+        groundedness: number;
+        answerConsistency: number;
+        citationCoverage: number;
+        relevantEvidenceCount: number;
+        conflictCount: number;
+        insufficientEvidence: boolean;
+        contradictoryContext: boolean;
+        missingCitations: boolean;
+        lowGroundedness: boolean;
+        partialCoverage: boolean;
+        inconsistentAnswer: boolean;
+      };
       factors: {
         retrievalScore: number;
         sourceDiversity: number;

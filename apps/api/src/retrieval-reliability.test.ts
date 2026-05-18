@@ -86,7 +86,8 @@ describe("retrieval reliability", () => {
 
     expect(taxonomy.category).toBe("UNGROUNDED_ANSWER");
     expect(confidence.confidenceLevel).toBe("UNRELIABLE");
-    expect(confidence.confidenceReasoning.join(" ")).toContain("groundedness");
+    expect(confidence.evidenceSignals.lowGroundedness).toBe(true);
+    expect(confidence.confidenceReasoning.join(" ")).toContain("FLAG low-groundedness");
   });
 
   it("calibrates high confidence for grounded diverse evidence", () => {
@@ -131,6 +132,163 @@ describe("retrieval reliability", () => {
 
     expect(confidence.confidenceLevel).toBe("HIGH");
     expect(confidence.confidenceScore).toBeGreaterThan(0.8);
+    expect(confidence.evidenceSignals.insufficientEvidence).toBe(false);
+    expect(confidence.evidenceSignals.missingCitations).toBe(false);
+  });
+
+  it("calibrates medium confidence for partial but grounded evidence", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.72,
+          text: "Hybrid retrieval combines dense and sparse signals.",
+        },
+        {
+          chunkId: "doc:section-1:chunk-2",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.54,
+          text: "Reranking adjusts order based on lexical overlap.",
+        },
+      ],
+      citations: [{ chunkId: "doc:section-1:chunk-1" }],
+      evals: {
+        groundedness: 0.72,
+        answerOverlap: 0.58,
+      },
+      retrievalMode: "hybrid",
+      rerankingApplied: true,
+    });
+
+    const confidence = calibrateConfidence({
+      diagnostics,
+      evals: {
+        groundedness: 0.72,
+        answerOverlap: 0.58,
+        scorerResults: {
+          faithfulness: { score: 0.71 },
+          relevance: { score: 0.59 },
+        },
+      },
+    });
+
+    expect(confidence.confidenceLevel).toBe("MEDIUM");
+    expect(confidence.evidenceSignals.partialCoverage).toBe(false);
+  });
+
+  it("flags insufficient evidence as unreliable confidence", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.08,
+          text: "General note without direct answer.",
+        },
+      ],
+      citations: [],
+      evals: {
+        groundedness: 0.3,
+        answerOverlap: 0.1,
+      },
+      retrievalMode: "hybrid",
+      rerankingApplied: true,
+    });
+
+    const confidence = calibrateConfidence({
+      diagnostics,
+      evals: {
+        groundedness: 0.3,
+        answerOverlap: 0.1,
+        scorerResults: {
+          faithfulness: { score: 0.28 },
+        },
+      },
+    });
+
+    expect(confidence.confidenceLevel).toBe("UNRELIABLE");
+    expect(confidence.evidenceSignals.insufficientEvidence).toBe(true);
+    expect(confidence.confidenceReasoning.join(" ")).toContain("FLAG low-evidence");
+  });
+
+  it("flags conflicting chunks as contradictory context", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.89,
+          text: "The retrieval pipeline uses reranking for quality verification on every answer.",
+        },
+        {
+          chunkId: "doc:section-2:chunk-1",
+          documentId: "doc",
+          sectionId: "section-2",
+          score: 0.87,
+          text: "The retrieval pipeline does not use reranking for quality verification on every answer.",
+        },
+      ],
+      citations: [{ chunkId: "doc:section-1:chunk-1" }, { chunkId: "doc:section-2:chunk-1" }],
+      evals: {
+        groundedness: 0.76,
+        answerOverlap: 0.79,
+      },
+      retrievalMode: "hybrid",
+      rerankingApplied: true,
+    });
+
+    const confidence = calibrateConfidence({
+      diagnostics,
+      evals: {
+        groundedness: 0.76,
+        answerOverlap: 0.79,
+      },
+    });
+
+    expect(diagnostics.conflictCount).toBeGreaterThan(0);
+    expect(confidence.evidenceSignals.contradictoryContext).toBe(true);
+    expect(confidence.confidenceReasoning.join(" ")).toContain("FLAG contradictory-context");
+  });
+
+  it("flags answers without citations as fragile", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.84,
+          text: "Grounded answers should carry chunk citations in metadata.",
+        },
+      ],
+      citations: [],
+      evals: {
+        groundedness: 0.81,
+        answerOverlap: 0.8,
+      },
+      retrievalMode: "hybrid",
+      rerankingApplied: true,
+    });
+
+    const confidence = calibrateConfidence({
+      diagnostics,
+      evals: {
+        groundedness: 0.81,
+        answerOverlap: 0.8,
+        scorerResults: {
+          faithfulness: { score: 0.84 },
+          relevance: { score: 0.79 },
+        },
+      },
+    });
+
+    expect(confidence.evidenceSignals.missingCitations).toBe(true);
+    expect(confidence.confidenceReasoning.join(" ")).toContain("FLAG missing-citations");
   });
 
   it("compares deterministic replay snapshots", () => {
