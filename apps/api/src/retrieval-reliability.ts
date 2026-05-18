@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import { resolve } from "path";
 
@@ -78,12 +78,23 @@ export interface ReplaySnapshot {
   capturedAt: string;
   mode: "inline" | "persisted";
   query: string;
+  correlation: {
+    requestId?: string;
+    sessionId?: string;
+    traceId?: string;
+  };
   document: {
     documentId: string;
     title?: string;
     checksum?: string;
     persisted: boolean;
     indexPath?: string;
+    originalFilename?: string;
+  };
+  indexRef: {
+    indexId: string;
+    indexVersion?: string;
+    snapshotId?: string;
   };
   parameters: {
     topK: number;
@@ -103,6 +114,15 @@ export interface ReplaySnapshot {
     selectedModel?: string;
     selectedProvider?: string;
   };
+  generation: {
+    strategy: "extractive-grounded";
+    deterministic: boolean;
+    config: {
+      temperature: 0;
+      topP: 1;
+      maxTokens?: number;
+    };
+  };
   prompts: {
     systemPrompt: string;
     answerPolicy: string;
@@ -117,31 +137,73 @@ export interface ReplaySnapshot {
     sectionId: string;
     rank: number;
     score: number;
+    text: string;
     textHash: string;
     textPreview: string;
   }>;
+  rerankingConfig: {
+    applied: boolean;
+    candidateCount: number;
+    returnedCount: number;
+  };
   reranking: Array<{
     chunkId: string;
     beforeRank: number;
     afterRank: number;
     finalScore: number;
   }>;
+  original: {
+    answer: {
+      text: string;
+      grounded: boolean;
+      citations: Array<{
+        chunkId: string;
+        documentId: string;
+        sectionId: string;
+      }>;
+    };
+    costUsd?: number;
+    latencyMs?: number;
+    groundedness?: number;
+  };
+  environment: {
+    runtime: "node";
+    nodeVersion: string;
+    platform: NodeJS.Platform;
+    nodeEnv?: string;
+  };
 }
 
 export interface ReplayComparisonReport {
   version: "v1";
+  replayId: string;
+  originalTraceId?: string;
   createdAt: string;
+  status: "matched" | "diverged" | "error";
   original: ReplaySnapshot;
   replay: ReplaySnapshot;
   differences: {
     responseChanged: boolean;
     retrievalChanged: boolean;
+    chunkOrderChanged: boolean;
+    scoresChanged: boolean;
     groundednessChanged: boolean;
+    modelChanged: boolean;
+    providerChanged: boolean;
+    embeddingProviderChanged: boolean;
     costDeltaUsd: number;
     latencyDeltaMs: number;
     addedChunkIds: string[];
     removedChunkIds: string[];
+    reorderedChunkIds: string[];
+    scoreDeltas: Array<{
+      chunkId: string;
+      originalScore?: number;
+      replayScore?: number;
+      delta?: number;
+    }>;
   };
+  errors: string[];
   summary: string[];
 }
 
@@ -485,13 +547,16 @@ export function calibrateConfidence(input: {
 
 export function buildReplaySnapshot(input: {
   query: string;
+  correlation?: ReplaySnapshot["correlation"];
   document: {
     documentId: string;
     title?: string;
     checksum?: string;
     persisted: boolean;
     indexPath?: string;
+    originalFilename?: string;
   };
+  indexRef?: ReplaySnapshot["indexRef"];
   parameters: ReplaySnapshot["parameters"];
   retrievalConfig: ReplaySnapshot["retrievalConfig"];
   providers: ReplaySnapshot["providers"];
@@ -502,17 +567,33 @@ export function buildReplaySnapshot(input: {
     score: number;
     text: string;
   }>;
+  generation?: ReplaySnapshot["generation"];
+  rerankingConfig?: ReplaySnapshot["rerankingConfig"];
   reranking?: ReplaySnapshot["reranking"];
+  original?: ReplaySnapshot["original"];
+  environment?: ReplaySnapshot["environment"];
 }): ReplaySnapshot {
   return {
     version: "v1",
     capturedAt: new Date().toISOString(),
     mode: input.document.persisted ? "persisted" : "inline",
     query: input.query,
+    correlation: input.correlation ?? {},
     document: input.document,
+    indexRef: input.indexRef ?? {
+      indexId: input.document.documentId,
+    },
     parameters: input.parameters,
     retrievalConfig: input.retrievalConfig,
     providers: input.providers,
+    generation: input.generation ?? {
+      strategy: "extractive-grounded",
+      deterministic: true,
+      config: {
+        temperature: 0,
+        topP: 1,
+      },
+    },
     prompts: {
       systemPrompt:
         "Answer only from retrieved evidence. Preserve grounding. Do not invent missing facts.",
@@ -529,10 +610,29 @@ export function buildReplaySnapshot(input: {
       sectionId: result.sectionId,
       rank: result.rank,
       score: round(result.score, 3),
+      text: result.text,
       textHash: createHash("sha256").update(result.text).digest("hex"),
       textPreview: result.text.slice(0, 140),
     })),
+    rerankingConfig: input.rerankingConfig ?? {
+      applied: (input.reranking ?? []).length > 0,
+      candidateCount: input.retrievalConfig.candidateCount,
+      returnedCount: input.retrievalConfig.returnedCount,
+    },
     reranking: input.reranking ?? [],
+    original: input.original ?? {
+      answer: {
+        text: "",
+        grounded: false,
+        citations: [],
+      },
+    },
+    environment: input.environment ?? {
+      runtime: "node",
+      nodeVersion: process.version,
+      platform: process.platform,
+      nodeEnv: process.env.NODE_ENV,
+    },
   };
 }
 
@@ -550,35 +650,116 @@ export function compareReplaySnapshots(input: {
   const replayChunkIds = new Set(input.replay.chunks.map((item) => item.chunkId));
   const addedChunkIds = [...replayChunkIds].filter((item) => !originalChunkIds.has(item));
   const removedChunkIds = [...originalChunkIds].filter((item) => !replayChunkIds.has(item));
+  const reorderedChunkIds = input.original.chunks
+    .filter((item) => input.replay.chunks.some((replayItem) => replayItem.chunkId === item.chunkId))
+    .filter((item) => {
+      const replayItem = input.replay.chunks.find((candidate) => candidate.chunkId === item.chunkId);
+      return replayItem?.rank !== item.rank;
+    })
+    .map((item) => item.chunkId);
+  const scoreDeltas = input.original.chunks
+    .filter((item) => input.replay.chunks.some((replayItem) => replayItem.chunkId === item.chunkId))
+    .map((item) => {
+      const replayItem = input.replay.chunks.find((candidate) => candidate.chunkId === item.chunkId);
+      const originalScore = item.score;
+      const replayScore = replayItem?.score;
+      return {
+        chunkId: item.chunkId,
+        originalScore,
+        replayScore,
+        delta:
+          typeof replayScore === "number"
+            ? round(replayScore - originalScore, 3)
+            : undefined,
+      };
+    })
+    .filter((item) => item.delta !== 0);
   const retrievalChanged =
     addedChunkIds.length > 0 ||
     removedChunkIds.length > 0 ||
+    reorderedChunkIds.length > 0 ||
+    scoreDeltas.length > 0 ||
     JSON.stringify(input.original.reranking) !== JSON.stringify(input.replay.reranking);
   const responseChanged = normalizeWhitespace(input.originalAnswer.text) !== normalizeWhitespace(input.replayAnswer.text);
   const groundednessChanged = input.originalAnswer.grounded !== input.replayAnswer.grounded;
+  const modelChanged = input.original.providers.selectedModel !== input.replay.providers.selectedModel;
+  const providerChanged = input.original.providers.selectedProvider !== input.replay.providers.selectedProvider;
+  const embeddingProviderChanged =
+    input.original.providers.embeddingProvider !== input.replay.providers.embeddingProvider;
+  const scoresChanged = scoreDeltas.length > 0;
+  const chunkOrderChanged = reorderedChunkIds.length > 0;
+  const errors: string[] = [];
+  const status: ReplayComparisonReport["status"] =
+    responseChanged ||
+    retrievalChanged ||
+    groundednessChanged ||
+    modelChanged ||
+    providerChanged ||
+    embeddingProviderChanged
+      ? "diverged"
+      : "matched";
 
   const summary = [
     responseChanged ? "Answer text changed between original and replay." : "Answer text remained stable.",
     retrievalChanged ? "Retrieved evidence changed." : "Retrieved evidence remained stable.",
     groundednessChanged ? "Groundedness changed." : "Groundedness remained stable.",
+    chunkOrderChanged ? "Chunk order changed." : "Chunk order remained stable.",
+    scoresChanged ? "Chunk scores changed." : "Chunk scores remained stable.",
   ];
+  if (modelChanged) {
+    summary.push("Selected model changed.");
+  }
+  if (providerChanged || embeddingProviderChanged) {
+    summary.push("Provider selection changed.");
+  }
 
   return {
     version: "v1",
+    replayId: randomUUID(),
+    originalTraceId: input.original.correlation.traceId,
     createdAt: new Date().toISOString(),
+    status,
     original: input.original,
     replay: input.replay,
     differences: {
       responseChanged,
       retrievalChanged,
+      chunkOrderChanged,
+      scoresChanged,
       groundednessChanged,
+      modelChanged,
+      providerChanged,
+      embeddingProviderChanged,
       costDeltaUsd: round((input.replayCostUsd ?? 0) - (input.originalCostUsd ?? 0), 6),
       latencyDeltaMs: round((input.replayLatencyMs ?? 0) - (input.originalLatencyMs ?? 0), 3),
       addedChunkIds,
       removedChunkIds,
+      reorderedChunkIds,
+      scoreDeltas,
     },
+    errors,
     summary,
   };
+}
+
+export function assertReplaySnapshotComplete(snapshot: ReplaySnapshot): void {
+  if (!snapshot.query.trim()) {
+    throw new Error("Replay snapshot is incomplete: missing original query.");
+  }
+
+  if (!snapshot.document.documentId.trim()) {
+    throw new Error("Replay snapshot is incomplete: missing document identifier.");
+  }
+
+  if (snapshot.parameters.topK <= 0) {
+    throw new Error("Replay snapshot is incomplete: topK must be a positive integer.");
+  }
+
+  if (snapshot.mode === "inline" && !snapshot.document.indexPath) {
+    throw new Error(
+      "Replay snapshot is incomplete: inline replay requires the original content file path or a persisted index."
+    );
+  }
 }
 
 export function createCorpusDriftReport(input: {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertReplaySnapshotComplete,
   buildRetrievalDiagnostics,
   buildReplaySnapshot,
   calibrateConfidence,
@@ -135,9 +136,18 @@ describe("retrieval reliability", () => {
   it("compares deterministic replay snapshots", () => {
     const original = buildReplaySnapshot({
       query: "What does hybrid retrieval blend?",
+      correlation: {
+        requestId: "req-1",
+        traceId: "trace-1",
+      },
       document: {
         documentId: "doc-1",
         persisted: true,
+      },
+      indexRef: {
+        indexId: "doc-1",
+        indexVersion: "1",
+        snapshotId: "2026-01-01T00:00:00.000Z",
       },
       parameters: {
         topK: 3,
@@ -154,6 +164,22 @@ describe("retrieval reliability", () => {
       providers: {
         embeddingProvider: "api-lexical",
         selectedModel: "local-extractive",
+      },
+      original: {
+        answer: {
+          text: "It blends dense vector similarity and sparse lexical scoring.",
+          grounded: true,
+          citations: [
+            {
+              chunkId: "doc-1:section-1:chunk-1",
+              documentId: "doc-1",
+              sectionId: "section-1",
+            },
+          ],
+        },
+        costUsd: 0.01,
+        latencyMs: 30,
+        groundedness: 1,
       },
       results: [
         {
@@ -198,7 +224,99 @@ describe("retrieval reliability", () => {
 
     expect(report.differences.responseChanged).toBe(true);
     expect(report.differences.retrievalChanged).toBe(true);
+    expect(report.differences.chunkOrderChanged).toBe(false);
+    expect(report.differences.scoresChanged).toBe(false);
     expect(report.differences.addedChunkIds).toContain("doc-1:section-2:chunk-1");
+    expect(report.status).toBe("diverged");
+    expect(report.originalTraceId).toBe("trace-1");
+  });
+
+  it("marks stable replay snapshots as matched", () => {
+    const snapshot = buildReplaySnapshot({
+      query: "What does hybrid retrieval blend?",
+      document: {
+        documentId: "doc-1",
+        persisted: true,
+      },
+      parameters: {
+        topK: 1,
+        reasoningEnabled: false,
+        useMultiModelOrchestration: true,
+        enableShadowRetrieval: true,
+      },
+      retrievalConfig: {
+        mode: "hybrid",
+        candidateCount: 1,
+        returnedCount: 1,
+        rerankingApplied: false,
+      },
+      providers: {
+        embeddingProvider: "api-lexical",
+        selectedModel: "local-extractive",
+      },
+      original: {
+        answer: {
+          text: "It blends dense vector similarity and sparse lexical scoring.",
+          grounded: true,
+          citations: [],
+        },
+      },
+      results: [
+        {
+          chunkId: "doc-1:section-1:chunk-1",
+          sectionId: "section-1",
+          rank: 1,
+          score: 0.9,
+          text: "Hybrid retrieval blends dense vector similarity and sparse lexical scoring.",
+        },
+      ],
+    });
+
+    const report = compareReplaySnapshots({
+      original: snapshot,
+      replay: snapshot,
+      originalAnswer: { text: snapshot.original.answer.text, grounded: true },
+      replayAnswer: { text: snapshot.original.answer.text, grounded: true },
+      originalCostUsd: 0.01,
+      replayCostUsd: 0.01,
+      originalLatencyMs: 30,
+      replayLatencyMs: 30,
+    });
+
+    expect(report.status).toBe("matched");
+    expect(report.differences.retrievalChanged).toBe(false);
+    expect(report.differences.chunkOrderChanged).toBe(false);
+    expect(report.differences.scoresChanged).toBe(false);
+  });
+
+  it("throws a controlled error when a replay snapshot is incomplete", () => {
+    const snapshot = buildReplaySnapshot({
+      query: "What does hybrid retrieval blend?",
+      document: {
+        documentId: "doc-1",
+        persisted: false,
+      },
+      parameters: {
+        topK: 1,
+        reasoningEnabled: false,
+        useMultiModelOrchestration: true,
+        enableShadowRetrieval: true,
+      },
+      retrievalConfig: {
+        mode: "hybrid",
+        candidateCount: 1,
+        returnedCount: 1,
+        rerankingApplied: false,
+      },
+      providers: {
+        embeddingProvider: "api-lexical",
+      },
+      results: [],
+    });
+
+    expect(() => assertReplaySnapshotComplete(snapshot)).toThrow(
+      "Replay snapshot is incomplete: inline replay requires the original content file path or a persisted index."
+    );
   });
 
   it("detects corpus drift regressions", () => {

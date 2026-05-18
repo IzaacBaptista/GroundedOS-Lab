@@ -7,11 +7,13 @@ import {
   ApiRequestError,
   askRag,
   askRagFromFile,
+  askPersistedRag,
   deletePersistedRagIndex,
   getRagSessionMemory,
   getRagTradeoffMetrics,
   indexRag,
   listPersistedRagIndexes,
+  replayRagFromSnapshot,
   resetRagRuntimeStateForTests,
 } from "./rag-service";
 
@@ -291,6 +293,36 @@ describe("persisted RAG indexes", () => {
       expect(output.devMode.results[0]?.chunkId).toBe(
         "persisted-api-test:section-2:chunk-1"
       );
+    } finally {
+      await rm(indexDir, { recursive: true, force: true });
+    }
+  });
+
+  it("replays a persisted snapshot with stable output", async () => {
+    const indexDir = await createTempIndexDir();
+
+    try {
+      await indexRag({
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Replay Persisted API Test",
+        documentId: "persisted-replay-test",
+        indexDir,
+      });
+
+      const original = await askPersistedRag({
+        documentId: "persisted-replay-test",
+        query: "What explains vector search?",
+        topK: 1,
+        indexDir,
+      });
+      const replay = await replayRagFromSnapshot(original.devMode.replay!.snapshot);
+
+      expect(replay.response.answer.text).toBe(original.answer.text);
+      expect(replay.report.status).toBe("matched");
+      expect(replay.report.differences.retrievalChanged).toBe(false);
+      expect(replay.report.differences.responseChanged).toBe(false);
     } finally {
       await rm(indexDir, { recursive: true, force: true });
     }

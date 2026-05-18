@@ -74,6 +74,7 @@ export function createRagSuccessTrace(input: {
             reproducible: response.devMode.replay.reproducible,
             command: response.devMode.replay.command,
             mode: response.devMode.replay.snapshot.mode,
+            snapshot: response.devMode.replay.snapshot,
           }
         : undefined,
       retrievalDiagnostics: response.devMode.retrievalDiagnostics,
