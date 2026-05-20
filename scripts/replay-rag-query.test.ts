@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
+import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -8,10 +7,9 @@ import {
   askPersistedRag,
   indexRag,
 } from "../apps/api/src/rag-service";
-import { makeRagTestCase, resetRagRuntimeState } from "@groundedos/test-harness";
+import { createTempDir, makeRagTestCase, resetRagRuntimeState } from "@groundedos/test-harness";
 import { runReplayCli } from "./replay-rag-query";
 
-const tempDirs: string[] = [];
 const originalObservabilityDir = process.env.GROUNDEDOS_OBSERVABILITY_DIR;
 
 beforeEach(async () => {
@@ -24,8 +22,6 @@ afterEach(async () => {
   } else {
     process.env.GROUNDEDOS_OBSERVABILITY_DIR = originalObservabilityDir;
   }
-
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe("replay-rag-query script", () => {
@@ -72,14 +68,13 @@ async function createReplayFixture(): Promise<{
   root: string;
   snapshot: NonNullable<Awaited<ReturnType<typeof askPersistedRag>>["devMode"]["replay"]>["snapshot"];
 }> {
-  const root = await mkdtemp(join(tmpdir(), "groundedos-replay-cli-test-"));
+  const root = await createTempDir("groundedos-replay-cli-test-");
   const indexDir = join(root, "indexes");
   const observabilityDir = join(root, "observability");
   const testCase = makeRagTestCase({
     title: "Replay CLI Test",
     documentId: "replay-cli-doc",
   });
-  tempDirs.push(root);
   process.env.GROUNDEDOS_OBSERVABILITY_DIR = observabilityDir;
 
   await indexRag({

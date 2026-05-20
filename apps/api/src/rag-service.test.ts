@@ -1,6 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
+import { readFile, writeFile } from "fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -15,7 +13,7 @@ import {
   listPersistedRagIndexes,
   replayRagFromSnapshot,
 } from "./rag-service";
-import { makeRagTestCase, resetRagRuntimeState } from "@groundedos/test-harness";
+import { makeRagTestCase, resetRagRuntimeState, createTempDir } from "@groundedos/test-harness";
 
 beforeEach(async () => {
   await resetRagRuntimeState();
@@ -241,8 +239,7 @@ describe("persisted RAG indexes", () => {
       documentId: "persisted-api-test",
     });
 
-    try {
-      const indexed = await indexRag({
+    const indexed = await indexRag({
         ...testCase,
         indexDir,
       });
@@ -279,9 +276,6 @@ describe("persisted RAG indexes", () => {
       expect(output.devMode.results[0]?.chunkId).toBe(
         "persisted-api-test:section-2:chunk-1"
       );
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("replays a persisted snapshot with stable output", async () => {
@@ -291,8 +285,7 @@ describe("persisted RAG indexes", () => {
       documentId: "persisted-replay-test",
     });
 
-    try {
-      await indexRag({
+    await indexRag({
         ...testCase,
         indexDir,
       });
@@ -309,9 +302,6 @@ describe("persisted RAG indexes", () => {
       expect(replay.report.status).toBe("matched");
       expect(replay.report.differences.retrievalChanged).toBe(false);
       expect(replay.report.differences.responseChanged).toBe(false);
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("indexes with local-hash and answers later using the persisted provider", async () => {
@@ -321,8 +311,7 @@ describe("persisted RAG indexes", () => {
       documentId: "local-hash-api-test",
     });
 
-    try {
-      const indexed = await indexRag({
+    const indexed = await indexRag({
         ...testCase,
         embeddingProvider: "local-hash",
         indexDir,
@@ -364,9 +353,6 @@ describe("persisted RAG indexes", () => {
           model: "local-hash-v1",
         },
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("continues to read older api-lexical indexes without embeddingModel", async () => {
@@ -376,8 +362,7 @@ describe("persisted RAG indexes", () => {
       documentId: "legacy-api-test",
     });
 
-    try {
-      const indexed = await indexRag({
+    const indexed = await indexRag({
         ...testCase,
         indexDir,
       });
@@ -407,9 +392,6 @@ describe("persisted RAG indexes", () => {
       });
       expect(output.answer.grounded).toBe(true);
       expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("can index and ask with the Ollama provider when configured", async () => {
@@ -457,7 +439,6 @@ describe("persisted RAG indexes", () => {
       expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
     } finally {
       globalThis.fetch = originalFetch;
-      await rm(indexDir, { recursive: true, force: true });
     }
   });
 
@@ -513,15 +494,13 @@ describe("persisted RAG indexes", () => {
       } else {
         process.env.OPENAI_API_KEY = originalApiKey;
       }
-      await rm(indexDir, { recursive: true, force: true });
     }
   });
 
   it("lists and deletes persisted indexes", async () => {
     const indexDir = await createTempIndexDir();
 
-    try {
-      await indexRag({
+    await indexRag({
         type: "text",
         content:
           "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
@@ -569,16 +548,12 @@ describe("persisted RAG indexes", () => {
         count: 0,
         indexes: [],
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("returns a typed not found error for missing persisted indexes", async () => {
     const indexDir = await createTempIndexDir();
 
-    try {
-      await expect(
+    await expect(
         askRag({
           documentId: "missing-index",
           query: "What is indexed?",
@@ -588,16 +563,12 @@ describe("persisted RAG indexes", () => {
         statusCode: 404,
         message: 'No persisted RAG index found for documentId "missing-index".',
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("isolates persisted retrieval by tenant and user ownership", async () => {
     const indexDir = await createTempIndexDir();
 
-    try {
-      await indexRag({
+    await indexRag({
         type: "text",
         content: "Tenant A private document.",
         title: "Tenant A",
@@ -624,14 +595,11 @@ describe("persisted RAG indexes", () => {
       ).resolves.toMatchObject({
         count: 0,
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 });
 
 async function createTempIndexDir(): Promise<string> {
-  return await mkdtemp(join(tmpdir(), "groundedos-api-index-test-"));
+  return await createTempDir("groundedos-api-index-test-");
 }
 
 function createFakeOllamaFetch(): typeof fetch {

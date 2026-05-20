@@ -1,20 +1,11 @@
-import { mkdtemp, rm } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { createTempDir } from "@groundedos/test-harness";
 import { TraceStore } from "./trace-store";
 
-const tempDirs: string[] = [];
-
 async function createStore(): Promise<TraceStore> {
-  const dir = await mkdtemp(join(tmpdir(), "groundedos-observability-"));
-  tempDirs.push(dir);
+  const dir = await createTempDir("groundedos-observability-");
   return new TraceStore(dir);
 }
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
 
 describe("TraceStore", () => {
   it("persists structured traces and reads them back", async () => {
