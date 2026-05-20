@@ -182,6 +182,18 @@ Diff reports compare:
 - stability
 - answer changes
 
+Diff reports now include:
+
+- `baselineVariant` and `candidateVariant`
+- `recommendation`: `promote`, `block`, or `manual_review`
+- `affectedQueries` with per-query regression reasons
+
+Approval criteria used by recommendation:
+
+- **block** when groundedness/recall drop, cost/latency/refusal increase, or responses change too much without clear gain
+- **promote** when the candidate wins and shows improvements without regressions
+- **manual_review** for inconclusive or mixed outcomes
+
 ## Examples
 
 ### Example taxonomy

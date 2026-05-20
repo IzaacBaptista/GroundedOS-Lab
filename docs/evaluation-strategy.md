@@ -249,6 +249,11 @@ decision.
 # Prompt / policy / retrieval diff report
 npm run experiment:prompts:diff -- --dataset phase-5-retrieval-text
 
+# Optional API trigger for the same diff execution
+curl -X POST http://localhost:3001/rag/metrics/prompt-policy-diff/run \
+  -H "content-type: application/json" \
+  -d '{"dataset":"phase-5-retrieval-text","topK":3}'
+
 # Drift snapshot + report
 npm run benchmark:drift -- --dataset phase-5-retrieval-text
 
@@ -263,6 +268,12 @@ Outputs:
 - `datasets/golden/baselines/retrieval-drift-snapshot.json`
 - `datasets/golden/baselines/retrieval-drift-report.json`
 - `datasets/golden/baselines/replay-report.json`
+
+Read the latest diff report via API:
+
+```bash
+curl http://localhost:3001/rag/metrics/prompt-policy-diff
+```
 
 ---
 

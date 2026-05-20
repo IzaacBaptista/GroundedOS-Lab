@@ -1563,6 +1563,23 @@ describe("api server", () => {
     expect(body.recent.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("serves GET /rag/metrics/prompt-policy-diff", async () => {
+    const app = await createTestServer();
+    const response = await app.inject({
+      method: "GET",
+      url: "/rag/metrics/prompt-policy-diff",
+    });
+    const body = response.json() as {
+      dataset: string;
+      comparedVariants: string[];
+      recommendation?: string;
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.dataset).toBeTruthy();
+    expect(body.comparedVariants.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("serves GET /rag/memory/:sessionId", async () => {
     const app = await createTestServer();
     const sessionId = `session-http-${Date.now()}`;

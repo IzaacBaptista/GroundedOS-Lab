@@ -1,45 +1,58 @@
 {
   "version": "v1",
-  "createdAt": "2026-05-17T20:56:22.510Z",
+  "createdAt": "2026-05-20T12:54:15.224Z",
   "dataset": "phase-5-retrieval-text",
   "comparedVariants": [
     "baseline-hybrid",
     "strict-grounding-policy",
     "dense-retrieval-baseline"
   ],
+  "baselineVariant": "baseline-hybrid",
+  "candidateVariant": "strict-grounding-policy",
   "winner": "baseline-hybrid",
-  "regressions": [],
+  "recommendation": "block",
+  "regressions": [
+    "responses changed substantially without clear quality gains."
+  ],
   "improvements": [
-    "strict-grounding-policy is faster than baseline-hybrid.",
-    "dense-retrieval-baseline is faster than baseline-hybrid."
+    "latency improved in candidate variant."
   ],
   "metricsComparison": [
     {
       "variant": "baseline-hybrid",
+      "avgFaithfulness": 1,
+      "avgRelevance": 0.6617,
       "avgQuality": 0.8816,
       "avgGroundedness": 1,
+      "avgConfidenceScore": 0.8816,
       "avgRecall": 1,
-      "avgLatencyMs": 2.3233,
+      "avgLatencyMs": 2.1343,
       "avgCostUsd": 0,
       "refusalRate": 0,
       "stability": 1
     },
     {
       "variant": "strict-grounding-policy",
+      "avgFaithfulness": 1,
+      "avgRelevance": 0.6617,
       "avgQuality": 0.8816,
       "avgGroundedness": 1,
+      "avgConfidenceScore": 0.8816,
       "avgRecall": 1,
-      "avgLatencyMs": 0.7211,
+      "avgLatencyMs": 0.625,
       "avgCostUsd": 0,
       "refusalRate": 0,
       "stability": 1
     },
     {
       "variant": "dense-retrieval-baseline",
+      "avgFaithfulness": 1,
+      "avgRelevance": 0.6617,
       "avgQuality": 0.8816,
       "avgGroundedness": 1,
+      "avgConfidenceScore": 0.8816,
       "avgRecall": 1,
-      "avgLatencyMs": 0.2698,
+      "avgLatencyMs": 0.2293,
       "avgCostUsd": 0,
       "refusalRate": 0,
       "stability": 1
@@ -87,6 +100,56 @@
       "changed": true,
       "winningVariant": "baseline-hybrid",
       "comparedAgainst": "strict-grounding-policy"
+    }
+  ],
+  "affectedQueries": [
+    {
+      "queryId": "p5-gd-001",
+      "question": "Which pipeline records offsets and preserves lineage metadata?",
+      "responseChanged": true,
+      "regressionReasons": [],
+      "baselineVariant": "baseline-hybrid",
+      "candidateVariant": "strict-grounding-policy"
+    },
+    {
+      "queryId": "p5-gd-002",
+      "question": "What does hybrid retrieval blend with sparse lexical scoring?",
+      "responseChanged": true,
+      "regressionReasons": [],
+      "baselineVariant": "baseline-hybrid",
+      "candidateVariant": "strict-grounding-policy"
+    },
+    {
+      "queryId": "p5-gd-003",
+      "question": "Which stage reorders candidate chunks after initial retrieval?",
+      "responseChanged": true,
+      "regressionReasons": [],
+      "baselineVariant": "baseline-hybrid",
+      "candidateVariant": "strict-grounding-policy"
+    },
+    {
+      "queryId": "p5-gd-004",
+      "question": "How is session memory isolated?",
+      "responseChanged": true,
+      "regressionReasons": [],
+      "baselineVariant": "baseline-hybrid",
+      "candidateVariant": "strict-grounding-policy"
+    },
+    {
+      "queryId": "p5-gd-005",
+      "question": "Which request metrics feed the trade-offs dashboard?",
+      "responseChanged": true,
+      "regressionReasons": [],
+      "baselineVariant": "baseline-hybrid",
+      "candidateVariant": "strict-grounding-policy"
+    },
+    {
+      "queryId": "p5-gd-006",
+      "question": "What should a good quantized retrieval path preserve?",
+      "responseChanged": true,
+      "regressionReasons": [],
+      "baselineVariant": "baseline-hybrid",
+      "candidateVariant": "strict-grounding-policy"
     }
   ]
 }
