@@ -69,6 +69,6 @@ export {
   compareReplayResults,
 } from "./replay";
 
-export { executeExperiment } from "./experiments";
+export { executeExperiment, type ExperimentConfig, type ExperimentExecutionResult } from "./experiments";
 
 export { loadGoldenDataset, validateDataset, compareDatasetVersions } from "./datasets";
