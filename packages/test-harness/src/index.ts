@@ -49,10 +49,15 @@ export {
 export { makeFakeTool, makeSpyTool, makeTestExecutionContext, makeSpyAgent } from "./agents";
 
 export {
+  createBullMqTestQueueAdapter,
   createTestQueue,
   createTestWorker,
   waitForJobState,
   waitForQueueDrain,
+  type BullMqRuntime,
+  type BullMqTestQueueAdapterOptions,
+  type JobState,
+  type TestJob,
   type TestQueueAdapter,
 } from "./jobs";
 
