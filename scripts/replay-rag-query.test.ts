@@ -7,15 +7,15 @@ import { TraceStore } from "../apps/api/src/observability/trace-store";
 import {
   askPersistedRag,
   indexRag,
-  resetRagRuntimeStateForTests,
 } from "../apps/api/src/rag-service";
+import { resetRagRuntimeState } from "@groundedos/test-harness";
 import { runReplayCli } from "./replay-rag-query";
 
 const tempDirs: string[] = [];
 const originalObservabilityDir = process.env.GROUNDEDOS_OBSERVABILITY_DIR;
 
 beforeEach(async () => {
-  await resetRagRuntimeStateForTests();
+  await resetRagRuntimeState();
 });
 
 afterEach(async () => {

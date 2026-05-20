@@ -14,16 +14,13 @@ import {
 import { ingest } from "@groundedos/etl";
 import { orchestrateAnswerPipeline } from "@groundedos/agents";
 import {
-  FileSessionMemoryStore,
   type MemoryEntry,
   type MemorySearchResult,
 } from "@groundedos/memory";
 import { routeModel } from "@groundedos/model-routing";
 import {
   CostBudgetEnforcer,
-  CostLedger,
   CostTracker,
-  TradeoffMetricsStore,
   resolveCostBudgetFromEnv,
   resolveUnitCostUsd,
   type RequestCostSummary,
@@ -38,7 +35,6 @@ import {
   OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   QdrantVectorStore,
-  SemanticCache,
   resolveVectorBackend,
   retrieveForDevMode,
   selectAdaptiveCacheThreshold,
@@ -84,6 +80,12 @@ import {
   saveRagIndex,
   type PersistedRagIndexListItem,
 } from "./rag-index-store";
+import {
+  costLedger,
+  semanticCache,
+  sessionMemoryStore,
+  tradeoffMetricsStore,
+} from "./rag-runtime-state";
 
 const DEFAULT_TOP_K = 3;
 const EMBEDDING_DIMENSIONS = 64;
@@ -98,13 +100,6 @@ const DEFAULT_RETRIEVAL_MODE = "hybrid" as const;
 const DEFAULT_RERANK_CANDIDATE_MULTIPLIER = 3;
 const DEFAULT_QDRANT_COLLECTION = "rag_chunks";
 const DEFAULT_QDRANT_TIMEOUT_MS = 5_000;
-const semanticCache = new SemanticCache();
-const costLedger = new CostLedger();
-const tradeoffMetricsStore = new TradeoffMetricsStore();
-const sessionMemoryStore = new FileSessionMemoryStore(
-  process.env.GROUNDEDOS_MEMORY_DIR ?? ".groundedos/memory/sessions"
-);
-
 // Singleton eval scorers — reused across requests to avoid allocation overhead
 const faithfulnessEvaluator = new FaithfulnessEvaluator();
 const relevanceEvaluator = new RelevanceEvaluator();
@@ -673,12 +668,6 @@ export async function getRagSessionMemory(
     count: entries.length,
     entries,
   };
-}
-
-export async function resetRagRuntimeStateForTests(): Promise<void> {
-  semanticCache.clear();
-  tradeoffMetricsStore.clear();
-  await sessionMemoryStore.clearAll();
 }
 
 class ApiLexicalEmbeddingProvider implements EmbeddingProvider {

@@ -1,23 +1,11 @@
-import { mkdtemp, rm } from "fs/promises";
-import { createHmac, randomUUID } from "crypto";
-import { tmpdir } from "os";
-import { join } from "path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { NestFastifyApplication } from "@nestjs/platform-fastify";
-
-import { createApiServer } from "./server";
-
-const servers: NestFastifyApplication[] = [];
-const tempDirs: string[] = [];
+import { describe, expect, it, vi } from "vitest";
+import {
+  createTempDir,
+  createTestServer,
+  createTestToken,
+} from "@groundedos/test-harness";
 
 process.env.AUTH_ENFORCEMENT = "false";
-
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => server.close()));
-  await Promise.all(
-    tempDirs.splice(0).map((tempDir) => rm(tempDir, { recursive: true, force: true }))
-  );
-});
 
 describe("api server", () => {
   it("serves health checks", async () => {
@@ -1126,7 +1114,7 @@ describe("api server", () => {
 
     try {
       const indexDir = await createTempIndexDir();
-      const app = await createTestServer(indexDir);
+      const app = await createTestServer({ indexDir });
       const adminToken = createTestToken({
         sub: "user-admin",
         username: "admin",
@@ -1347,7 +1335,7 @@ describe("api server", () => {
 
   it("serves POST /rag/index and asks against the persisted index", async () => {
     const indexDir = await createTempIndexDir();
-    const app = await createTestServer(indexDir);
+    const app = await createTestServer({ indexDir });
     const indexResponse = await app.inject({
       method: "POST",
       url: "/rag/index",
@@ -1400,7 +1388,7 @@ describe("api server", () => {
 
   it("serves GET and DELETE /rag/indexes", async () => {
     const indexDir = await createTempIndexDir();
-    const app = await createTestServer(indexDir);
+    const app = await createTestServer({ indexDir });
 
     await app.inject({
       method: "POST",
@@ -1458,7 +1446,7 @@ describe("api server", () => {
 
   it("serves GET /rag/indexes/:documentId/embedding-map", async () => {
     const indexDir = await createTempIndexDir();
-    const app = await createTestServer(indexDir);
+    const app = await createTestServer({ indexDir });
 
     await app.inject({
       method: "POST",
@@ -1833,53 +1821,8 @@ describe("api server", () => {
   });
 });
 
-async function createTestServer(indexDir?: string): Promise<NestFastifyApplication> {
-  const server = await createApiServer({ indexDir });
-  servers.push(server);
-
-  return server;
-}
-
 async function createTempIndexDir(): Promise<string> {
-  const tempDir = await mkdtemp(join(tmpdir(), "groundedos-api-server-test-"));
-  tempDirs.push(tempDir);
-
-  return tempDir;
-}
-
-function createTestToken(input: {
-  sub: string;
-  username: string;
-  roles: string[];
-  tokenType?: "access" | "refresh";
-  expiresInSeconds?: number;
-}): string {
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  const payload = {
-    sub: input.sub,
-    username: input.username,
-    roles: input.roles,
-    tokenType: input.tokenType ?? "access",
-    jti: randomUUID(),
-    iat: nowSeconds,
-    exp: nowSeconds + (input.expiresInSeconds ?? 3600),
-  };
-  const header = {
-    alg: "HS256",
-    typ: "JWT",
-  };
-
-  const encodedHeader = toBase64Url(Buffer.from(JSON.stringify(header), "utf8"));
-  const encodedPayload = toBase64Url(Buffer.from(JSON.stringify(payload), "utf8"));
-  const data = `${encodedHeader}.${encodedPayload}`;
-  const secret = process.env.JWT_SECRET ?? "dev-secret-change-in-production-immediately";
-  const signature = toBase64Url(createHmac("sha256", secret).update(data).digest());
-
-  return `${data}.${signature}`;
-}
-
-function toBase64Url(input: Buffer): string {
-  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return await createTempDir("groundedos-api-server-test-");
 }
 
 function sleep(ms: number): Promise<void> {

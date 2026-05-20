@@ -14,11 +14,11 @@ import {
   indexRag,
   listPersistedRagIndexes,
   replayRagFromSnapshot,
-  resetRagRuntimeStateForTests,
 } from "./rag-service";
+import { resetRagRuntimeState } from "@groundedos/test-harness";
 
 beforeEach(async () => {
-  await resetRagRuntimeStateForTests();
+  await resetRagRuntimeState();
 });
 
 describe("askRag", () => {

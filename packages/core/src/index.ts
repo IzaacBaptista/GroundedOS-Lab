@@ -58,6 +58,15 @@ export {
   ApiValidationErrorItemSchema,
   ApiErrorEnvelopeSchema,
   ApiEmbeddingProviderIdSchema,
+  ExecutionSnapshotSchema,
+  ReplayComparisonReportSchema,
+  EvaluatorOutputSchema,
+  EvalRunSampleSchema,
+  EvalRunSummarySchema,
+  EvalReportSchema,
+  EvalRunComparisonReportSchema,
+  DatasetEntrySchema,
+  DatasetSchema,
 } from "./contracts/index";
 
 export type {
@@ -67,6 +76,17 @@ export type {
   RagIndexRequestBody,
   ApiValidationErrorItem,
   ApiErrorEnvelope,
+  ExecutionSnapshot,
+  ReplaySnapshot,
+  ReplayComparisonReport,
+  EvaluatorOutput,
+  EvalRunSample,
+  EvalRunSummary,
+  EvalReport,
+  EvalRunComparisonReport,
+  DatasetEntry,
+  DatasetSchemaType,
+  GoldenDataset,
 } from "./contracts/index";
 
 // Workflow engine (Phase 2 — Workflow Orchestration)
