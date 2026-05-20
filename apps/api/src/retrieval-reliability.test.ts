@@ -579,7 +579,238 @@ describe("retrieval reliability", () => {
     });
 
     expect(report.winner).toBe("candidate");
+    expect(report.baselineVariant).toBe("baseline");
+    expect(report.candidateVariant).toBe("candidate");
+    expect(report.recommendation).toBe("block");
     expect(report.metricsComparison).toHaveLength(2);
+    expect(report.metricsComparison[0]).toHaveProperty("avgRelevance");
+    expect(report.metricsComparison[0]).toHaveProperty("avgConfidenceScore");
     expect(report.relevantDifferences[0]?.changed).toBe(true);
+    expect(report.affectedQueries[0]?.responseChanged).toBe(true);
+  });
+
+  it("blocks candidate variants when key reliability metrics regress", () => {
+    const report = createPromptPolicyDiffReport({
+      dataset: "phase-5-retrieval-text",
+      runs: [
+        {
+          variant: "baseline",
+          description: "current prompt",
+          metrics: {
+            sampleSize: 1,
+            avgFaithfulness: 0.9,
+            avgRelevance: 0.9,
+            avgRecall: 0.9,
+            avgQuality: 0.9,
+            avgGroundedness: 0.9,
+            avgLatencyMs: 20,
+            avgCostUsd: 0.001,
+            refusalRate: 0,
+          },
+          perQuery: [
+            {
+              id: "q-1",
+              question: "What does hybrid retrieval blend?",
+              answer: "It blends dense and sparse retrieval.",
+              retrievedChunkIds: ["doc:section-1:chunk-1"],
+              scores: {
+                faithfulness: 0.9,
+                relevance: 0.9,
+                recall: 0.9,
+                quality: 0.9,
+                groundedness: 0.9,
+              },
+              latencyMs: 20,
+              costUsd: 0.001,
+              refused: false,
+            },
+          ],
+        },
+        {
+          variant: "candidate",
+          description: "new policy",
+          metrics: {
+            sampleSize: 1,
+            avgFaithfulness: 0.7,
+            avgRelevance: 0.7,
+            avgRecall: 0.7,
+            avgQuality: 0.7,
+            avgGroundedness: 0.7,
+            avgLatencyMs: 40,
+            avgCostUsd: 0.004,
+            refusalRate: 0.25,
+          },
+          perQuery: [
+            {
+              id: "q-1",
+              question: "What does hybrid retrieval blend?",
+              answer: "I cannot answer from the context.",
+              retrievedChunkIds: ["doc:section-1:chunk-1"],
+              scores: {
+                faithfulness: 0.7,
+                relevance: 0.7,
+                recall: 0.7,
+                quality: 0.7,
+                groundedness: 0.7,
+              },
+              latencyMs: 40,
+              costUsd: 0.004,
+              refused: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(report.recommendation).toBe("block");
+    expect(report.regressions).toContain("groundedness decreased in candidate variant.");
+    expect(report.regressions).toContain("recall decreased in candidate variant.");
+    expect(report.regressions).toContain("latency increased in candidate variant.");
+    expect(report.regressions).toContain("cost increased in candidate variant.");
+    expect(report.regressions).toContain("refusal rate increased in candidate variant.");
+  });
+
+  it("promotes candidate variants when metrics improve without regressions", () => {
+    const report = createPromptPolicyDiffReport({
+      dataset: "phase-5-retrieval-text",
+      runs: [
+        {
+          variant: "baseline",
+          description: "current prompt",
+          metrics: {
+            sampleSize: 1,
+            avgFaithfulness: 0.7,
+            avgRelevance: 0.7,
+            avgRecall: 0.7,
+            avgQuality: 0.7,
+            avgGroundedness: 0.7,
+            avgLatencyMs: 30,
+            avgCostUsd: 0.003,
+            refusalRate: 0.2,
+          },
+          perQuery: [
+            {
+              id: "q-1",
+              question: "What does hybrid retrieval blend?",
+              answer: "It blends dense and sparse retrieval.",
+              retrievedChunkIds: ["doc:section-1:chunk-1"],
+              scores: {
+                faithfulness: 0.7,
+                relevance: 0.7,
+                recall: 0.7,
+                quality: 0.7,
+                groundedness: 0.7,
+              },
+              latencyMs: 30,
+              costUsd: 0.003,
+              refused: true,
+            },
+          ],
+        },
+        {
+          variant: "candidate",
+          description: "new prompt",
+          metrics: {
+            sampleSize: 1,
+            avgFaithfulness: 0.9,
+            avgRelevance: 0.9,
+            avgRecall: 0.9,
+            avgQuality: 0.9,
+            avgGroundedness: 0.9,
+            avgLatencyMs: 20,
+            avgCostUsd: 0.001,
+            refusalRate: 0,
+          },
+          perQuery: [
+            {
+              id: "q-1",
+              question: "What does hybrid retrieval blend?",
+              answer: "It blends dense vector similarity with sparse lexical scoring.",
+              retrievedChunkIds: ["doc:section-1:chunk-1"],
+              scores: {
+                faithfulness: 0.9,
+                relevance: 0.9,
+                recall: 0.9,
+                quality: 0.9,
+                groundedness: 0.9,
+              },
+              latencyMs: 20,
+              costUsd: 0.001,
+              refused: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(report.recommendation).toBe("promote");
+    expect(report.improvements).toContain("groundedness improved in candidate variant.");
+    expect(report.improvements).toContain("recall improved in candidate variant.");
+    expect(report.improvements).toContain("latency improved in candidate variant.");
+    expect(report.improvements).toContain("cost improved in candidate variant.");
+    expect(report.improvements).toContain("refusal rate improved in candidate variant.");
+  });
+
+  it("handles missing optional metrics safely in prompt/policy diff reports", () => {
+    const report = createPromptPolicyDiffReport({
+      dataset: "phase-5-retrieval-text",
+      runs: [
+        {
+          variant: "baseline",
+          description: "baseline",
+          metrics: {
+            sampleSize: 1,
+            avgFaithfulness: 0.5,
+            avgRelevance: 0.5,
+            avgRecall: 0.5,
+            avgQuality: 0.5,
+          },
+          perQuery: [
+            {
+              id: "q-1",
+              question: "q",
+              answer: "a",
+              retrievedChunkIds: [],
+              scores: {
+                faithfulness: 0.5,
+                relevance: 0.5,
+                recall: 0.5,
+                quality: 0.5,
+              },
+            },
+          ],
+        },
+        {
+          variant: "candidate",
+          description: "candidate",
+          metrics: {
+            sampleSize: 1,
+            avgFaithfulness: 0.5,
+            avgRelevance: 0.5,
+            avgRecall: 0.5,
+            avgQuality: 0.5,
+          },
+          perQuery: [
+            {
+              id: "q-1",
+              question: "q",
+              answer: "a",
+              retrievedChunkIds: [],
+              scores: {
+                faithfulness: 0.5,
+                relevance: 0.5,
+                recall: 0.5,
+                quality: 0.5,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(report.metricsComparison[0]?.avgLatencyMs).toBe(0);
+    expect(report.metricsComparison[0]?.avgCostUsd).toBe(0);
+    expect(report.metricsComparison[0]?.refusalRate).toBe(0);
+    expect(report.metricsComparison[0]?.avgConfidenceScore).toBe(0);
   });
 });

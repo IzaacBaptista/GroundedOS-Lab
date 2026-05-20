@@ -280,6 +280,7 @@ export interface PromptPolicyVariantRun {
     avgRecall: number;
     avgQuality: number;
     avgGroundedness?: number;
+    avgConfidenceScore?: number;
     avgLatencyMs?: number;
     avgCostUsd?: number;
     refusalRate?: number;
@@ -296,6 +297,7 @@ export interface PromptPolicyVariantRun {
       recall: number;
       quality: number;
       groundedness?: number;
+      confidenceScore?: number;
     };
     latencyMs?: number;
     costUsd?: number;
@@ -308,13 +310,19 @@ export interface PromptPolicyDiffReport {
   createdAt: string;
   dataset: string;
   comparedVariants: string[];
+  baselineVariant: string;
+  candidateVariant: string;
   winner: string;
+  recommendation: "promote" | "block" | "manual_review";
   regressions: string[];
   improvements: string[];
   metricsComparison: Array<{
     variant: string;
+    avgFaithfulness: number;
+    avgRelevance: number;
     avgQuality: number;
     avgGroundedness: number;
+    avgConfidenceScore: number;
     avgRecall: number;
     avgLatencyMs: number;
     avgCostUsd: number;
@@ -327,6 +335,14 @@ export interface PromptPolicyDiffReport {
     changed: boolean;
     winningVariant: string;
     comparedAgainst: string;
+  }>;
+  affectedQueries: Array<{
+    queryId: string;
+    question: string;
+    responseChanged: boolean;
+    regressionReasons: string[];
+    baselineVariant: string;
+    candidateVariant: string;
   }>;
 }
 
@@ -890,39 +906,129 @@ export function createPromptPolicyDiffReport(input: {
   dataset: string;
   runs: PromptPolicyVariantRun[];
 }): PromptPolicyDiffReport {
+  if (input.runs.length === 0) {
+    return {
+      version: "v1",
+      createdAt: new Date().toISOString(),
+      dataset: input.dataset,
+      comparedVariants: [],
+      baselineVariant: "n/a",
+      candidateVariant: "n/a",
+      winner: "n/a",
+      recommendation: "manual_review",
+      regressions: [],
+      improvements: [],
+      metricsComparison: [],
+      relevantDifferences: [],
+      affectedQueries: [],
+    };
+  }
+
   const ranked = [...input.runs].sort((left, right) => right.metrics.avgQuality - left.metrics.avgQuality);
   const winner = ranked[0];
-  const baseline = ranked[1] ?? ranked[0];
+  const baseline = input.runs[0] ?? ranked[0];
+  const candidate = ranked.find((run) => run.variant !== baseline?.variant) ?? baseline;
   const regressions: string[] = [];
   const improvements: string[] = [];
 
-  for (const run of input.runs) {
-    if (!winner || run.variant === winner.variant) {
-      continue;
-    }
+  const groundednessDelta = (candidate.metrics.avgGroundedness ?? 0) - (baseline.metrics.avgGroundedness ?? 0);
+  const recallDelta = candidate.metrics.avgRecall - baseline.metrics.avgRecall;
+  const latencyDelta = (candidate.metrics.avgLatencyMs ?? 0) - (baseline.metrics.avgLatencyMs ?? 0);
+  const costDelta = (candidate.metrics.avgCostUsd ?? 0) - (baseline.metrics.avgCostUsd ?? 0);
+  const refusalDelta = (candidate.metrics.refusalRate ?? 0) - (baseline.metrics.refusalRate ?? 0);
+  const qualityDelta = candidate.metrics.avgQuality - baseline.metrics.avgQuality;
 
-    if ((run.metrics.avgGroundedness ?? 0) < (winner.metrics.avgGroundedness ?? 0)) {
-      regressions.push(`${run.variant} has lower groundedness than ${winner.variant}.`);
-    }
-    if (run.metrics.avgRecall < winner.metrics.avgRecall) {
-      regressions.push(`${run.variant} has lower recall than ${winner.variant}.`);
-    }
-    if ((run.metrics.avgLatencyMs ?? 0) < (winner.metrics.avgLatencyMs ?? 0)) {
-      improvements.push(`${run.variant} is faster than ${winner.variant}.`);
-    }
-    if ((run.metrics.refusalRate ?? 0) < (winner.metrics.refusalRate ?? 0)) {
-      improvements.push(`${run.variant} refuses less often than ${winner.variant}.`);
-    }
+  if (groundednessDelta < -0.02) {
+    regressions.push("groundedness decreased in candidate variant.");
+  } else if (groundednessDelta > 0.02) {
+    improvements.push("groundedness improved in candidate variant.");
   }
 
+  if (recallDelta < -0.01) {
+    regressions.push("recall decreased in candidate variant.");
+  } else if (recallDelta > 0.01) {
+    improvements.push("recall improved in candidate variant.");
+  }
+
+  if (latencyDelta > Math.max(1, (baseline.metrics.avgLatencyMs ?? 0) * 0.05)) {
+    regressions.push("latency increased in candidate variant.");
+  } else if (latencyDelta < -Math.max(1, (baseline.metrics.avgLatencyMs ?? 0) * 0.05)) {
+    improvements.push("latency improved in candidate variant.");
+  }
+
+  if (costDelta > Math.max(0.000001, (baseline.metrics.avgCostUsd ?? 0) * 0.1)) {
+    regressions.push("cost increased in candidate variant.");
+  } else if (costDelta < -Math.max(0.000001, (baseline.metrics.avgCostUsd ?? 0) * 0.1)) {
+    improvements.push("cost improved in candidate variant.");
+  }
+
+  if (refusalDelta > 0.01) {
+    regressions.push("refusal rate increased in candidate variant.");
+  } else if (refusalDelta < -0.01) {
+    improvements.push("refusal rate improved in candidate variant.");
+  }
+
+  if (qualityDelta > 0.02) {
+    improvements.push("answer quality improved in candidate variant.");
+  }
+
+  const affectedQueries = (candidate.perQuery ?? [])
+    .map((query) => {
+      const baselineQuery = baseline.perQuery.find((item) => item.id === query.id);
+      const responseChanged =
+        normalizeWhitespace(query.answer) !== normalizeWhitespace(baselineQuery?.answer ?? "");
+      const regressionReasons: string[] = [];
+      if ((query.scores.groundedness ?? 0) < (baselineQuery?.scores.groundedness ?? 0) - 0.02) {
+        regressionReasons.push("groundedness_drop");
+      }
+      if (query.scores.recall < (baselineQuery?.scores.recall ?? 0) - 0.01) {
+        regressionReasons.push("recall_drop");
+      }
+      if ((query.costUsd ?? 0) > (baselineQuery?.costUsd ?? 0)) {
+        regressionReasons.push("cost_increase");
+      }
+      if ((query.latencyMs ?? 0) > (baselineQuery?.latencyMs ?? 0) + 1) {
+        regressionReasons.push("latency_increase");
+      }
+      if ((query.refused ?? false) && !(baselineQuery?.refused ?? false)) {
+        regressionReasons.push("new_refusal");
+      }
+      return {
+        queryId: query.id,
+        question: query.question,
+        responseChanged,
+        regressionReasons,
+        baselineVariant: baseline.variant,
+        candidateVariant: candidate.variant,
+      };
+    })
+    .filter((query) => query.responseChanged || query.regressionReasons.length > 0);
+
+  const responseChangeRate = round(
+    affectedQueries.filter((query) => query.responseChanged).length / Math.max(1, candidate.perQuery.length),
+    4
+  );
+  const clearGain = qualityDelta > 0.02 || groundednessDelta > 0.02 || recallDelta > 0.02;
+  if (responseChangeRate > 0.4 && !clearGain) {
+    regressions.push("responses changed substantially without clear quality gains.");
+  }
+
+  const recommendation: PromptPolicyDiffReport["recommendation"] =
+    regressions.length > 0
+      ? "block"
+      : winner?.variant === candidate.variant && improvements.length > 0
+        ? "promote"
+        : "manual_review";
+
+  const comparedRun = winner?.variant === baseline?.variant ? candidate : baseline;
   const relevantDifferences = (winner?.perQuery ?? []).map((query) => {
-    const baselineQuery = baseline?.perQuery.find((item) => item.id === query.id);
+    const comparedQuery = comparedRun?.perQuery.find((item) => item.id === query.id);
     return {
       queryId: query.id,
       question: query.question,
-      changed: normalizeWhitespace(query.answer) !== normalizeWhitespace(baselineQuery?.answer ?? ""),
+      changed: normalizeWhitespace(query.answer) !== normalizeWhitespace(comparedQuery?.answer ?? ""),
       winningVariant: winner?.variant ?? "n/a",
-      comparedAgainst: baseline?.variant ?? "n/a",
+      comparedAgainst: comparedRun?.variant ?? "n/a",
     };
   });
 
@@ -931,13 +1037,19 @@ export function createPromptPolicyDiffReport(input: {
     createdAt: new Date().toISOString(),
     dataset: input.dataset,
     comparedVariants: input.runs.map((run) => run.variant),
+    baselineVariant: baseline.variant,
+    candidateVariant: candidate.variant,
     winner: winner?.variant ?? "n/a",
+    recommendation,
     regressions,
     improvements,
     metricsComparison: input.runs.map((run) => ({
       variant: run.variant,
+      avgFaithfulness: round(run.metrics.avgFaithfulness, 4),
+      avgRelevance: round(run.metrics.avgRelevance, 4),
       avgQuality: round(run.metrics.avgQuality, 4),
       avgGroundedness: round(run.metrics.avgGroundedness ?? 0, 4),
+      avgConfidenceScore: round(run.metrics.avgConfidenceScore ?? 0, 4),
       avgRecall: round(run.metrics.avgRecall, 4),
       avgLatencyMs: round(run.metrics.avgLatencyMs ?? 0, 4),
       avgCostUsd: round(run.metrics.avgCostUsd ?? 0, 6),
@@ -945,6 +1057,7 @@ export function createPromptPolicyDiffReport(input: {
       stability: round(run.metrics.stability ?? 0, 4),
     })),
     relevantDifferences,
+    affectedQueries,
   };
 }
 

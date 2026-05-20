@@ -5,11 +5,15 @@ import type {
   RagModelBenchmarkRunResponse,
   RagTradeoffMetricsResponse,
 } from "../../rag-service";
-import { RagMetricsService } from "./rag-metrics.service";
+import {
+  RagMetricsService,
+  type PromptPolicyDiffRunResponse,
+} from "./rag-metrics.service";
 import type {
   ObservabilityMetricsSummary,
   StructuredTraceRecord,
 } from "../../observability/trace-store";
+import type { PromptPolicyDiffReport } from "../../retrieval-reliability";
 
 @Controller("rag/metrics")
 export class RagMetricsController {
@@ -52,6 +56,22 @@ export class RagMetricsController {
   ): Promise<RagModelBenchmarkRunResponse> {
     return this.ragMetrics.runModelBenchmark({
       providers: body?.providers,
+    });
+  }
+
+  @Get("prompt-policy-diff")
+  getPromptPolicyDiffReport(): Promise<PromptPolicyDiffReport> {
+    return this.ragMetrics.getPromptPolicyDiffReport();
+  }
+
+  @Post("prompt-policy-diff/run")
+  runPromptPolicyDiff(
+    @Body() body?: { dataset?: string; topK?: number; outputPath?: string }
+  ): Promise<PromptPolicyDiffRunResponse> {
+    return this.ragMetrics.runPromptPolicyDiff({
+      dataset: body?.dataset,
+      topK: body?.topK,
+      outputPath: body?.outputPath,
     });
   }
 }

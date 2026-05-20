@@ -147,6 +147,7 @@ await new TraceStore().append({
     dataset: dataset.id,
     variants: report.comparedVariants,
     winner: report.winner,
+    recommendation: report.recommendation,
     regressions: report.regressions,
     improvements: report.improvements,
   },
@@ -211,6 +212,7 @@ async function runVariant(
         recall: recall.score,
         quality,
         groundedness: faithfulness.score,
+        confidenceScore: quality,
       },
       latencyMs: round(latencyMs, 4),
       costUsd: 0,
@@ -269,6 +271,7 @@ function summarizeVariant(
     avgRecall: round(avg(perQuery.map((query) => query.scores.recall)), 4),
     avgQuality: round(avg(perQuery.map((query) => query.scores.quality)), 4),
     avgGroundedness: round(avg(perQuery.map((query) => query.scores.groundedness ?? 0)), 4),
+    avgConfidenceScore: round(avg(perQuery.map((query) => query.scores.confidenceScore ?? 0)), 4),
     avgLatencyMs: round(avg(perQuery.map((query) => query.latencyMs ?? 0)), 4),
     avgCostUsd: round(avg(perQuery.map((query) => query.costUsd ?? 0)), 6),
     refusalRate: round(
