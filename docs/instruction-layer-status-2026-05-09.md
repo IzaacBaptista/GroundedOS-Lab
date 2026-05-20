@@ -113,11 +113,12 @@ Script `scripts/report-instruction-deprecations.ts`:
 - Produces automated migration checklist
 
 ### 5. Automated Tests
-File `scripts/instruction-layer.test.ts` (4 tests):
+File `scripts/instruction-layer.test.ts` (5 tests):
 - ✅ Checker passes on current workspace state
 - ✅ Migration planner defaults to policy current_version
 - ✅ Deprecation report runs without crashing
 - ✅ Resolver generates bundles for all consumers
+- ✅ Reference validator passes with valid graph
 
 ## Schema 1.3 Capabilities
 

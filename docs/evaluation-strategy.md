@@ -243,6 +243,15 @@ result is not statistically conclusive while the golden dataset contains only
 one query. Add more golden entries before using the winner as a product
 decision.
 
+### Eval harness smoke run
+
+```bash
+npm run eval:harness
+```
+
+Output is a compact JSON summary printed to stdout with run metadata and pass
+rate for a deterministic CI-oriented harness dataset.
+
 ### Retrieval reliability reports
 
 ```bash
