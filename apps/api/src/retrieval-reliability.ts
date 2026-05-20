@@ -242,8 +242,14 @@ export interface CorpusDriftSnapshot {
   queries: CorpusDriftQuerySnapshot[];
 }
 
+export type CorpusDriftSeverity = "critical" | "high" | "medium" | "low";
+
 export interface CorpusDriftReport {
   version: "v1";
+  driftReportId: string;
+  baselineId: string;
+  currentRunId: string;
+  indexId: string;
   createdAt: string;
   dataset: string;
   baselineCreatedAt?: string;
@@ -255,6 +261,10 @@ export interface CorpusDriftReport {
     improvements: number;
     missingRelevantChunks: number;
   };
+  affectedQueries: string[];
+  degradedQueries: string[];
+  improvedQueries: string[];
+  recommendations: string[];
   queries: Array<{
     id: string;
     question: string;
@@ -265,6 +275,8 @@ export interface CorpusDriftReport {
     rankCurrent: number | null;
     missingRelevantChunks: string[];
     possibleResponsibleDocuments: string[];
+    relatedIngestion?: string;
+    severity: CorpusDriftSeverity;
     timestamp: string;
     status: "regressed" | "improved" | "stable";
   }>;
@@ -847,6 +859,8 @@ export function assertReplaySnapshotComplete(snapshot: ReplaySnapshot): void {
 
 export function createCorpusDriftReport(input: {
   dataset: string;
+  indexId?: string;
+  ingestAt?: string;
   previous?: CorpusDriftSnapshot;
   current: CorpusDriftSnapshot;
 }): CorpusDriftReport {
@@ -867,6 +881,13 @@ export function createCorpusDriftReport(input: {
           ? "improved"
           : "stable";
 
+    const severity: CorpusDriftSeverity = (() => {
+      if (status !== "regressed") return "low";
+      if (difference <= -0.5) return "critical";
+      if (difference <= -0.25) return "high";
+      return "medium";
+    })();
+
     return {
       id: query.id,
       question: query.question,
@@ -877,6 +898,8 @@ export function createCorpusDriftReport(input: {
       rankCurrent: query.rankOfExpected,
       missingRelevantChunks,
       possibleResponsibleDocuments: missingRelevantChunks.map((chunkId) => chunkId.split(":")[0] ?? chunkId),
+      relatedIngestion: input.ingestAt,
+      severity,
       timestamp: input.current.createdAt,
       status,
     };
@@ -885,8 +908,47 @@ export function createCorpusDriftReport(input: {
   const regressions = queries.filter((query) => query.status === "regressed").length;
   const improvements = queries.filter((query) => query.status === "improved").length;
 
+  const degradedQueries = queries.filter((q) => q.status === "regressed").map((q) => q.id);
+  const improvedQueries = queries.filter((q) => q.status === "improved").map((q) => q.id);
+  const affectedQueries = [...degradedQueries, ...improvedQueries];
+
+  const recommendations: string[] = [];
+  if (regressions > 0) {
+    recommendations.push(
+      `Review ${regressions} regressed ${regressions === 1 ? "query" : "queries"} and identify recently ingested documents that may interfere with retrieval.`
+    );
+    const criticalCount = queries.filter((q) => q.severity === "critical").length;
+    if (criticalCount > 0) {
+      recommendations.push(
+        `${criticalCount} critical regression${criticalCount > 1 ? "s" : ""} detected — consider blocking the ingestion or rolling back the index.`
+      );
+    }
+    const missingTotal = queries.reduce((sum, q) => sum + q.missingRelevantChunks.length, 0);
+    if (missingTotal > 0) {
+      recommendations.push(
+        `${missingTotal} expected chunk${missingTotal > 1 ? "s are" : " is"} no longer surfaced — verify chunking and embedding pipeline integrity.`
+      );
+    }
+  }
+  if (improvements > 0) {
+    recommendations.push(
+      `${improvements} ${improvements === 1 ? "query" : "queries"} improved — consider promoting the current index as the new baseline.`
+    );
+  }
+  if (regressions === 0 && improvements === 0) {
+    recommendations.push("No recall changes detected. Index is stable relative to the baseline.");
+  }
+
+  const baselineId = input.previous
+    ? createHash("sha256").update(input.previous.createdAt + input.previous.dataset).digest("hex").slice(0, 16)
+    : "no-baseline";
+
   return {
     version: "v1",
+    driftReportId: randomUUID(),
+    baselineId,
+    currentRunId: randomUUID(),
+    indexId: input.indexId ?? input.dataset,
     createdAt: new Date().toISOString(),
     dataset: input.dataset,
     baselineCreatedAt: input.previous?.createdAt,
@@ -898,6 +960,10 @@ export function createCorpusDriftReport(input: {
       improvements,
       missingRelevantChunks: queries.reduce((sum, query) => sum + query.missingRelevantChunks.length, 0),
     },
+    affectedQueries,
+    degradedQueries,
+    improvedQueries,
+    recommendations,
     queries,
   };
 }

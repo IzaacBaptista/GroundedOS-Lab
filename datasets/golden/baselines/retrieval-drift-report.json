@@ -1,5 +1,9 @@
 {
   "version": "v1",
+  "driftReportId": "00000000-0000-0000-0000-000000000001",
+  "baselineId": "no-baseline",
+  "currentRunId": "00000000-0000-0000-0000-000000000002",
+  "indexId": "phase-5-retrieval-text",
   "createdAt": "2026-05-17T20:56:21.450Z",
   "dataset": "phase-5-retrieval-text",
   "currentCreatedAt": "2026-05-17T20:56:21.437Z",
@@ -10,6 +14,12 @@
     "improvements": 0,
     "missingRelevantChunks": 0
   },
+  "affectedQueries": [],
+  "degradedQueries": [],
+  "improvedQueries": [],
+  "recommendations": [
+    "No recall changes detected. Index is stable relative to the baseline."
+  ],
   "queries": [
     {
       "id": "p5-gd-001",
@@ -21,6 +31,7 @@
       "rankCurrent": 1,
       "missingRelevantChunks": [],
       "possibleResponsibleDocuments": [],
+      "severity": "low",
       "timestamp": "2026-05-17T20:56:21.437Z",
       "status": "stable"
     },
@@ -34,6 +45,7 @@
       "rankCurrent": 1,
       "missingRelevantChunks": [],
       "possibleResponsibleDocuments": [],
+      "severity": "low",
       "timestamp": "2026-05-17T20:56:21.437Z",
       "status": "stable"
     },
@@ -47,6 +59,7 @@
       "rankCurrent": 1,
       "missingRelevantChunks": [],
       "possibleResponsibleDocuments": [],
+      "severity": "low",
       "timestamp": "2026-05-17T20:56:21.437Z",
       "status": "stable"
     },
@@ -60,6 +73,7 @@
       "rankCurrent": 1,
       "missingRelevantChunks": [],
       "possibleResponsibleDocuments": [],
+      "severity": "low",
       "timestamp": "2026-05-17T20:56:21.437Z",
       "status": "stable"
     },
@@ -73,6 +87,7 @@
       "rankCurrent": 1,
       "missingRelevantChunks": [],
       "possibleResponsibleDocuments": [],
+      "severity": "low",
       "timestamp": "2026-05-17T20:56:21.437Z",
       "status": "stable"
     },
@@ -86,6 +101,7 @@
       "rankCurrent": 1,
       "missingRelevantChunks": [],
       "possibleResponsibleDocuments": [],
+      "severity": "low",
       "timestamp": "2026-05-17T20:56:21.437Z",
       "status": "stable"
     }

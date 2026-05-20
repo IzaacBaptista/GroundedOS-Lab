@@ -20,6 +20,11 @@
           "sectionId": "section-2"
         }
       ],
+      "expected_answer_hints": [
+        "The ingestion pipeline records byte offsets and preserves lineage metadata for every chunk."
+      ],
+      "tags": ["ingestion", "lineage", "metadata"],
+      "priority": "high",
       "notes": "Targets the ingestion and lineage section."
     },
     {
@@ -39,6 +44,11 @@
           "sectionId": "section-3"
         }
       ],
+      "expected_answer_hints": [
+        "Hybrid retrieval blends dense vector similarity with sparse lexical scoring."
+      ],
+      "tags": ["retrieval", "hybrid", "lexical", "dense"],
+      "priority": "critical",
       "notes": "Targets the hybrid retrieval section."
     },
     {
@@ -58,6 +68,11 @@
           "sectionId": "section-4"
         }
       ],
+      "expected_answer_hints": [
+        "Reranking reorders candidate chunks after initial retrieval to improve final result quality."
+      ],
+      "tags": ["retrieval", "reranking"],
+      "priority": "high",
       "notes": "Targets the reranking section."
     },
     {
@@ -77,6 +92,11 @@
           "sectionId": "section-5"
         }
       ],
+      "expected_answer_hints": [
+        "Session memory is isolated by session identifier so that state does not bleed across requests."
+      ],
+      "tags": ["memory", "session", "isolation"],
+      "priority": "medium",
       "notes": "Targets the session memory section."
     },
     {
@@ -98,6 +118,11 @@
           "sectionId": "section-6"
         }
       ],
+      "expected_answer_hints": [
+        "Provider cost, latency, cache status, and budget checks feed the trade-offs dashboard."
+      ],
+      "tags": ["cost", "latency", "observability", "tradeoffs"],
+      "priority": "medium",
       "notes": "Targets the cost tracking section."
     },
     {
@@ -117,6 +142,11 @@
           "sectionId": "section-7"
         }
       ],
+      "expected_answer_hints": [
+        "A good quantized path should reduce memory footprint while preserving Recall@1 for core queries."
+      ],
+      "tags": ["quantization", "recall", "memory"],
+      "priority": "high",
       "notes": "Targets the quantization section."
     }
   ]

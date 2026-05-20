@@ -7,13 +7,14 @@ import type {
 } from "../../rag-service";
 import {
   RagMetricsService,
+  type CorpusDriftRunResponse,
   type PromptPolicyDiffRunResponse,
 } from "./rag-metrics.service";
 import type {
   ObservabilityMetricsSummary,
   StructuredTraceRecord,
 } from "../../observability/trace-store";
-import type { PromptPolicyDiffReport } from "../../retrieval-reliability";
+import type { CorpusDriftReport, PromptPolicyDiffReport } from "../../retrieval-reliability";
 
 @Controller("rag/metrics")
 export class RagMetricsController {
@@ -72,6 +73,33 @@ export class RagMetricsController {
       dataset: body?.dataset,
       topK: body?.topK,
       outputPath: body?.outputPath,
+    });
+  }
+
+  @Get("corpus-drift")
+  getCorpusDriftReport(): Promise<CorpusDriftReport> {
+    return this.ragMetrics.getCorpusDriftReport();
+  }
+
+  @Post("corpus-drift/baseline")
+  createCorpusDriftBaseline(
+    @Body() body?: { dataset?: string; topK?: number }
+  ): Promise<CorpusDriftRunResponse> {
+    return this.ragMetrics.runCorpusDrift({
+      dataset: body?.dataset,
+      topK: body?.topK,
+    });
+  }
+
+  @Post("corpus-drift/run")
+  runCorpusDriftCheck(
+    @Body() body?: { dataset?: string; topK?: number; snapshotPath?: string; reportPath?: string }
+  ): Promise<CorpusDriftRunResponse> {
+    return this.ragMetrics.runCorpusDrift({
+      dataset: body?.dataset,
+      topK: body?.topK,
+      snapshotPath: body?.snapshotPath,
+      reportPath: body?.reportPath,
     });
   }
 }
