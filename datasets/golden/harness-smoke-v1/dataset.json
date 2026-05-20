@@ -1,0 +1,49 @@
+{
+  "name": "Harness Smoke v1",
+  "version": "1.0.0",
+  "createdAt": "2026-05-20T00:00:00.000Z",
+  "entries": [
+    {
+      "id": "harness-smoke-001",
+      "question": "What is grounded retrieval?",
+      "expectedAnswer": "Grounded retrieval uses retrieved evidence to support generated answers.",
+      "expectedChunkIds": [
+        "grounded-retrieval:chunk-1"
+      ],
+      "metadata": {
+        "tags": [
+          "smoke",
+          "retrieval"
+        ]
+      }
+    },
+    {
+      "id": "harness-smoke-002",
+      "question": "Why are execution snapshots useful?",
+      "expectedAnswer": "Execution snapshots preserve retrieval, prompt, model, and output context for replay comparisons.",
+      "expectedChunkIds": [
+        "execution-snapshot:chunk-1"
+      ],
+      "metadata": {
+        "tags": [
+          "smoke",
+          "replay"
+        ]
+      }
+    },
+    {
+      "id": "harness-smoke-003",
+      "question": "What does an eval report summarize?",
+      "expectedAnswer": "An eval report summarizes pass rate, scores, and per-item evaluation outputs for a dataset run.",
+      "expectedChunkIds": [
+        "eval-report:chunk-1"
+      ],
+      "metadata": {
+        "tags": [
+          "smoke",
+          "evals"
+        ]
+      }
+    }
+  ]
+}

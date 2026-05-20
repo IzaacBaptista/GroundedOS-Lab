@@ -10,6 +10,7 @@ export const DatasetEntrySchema = z.object({
 });
 
 export type DatasetEntry = z.infer<typeof DatasetEntrySchema>;
+export type GoldenDatasetItem = DatasetEntry;
 
 export const DatasetSchema = z.object({
   name: z.string(),

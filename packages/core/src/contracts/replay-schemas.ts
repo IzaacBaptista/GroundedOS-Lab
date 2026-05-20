@@ -146,3 +146,4 @@ export const ReplayComparisonReportSchema = z.object({
 });
 
 export type ReplayComparisonReport = z.infer<typeof ReplayComparisonReportSchema>;
+export type ReplayComparisonResult = ReplayComparisonReport;

@@ -67,6 +67,7 @@ export {
   EvalRunComparisonReportSchema,
   DatasetEntrySchema,
   DatasetSchema,
+  loadGoldenDataset,
 } from "./contracts/index";
 
 export type {
@@ -79,6 +80,7 @@ export type {
   ExecutionSnapshot,
   ReplaySnapshot,
   ReplayComparisonReport,
+  ReplayComparisonResult,
   EvaluatorOutput,
   EvalRunSample,
   EvalRunSummary,
@@ -87,6 +89,7 @@ export type {
   DatasetEntry,
   DatasetSchemaType,
   GoldenDataset,
+  GoldenDatasetItem,
 } from "./contracts/index";
 
 // Workflow engine (Phase 2 — Workflow Orchestration)

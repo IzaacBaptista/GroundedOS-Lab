@@ -35,6 +35,7 @@ export type {
   ExecutionSnapshot,
   ReplaySnapshot,
   ReplayComparisonReport,
+  ReplayComparisonResult,
 } from "./replay-schemas";
 
 export {
@@ -54,5 +55,11 @@ export type {
 } from "./eval-schemas";
 
 export { DatasetEntrySchema, DatasetSchema } from "./dataset-schemas";
+export { loadGoldenDataset } from "./dataset-loader";
 
-export type { DatasetEntry, DatasetSchemaType, GoldenDataset } from "./dataset-schemas";
+export type {
+  DatasetEntry,
+  DatasetSchemaType,
+  GoldenDataset,
+  GoldenDatasetItem,
+} from "./dataset-schemas";

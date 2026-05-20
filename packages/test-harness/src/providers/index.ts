@@ -6,6 +6,46 @@ export interface ProviderSuiteResult {
   details?: Record<string, unknown>;
 }
 
+export function assertEmbeddingVector(
+  vector: number[],
+  options: { expectedDimensions?: number } = {}
+): void {
+  if (!Array.isArray(vector) || vector.length === 0) {
+    throw new Error("Embedding vector must be a non-empty array.");
+  }
+
+  if (
+    options.expectedDimensions !== undefined &&
+    vector.length !== options.expectedDimensions
+  ) {
+    throw new Error(
+      `Embedding vector dimensions mismatch. Expected ${options.expectedDimensions}, received ${vector.length}.`
+    );
+  }
+
+  for (const value of vector) {
+    if (!Number.isFinite(value)) {
+      throw new Error("Embedding vector contains non-finite numeric values.");
+    }
+  }
+}
+
+export async function assertDeterministicEmbedding(
+  provider: EmbeddingProvider,
+  text: string
+): Promise<number[]> {
+  const [vectorA] = await provider.embedTexts([text]);
+  const [vectorB] = await provider.embedTexts([text]);
+  assertEmbeddingVector(vectorA, { expectedDimensions: provider.dimensions });
+  assertEmbeddingVector(vectorB, { expectedDimensions: provider.dimensions });
+
+  if (JSON.stringify(vectorA) !== JSON.stringify(vectorB)) {
+    throw new Error(`Embedding provider "${provider.name}" is not deterministic for identical input.`);
+  }
+
+  return vectorA;
+}
+
 export async function runProviderDeterminismSuite(
   provider: EmbeddingProvider
 ): Promise<ProviderSuiteResult> {
@@ -62,28 +102,46 @@ export async function runProviderSemanticSuite(
 
 export async function runProviderCompatibilitySuite(
   providerA: EmbeddingProvider,
-  providerB: EmbeddingProvider
+  providerB?: EmbeddingProvider
 ): Promise<ProviderSuiteResult> {
   const sample = ["alpha beta gamma"];
   const [a] = await providerA.embedTexts(sample);
-  const [b] = await providerB.embedTexts(sample);
-  const dimensionMatch = a.length === b.length;
-  const drift = dimensionMatch ? Math.abs(cosine(a, a) - cosine(a, b)) : 1;
+  assertEmbeddingVector(a, { expectedDimensions: providerA.dimensions });
+
+  const deterministic = await isDeterministic(providerA, sample[0]);
+  const metadataValid =
+    typeof providerA.name === "string" &&
+    providerA.name.length > 0 &&
+    Number.isInteger(providerA.dimensions) &&
+    providerA.dimensions > 0;
+
+  let dimensionMatch = true;
+  let drift = 0;
+
+  if (providerB) {
+    const [b] = await providerB.embedTexts(sample);
+    assertEmbeddingVector(b, { expectedDimensions: providerB.dimensions });
+    dimensionMatch = a.length === b.length;
+    drift = dimensionMatch ? Math.abs(cosine(a, a) - cosine(a, b)) : 1;
+  }
 
   return {
-    passed: dimensionMatch && drift < 0.2,
+    passed: metadataValid && deterministic && dimensionMatch && drift < 0.2,
     checks: {
+      metadataValid,
+      deterministic,
+      vectorNumericValid: true,
       vectorSpaceCompatibility: dimensionMatch,
-      reindexRequired: !dimensionMatch || drift >= 0.2,
+      reindexRequired: providerB ? !dimensionMatch || drift >= 0.2 : false,
       dimensionMismatch: !dimensionMatch,
       similarityDrift: drift < 0.2,
     },
     details: {
       providerA: providerA.name,
-      providerB: providerB.name,
+      providerB: providerB?.name,
       drift,
       dimensionsA: providerA.dimensions,
-      dimensionsB: providerB.dimensions,
+      dimensionsB: providerB?.dimensions,
     },
   };
 }
@@ -113,4 +171,10 @@ function cosine(left: number[], right: number[]): number {
   }
 
   return dot / (leftNorm * rightNorm);
+}
+
+async function isDeterministic(provider: EmbeddingProvider, text: string): Promise<boolean> {
+  const [a] = await provider.embedTexts([text]);
+  const [b] = await provider.embedTexts([text]);
+  return JSON.stringify(a) === JSON.stringify(b);
 }

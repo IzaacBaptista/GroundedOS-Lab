@@ -24,6 +24,8 @@ export {
 } from "./rag";
 
 export {
+  assertEmbeddingVector,
+  assertDeterministicEmbedding,
   runProviderDeterminismSuite,
   runProviderSemanticSuite,
   runProviderCompatibilitySuite,

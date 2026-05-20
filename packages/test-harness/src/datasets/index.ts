@@ -1,15 +1,16 @@
-import { readFile } from "fs/promises";
 import { resolve } from "path";
-import { DatasetSchema, type GoldenDataset } from "@groundedos/core";
+import {
+  DatasetSchema,
+  loadGoldenDataset as loadGoldenDatasetFromPath,
+  type GoldenDataset,
+} from "@groundedos/core";
 
 export async function loadGoldenDataset(
   name: string,
   root = resolve(process.cwd(), "datasets/golden")
 ): Promise<GoldenDataset> {
   const filePath = resolve(root, `${name}.json`);
-  const content = await readFile(filePath, "utf8");
-  const parsed = JSON.parse(content) as unknown;
-  return validateDataset(parsed);
+  return loadGoldenDatasetFromPath(filePath);
 }
 
 export function validateDataset(dataset: unknown): GoldenDataset {
