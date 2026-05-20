@@ -44,6 +44,8 @@ export {
   EvalRunSummarySchema,
   EvalReportSchema,
   EvalRunComparisonReportSchema,
+  EvalMetricResultSchema,
+  EvalRunResultSchema,
 } from "./eval-schemas";
 
 export type {
@@ -52,7 +54,12 @@ export type {
   EvalRunSummary,
   EvalReport,
   EvalRunComparisonReport,
+  EvalMetricResult,
+  EvalRunResult,
 } from "./eval-schemas";
+
+export { ExperimentRunMetadataSchema } from "./experiment-schemas";
+export type { ExperimentRunMetadata } from "./experiment-schemas";
 
 export { DatasetEntrySchema, DatasetSchema } from "./dataset-schemas";
 export { loadGoldenDataset } from "./dataset-loader";

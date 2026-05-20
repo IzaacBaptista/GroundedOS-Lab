@@ -21,6 +21,9 @@ Harness Engineering in GroundedOS-Lab is implemented incrementally, with transve
 - Core contracts in `@groundedos/core` include:
   - `ExecutionSnapshot`
   - `EvalReport`
+  - `EvalRunResult`
+  - `EvalMetricResult`
+  - `ExperimentRunMetadata`
   - `GoldenDataset`
   - `GoldenDatasetItem`
   - `ReplayComparisonResult`
