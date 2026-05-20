@@ -24,5 +24,17 @@ export function compareReplayResults(
   return compareReplaySnapshots({
     original: captureExecutionSnapshot(original),
     replay: captureExecutionSnapshot(replay),
+    originalAnswer: {
+      text: original.original.answer.text,
+      grounded: original.original.answer.grounded,
+    },
+    replayAnswer: {
+      text: replay.original.answer.text,
+      grounded: replay.original.answer.grounded,
+    },
+    originalCostUsd: original.original.costUsd,
+    replayCostUsd: replay.original.costUsd,
+    originalLatencyMs: original.original.latencyMs,
+    replayLatencyMs: replay.original.latencyMs,
   });
 }

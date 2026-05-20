@@ -40,14 +40,15 @@ export interface CreateTestTokenInput {
 }
 
 export function createTestToken(input: CreateTestTokenInput = {}): string {
+  const nowSeconds = input.issuedAtSeconds ?? Math.floor(Date.now() / 1000);
   const payload = {
     sub: input.sub ?? "test-user",
     username: input.username ?? "test-user",
     roles: input.roles ?? ["user"],
     tokenType: input.tokenType ?? "access",
     jti: stableJti(input.sub ?? "test-user", input.roles ?? ["user"]),
-    iat: input.issuedAtSeconds ?? 1_700_000_000,
-    exp: (input.issuedAtSeconds ?? 1_700_000_000) + (input.expiresInSeconds ?? 3600),
+    iat: nowSeconds,
+    exp: nowSeconds + (input.expiresInSeconds ?? 3600),
   };
   const header = { alg: "HS256", typ: "JWT" as const };
   const encodedHeader = toBase64Url(Buffer.from(JSON.stringify(header), "utf8"));
@@ -79,7 +80,12 @@ function registerTeardown(): void {
 }
 
 function toBase64Url(input: Buffer): string {
-  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const base64 = input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
+  let end = base64.length;
+  while (end > 0 && base64[end - 1] === "=") {
+    end -= 1;
+  }
+  return base64.slice(0, end);
 }
 
 function stableJti(sub: string, roles: string[]): string {

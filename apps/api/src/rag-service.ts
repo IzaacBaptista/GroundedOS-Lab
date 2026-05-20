@@ -3907,7 +3907,7 @@ function summarizeScores(scores: number[]): { min: number; max: number; avg: num
 }
 
 function recordTradeoffSample(
-  sample: Parameters<TradeoffMetricsStore["record"]>[0]
+  sample: Parameters<typeof tradeoffMetricsStore.record>[0]
 ): void {
   tradeoffMetricsStore.record(sample);
 }

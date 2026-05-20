@@ -22,6 +22,7 @@ export default defineConfig({
       "@groundedos/agents": resolve(__dirname, "packages/agents/src"),
       "@groundedos/safety": resolve(__dirname, "packages/safety/src"),
       "@groundedos/evals": resolve(__dirname, "packages/evals/src"),
+      "@groundedos/test-harness": resolve(__dirname, "packages/test-harness/src"),
       "@groundedos/model-routing": resolve(__dirname, "packages/model-routing/src"),
       "@groundedos/query-understanding": resolve(__dirname, "packages/query-understanding/src"),
     },
