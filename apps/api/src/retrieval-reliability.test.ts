@@ -813,4 +813,524 @@ describe("retrieval reliability", () => {
     expect(report.metricsComparison[0]?.refusalRate).toBe(0);
     expect(report.metricsComparison[0]?.avgConfidenceScore).toBe(0);
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Corpus Drift Detection — comprehensive tests
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it("creates a baseline report when no previous snapshot exists", () => {
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "What does hybrid retrieval blend?",
+            expectedChunkIds: ["doc:section-1:chunk-1"],
+            retrievedChunkIds: ["doc:section-1:chunk-1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.9,
+          },
+        ],
+      },
+    });
+
+    expect(report.baselineId).toBe("no-baseline");
+    expect(report.summary.regressions).toBe(0);
+    expect(report.summary.improvements).toBe(0);
+    expect(report.queries[0]?.status).toBe("stable");
+    expect(report.queries[0]?.recallPrevious).toBe(1);
+    expect(report.queries[0]?.recallCurrent).toBe(1);
+  });
+
+  it("assigns a stable driftReportId and currentRunId on each call", () => {
+    const current: import("./retrieval-reliability").CorpusDriftSnapshot = {
+      version: "v1",
+      createdAt: "2026-02-01T00:00:00.000Z",
+      dataset: "phase-5-retrieval-text",
+      topK: 3,
+      queries: [],
+    };
+
+    const report1 = createCorpusDriftReport({ dataset: "phase-5-retrieval-text", current });
+    const report2 = createCorpusDriftReport({ dataset: "phase-5-retrieval-text", current });
+
+    expect(report1.driftReportId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+    expect(report1.currentRunId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+    // Each call produces a fresh ID
+    expect(report1.driftReportId).not.toBe(report2.driftReportId);
+    expect(report1.currentRunId).not.toBe(report2.currentRunId);
+  });
+
+  it("computes recall correctly from chunk hits", () => {
+    // 2 expected chunks, only 1 retrieved → recall = 0.5
+    const report = createCorpusDriftReport({
+      dataset: "test-ds",
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "test-ds",
+        topK: 5,
+        queries: [
+          {
+            id: "q-1",
+            question: "What is the difference between A and B?",
+            expectedChunkIds: ["doc:section-1:chunk-1", "doc:section-2:chunk-1"],
+            retrievedChunkIds: ["doc:section-1:chunk-1", "doc:section-3:chunk-1"],
+            recallAtK: 0.5,
+            rankOfExpected: 1,
+            topScore: 0.88,
+          },
+        ],
+      },
+    });
+
+    expect(report.queries[0]?.recallCurrent).toBe(0.5);
+    expect(report.queries[0]?.missingRelevantChunks).toEqual(["doc:section-2:chunk-1"]);
+    expect(report.queries[0]?.possibleResponsibleDocuments).toContain("doc");
+  });
+
+  it("detects corpus drift improvements", () => {
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      previous: {
+        version: "v1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "What does hybrid retrieval blend?",
+            expectedChunkIds: ["doc:section-1:chunk-1"],
+            retrievedChunkIds: ["doc:section-2:chunk-1"],
+            recallAtK: 0,
+            rankOfExpected: null,
+            topScore: 0.4,
+          },
+        ],
+      },
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "What does hybrid retrieval blend?",
+            expectedChunkIds: ["doc:section-1:chunk-1"],
+            retrievedChunkIds: ["doc:section-1:chunk-1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.91,
+          },
+        ],
+      },
+    });
+
+    expect(report.summary.degraded).toBe(false);
+    expect(report.summary.improvements).toBe(1);
+    expect(report.summary.regressions).toBe(0);
+    expect(report.queries[0]?.status).toBe("improved");
+    expect(report.queries[0]?.difference).toBeGreaterThan(0);
+    expect(report.improvedQueries).toContain("q-1");
+    expect(report.degradedQueries).toHaveLength(0);
+  });
+
+  it("populates affectedQueries, degradedQueries, and improvedQueries correctly", () => {
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      previous: {
+        version: "v1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "A?",
+            expectedChunkIds: ["doc:s1:c1"],
+            retrievedChunkIds: ["doc:s1:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.9,
+          },
+          {
+            id: "q-2",
+            question: "B?",
+            expectedChunkIds: ["doc:s2:c1"],
+            retrievedChunkIds: ["doc:s2:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.88,
+          },
+          {
+            id: "q-3",
+            question: "C?",
+            expectedChunkIds: ["doc:s3:c1"],
+            retrievedChunkIds: ["doc:s4:c1"],
+            recallAtK: 0,
+            rankOfExpected: null,
+            topScore: 0.3,
+          },
+        ],
+      },
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "A?",
+            expectedChunkIds: ["doc:s1:c1"],
+            retrievedChunkIds: ["doc:s9:c1"], // regressed
+            recallAtK: 0,
+            rankOfExpected: null,
+            topScore: 0.4,
+          },
+          {
+            id: "q-2",
+            question: "B?",
+            expectedChunkIds: ["doc:s2:c1"],
+            retrievedChunkIds: ["doc:s2:c1"], // stable
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.88,
+          },
+          {
+            id: "q-3",
+            question: "C?",
+            expectedChunkIds: ["doc:s3:c1"],
+            retrievedChunkIds: ["doc:s3:c1"], // improved
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.9,
+          },
+        ],
+      },
+    });
+
+    expect(report.degradedQueries).toContain("q-1");
+    expect(report.degradedQueries).not.toContain("q-2");
+    expect(report.degradedQueries).not.toContain("q-3");
+    expect(report.improvedQueries).toContain("q-3");
+    expect(report.improvedQueries).not.toContain("q-1");
+    expect(report.affectedQueries).toContain("q-1");
+    expect(report.affectedQueries).toContain("q-3");
+    expect(report.affectedQueries).not.toContain("q-2");
+  });
+
+  it("assigns severity levels to regressed queries correctly", () => {
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      previous: {
+        version: "v1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-critical",
+            question: "Critical query?",
+            expectedChunkIds: ["doc:s1:c1", "doc:s2:c1"],
+            retrievedChunkIds: ["doc:s1:c1", "doc:s2:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.9,
+          },
+          {
+            id: "q-high",
+            question: "High severity query?",
+            expectedChunkIds: ["doc:s3:c1", "doc:s4:c1", "doc:s5:c1", "doc:s6:c1"],
+            retrievedChunkIds: ["doc:s3:c1", "doc:s4:c1", "doc:s5:c1", "doc:s6:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.88,
+          },
+          {
+            id: "q-medium",
+            question: "Medium severity query?",
+            expectedChunkIds: ["doc:s7:c1", "doc:s8:c1", "doc:s9:c1", "doc:s10:c1"],
+            retrievedChunkIds: ["doc:s7:c1", "doc:s8:c1", "doc:s9:c1", "doc:s10:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.85,
+          },
+        ],
+      },
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-critical",
+            question: "Critical query?",
+            expectedChunkIds: ["doc:s1:c1", "doc:s2:c1"],
+            retrievedChunkIds: [], // recall 0 → diff = -1.0 → critical
+            recallAtK: 0,
+            rankOfExpected: null,
+            topScore: 0.2,
+          },
+          {
+            id: "q-high",
+            question: "High severity query?",
+            expectedChunkIds: ["doc:s3:c1", "doc:s4:c1", "doc:s5:c1", "doc:s6:c1"],
+            retrievedChunkIds: ["doc:s3:c1"], // recall 0.25 → diff = -0.75 → critical too
+            recallAtK: 0.25,
+            rankOfExpected: 1,
+            topScore: 0.7,
+          },
+          {
+            id: "q-medium",
+            question: "Medium severity query?",
+            expectedChunkIds: ["doc:s7:c1", "doc:s8:c1", "doc:s9:c1", "doc:s10:c1"],
+            retrievedChunkIds: ["doc:s7:c1", "doc:s8:c1", "doc:s9:c1"], // recall 0.75 → diff = -0.25 → high
+            recallAtK: 0.75,
+            rankOfExpected: 1,
+            topScore: 0.84,
+          },
+        ],
+      },
+    });
+
+    const criticalQuery = report.queries.find((q) => q.id === "q-critical");
+    const highQuery = report.queries.find((q) => q.id === "q-high");
+    const mediumQuery = report.queries.find((q) => q.id === "q-medium");
+
+    expect(criticalQuery?.severity).toBe("critical");
+    expect(highQuery?.severity).toBe("critical");
+    expect(mediumQuery?.severity).toBe("high");
+  });
+
+  it("generates recommendations for regressions", () => {
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      previous: {
+        version: "v1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "What does hybrid retrieval blend?",
+            expectedChunkIds: ["doc:section-1:chunk-1"],
+            retrievedChunkIds: ["doc:section-1:chunk-1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.9,
+          },
+        ],
+      },
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "What does hybrid retrieval blend?",
+            expectedChunkIds: ["doc:section-1:chunk-1"],
+            retrievedChunkIds: [],
+            recallAtK: 0,
+            rankOfExpected: null,
+            topScore: 0.2,
+          },
+        ],
+      },
+    });
+
+    expect(report.recommendations.length).toBeGreaterThan(0);
+    expect(report.recommendations.some((r) => r.includes("regressed"))).toBe(true);
+    expect(report.recommendations.some((r) => r.includes("critical"))).toBe(true);
+  });
+
+  it("generates stable recommendation when index is unchanged", () => {
+    const snapshot: import("./retrieval-reliability").CorpusDriftSnapshot = {
+      version: "v1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      dataset: "phase-5-retrieval-text",
+      topK: 3,
+      queries: [
+        {
+          id: "q-1",
+          question: "What does hybrid retrieval blend?",
+          expectedChunkIds: ["doc:section-1:chunk-1"],
+          retrievedChunkIds: ["doc:section-1:chunk-1"],
+          recallAtK: 1,
+          rankOfExpected: 1,
+          topScore: 0.9,
+        },
+      ],
+    };
+
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      previous: snapshot,
+      current: { ...snapshot, createdAt: "2026-02-01T00:00:00.000Z" },
+    });
+
+    expect(report.summary.degraded).toBe(false);
+    expect(report.summary.regressions).toBe(0);
+    expect(report.summary.improvements).toBe(0);
+    expect(report.recommendations).toContain("No recall changes detected. Index is stable relative to the baseline.");
+  });
+
+  it("derives baselineId deterministically from previous snapshot", () => {
+    const previous: import("./retrieval-reliability").CorpusDriftSnapshot = {
+      version: "v1",
+      createdAt: "2026-01-15T12:00:00.000Z",
+      dataset: "phase-5-retrieval-text",
+      topK: 3,
+      queries: [],
+    };
+    const current: import("./retrieval-reliability").CorpusDriftSnapshot = {
+      version: "v1",
+      createdAt: "2026-02-01T00:00:00.000Z",
+      dataset: "phase-5-retrieval-text",
+      topK: 3,
+      queries: [],
+    };
+
+    const report1 = createCorpusDriftReport({ dataset: "phase-5-retrieval-text", previous, current });
+    const report2 = createCorpusDriftReport({ dataset: "phase-5-retrieval-text", previous, current });
+
+    // baselineId is deterministic — same inputs → same value
+    expect(report1.baselineId).toBe(report2.baselineId);
+    expect(report1.baselineId).not.toBe("no-baseline");
+    expect(report1.baselineId.length).toBe(16);
+  });
+
+  it("attaches relatedIngestion when ingestAt is supplied", () => {
+    const ingestAt = "2026-01-25T08:00:00.000Z";
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      ingestAt,
+      previous: {
+        version: "v1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "Test?",
+            expectedChunkIds: ["doc:s1:c1"],
+            retrievedChunkIds: ["doc:s1:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1,
+            topScore: 0.9,
+          },
+        ],
+      },
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 3,
+        queries: [
+          {
+            id: "q-1",
+            question: "Test?",
+            expectedChunkIds: ["doc:s1:c1"],
+            retrievedChunkIds: [],
+            recallAtK: 0,
+            rankOfExpected: null,
+            topScore: 0.2,
+          },
+        ],
+      },
+    });
+
+    expect(report.queries[0]?.relatedIngestion).toBe(ingestAt);
+  });
+
+  it("uses dataset id as indexId when no explicit indexId is provided", () => {
+    const report = createCorpusDriftReport({
+      dataset: "my-dataset",
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "my-dataset",
+        topK: 3,
+        queries: [],
+      },
+    });
+
+    expect(report.indexId).toBe("my-dataset");
+  });
+
+  it("uses provided indexId when supplied", () => {
+    const report = createCorpusDriftReport({
+      dataset: "my-dataset",
+      indexId: "custom-index-v2",
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "my-dataset",
+        topK: 3,
+        queries: [],
+      },
+    });
+
+    expect(report.indexId).toBe("custom-index-v2");
+  });
+
+  it("detects rank regression even without recall change", () => {
+    const report = createCorpusDriftReport({
+      dataset: "phase-5-retrieval-text",
+      previous: {
+        version: "v1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 5,
+        queries: [
+          {
+            id: "q-1",
+            question: "Rank order test?",
+            expectedChunkIds: ["doc:s1:c1"],
+            retrievedChunkIds: ["doc:s1:c1", "doc:s2:c1"],
+            recallAtK: 1,
+            rankOfExpected: 1, // top rank
+            topScore: 0.9,
+          },
+        ],
+      },
+      current: {
+        version: "v1",
+        createdAt: "2026-02-01T00:00:00.000Z",
+        dataset: "phase-5-retrieval-text",
+        topK: 5,
+        queries: [
+          {
+            id: "q-1",
+            question: "Rank order test?",
+            expectedChunkIds: ["doc:s1:c1"],
+            retrievedChunkIds: ["doc:s2:c1", "doc:s3:c1", "doc:s1:c1"],
+            recallAtK: 1, // recall unchanged
+            rankOfExpected: 3, // rank worsened
+            topScore: 0.88,
+          },
+        ],
+      },
+    });
+
+    expect(report.queries[0]?.status).toBe("regressed");
+    expect(report.degradedQueries).toContain("q-1");
+  });
 });

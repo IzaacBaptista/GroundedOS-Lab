@@ -1580,6 +1580,42 @@ describe("api server", () => {
     expect(body.comparedVariants.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("serves GET /rag/metrics/corpus-drift", async () => {
+    const app = await createTestServer();
+    const response = await app.inject({
+      method: "GET",
+      url: "/rag/metrics/corpus-drift",
+    });
+    const body = response.json() as {
+      version: string;
+      dataset: string;
+      driftReportId: string;
+      baselineId: string;
+      currentRunId: string;
+      indexId: string;
+      summary: { degraded: boolean; queriesEvaluated: number };
+      affectedQueries: string[];
+      degradedQueries: string[];
+      improvedQueries: string[];
+      recommendations: string[];
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.version).toBe("v1");
+    expect(body.dataset).toBeTruthy();
+    expect(body.driftReportId).toBeTruthy();
+    expect(body.baselineId).toBeTruthy();
+    expect(body.currentRunId).toBeTruthy();
+    expect(body.indexId).toBeTruthy();
+    expect(typeof body.summary.degraded).toBe("boolean");
+    expect(typeof body.summary.queriesEvaluated).toBe("number");
+    expect(Array.isArray(body.affectedQueries)).toBe(true);
+    expect(Array.isArray(body.degradedQueries)).toBe(true);
+    expect(Array.isArray(body.improvedQueries)).toBe(true);
+    expect(Array.isArray(body.recommendations)).toBe(true);
+    expect(body.recommendations.length).toBeGreaterThan(0);
+  });
+
   it("serves GET /rag/memory/:sessionId", async () => {
     const app = await createTestServer();
     const sessionId = `session-http-${Date.now()}`;

@@ -17,7 +17,7 @@ import {
   type ObservabilityMetricsSummary,
   type StructuredTraceRecord,
 } from "../../observability/trace-store";
-import type { PromptPolicyDiffReport } from "../../retrieval-reliability";
+import type { CorpusDriftReport, PromptPolicyDiffReport } from "../../retrieval-reliability";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
@@ -30,6 +30,14 @@ const DEFAULT_PROVIDERS: RagModelBenchmarkPrecheckProvider[] = [
 ];
 const DEFAULT_RUN_PROVIDERS = ["local-extractive", "ollama", "openai", "groq"];
 const execFileAsync = promisify(execFile);
+
+export interface CorpusDriftRunResponse {
+  startedAt: string;
+  finishedAt: string;
+  command: string;
+  success: boolean;
+  output: string;
+}
 
 export interface PromptPolicyDiffRunResponse {
   startedAt: string;
@@ -62,6 +70,70 @@ export class RagMetricsService {
     );
     const content = await readFile(benchmarkPath, "utf8");
     return JSON.parse(content) as RagModelBenchmarkResponse;
+  }
+
+  async getCorpusDriftReport(): Promise<CorpusDriftReport> {
+    const reportPath = join(
+      process.cwd(),
+      "datasets/golden/baselines/retrieval-drift-report.json"
+    );
+    const content = await readFile(reportPath, "utf8");
+    return JSON.parse(content) as CorpusDriftReport;
+  }
+
+  async runCorpusDrift(options?: {
+    dataset?: string;
+    topK?: number;
+    snapshotPath?: string;
+    reportPath?: string;
+  }): Promise<CorpusDriftRunResponse> {
+    const args = ["run", "benchmark:drift", "--"];
+    if (options?.dataset?.trim()) {
+      args.push("--dataset", options.dataset.trim());
+    }
+    if (typeof options?.topK === "number" && Number.isFinite(options.topK) && options.topK > 0) {
+      args.push("--top-k", String(Math.floor(options.topK)));
+    }
+    if (options?.snapshotPath?.trim()) {
+      args.push("--snapshot", options.snapshotPath.trim());
+    }
+    if (options?.reportPath?.trim()) {
+      args.push("--report", options.reportPath.trim());
+    }
+
+    const startedAt = new Date().toISOString();
+    const command = `npm ${args.join(" ")}`;
+    try {
+      const { stdout, stderr } = await execFileAsync("npm", args, {
+        cwd: process.cwd(),
+        maxBuffer: 5 * 1024 * 1024,
+        env: process.env,
+      });
+
+      return {
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        command,
+        success: true,
+        output: [stdout, stderr].filter(Boolean).join("\n"),
+      };
+    } catch (error) {
+      const execError = error as {
+        stdout?: string;
+        stderr?: string;
+        message?: string;
+      };
+
+      return {
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        command,
+        success: false,
+        output: [execError.stdout, execError.stderr, execError.message]
+          .filter(Boolean)
+          .join("\n"),
+      };
+    }
   }
 
   async getPromptPolicyDiffReport(): Promise<PromptPolicyDiffReport> {
