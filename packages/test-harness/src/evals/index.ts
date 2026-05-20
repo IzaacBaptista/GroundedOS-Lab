@@ -5,6 +5,7 @@ import type {
   EvaluatorOutput,
   GoldenDataset,
 } from "@groundedos/core";
+import { EvalReportSchema, EvalRunComparisonReportSchema } from "@groundedos/core";
 import { FaithfulnessEvaluator, RecallEvaluator, RelevanceEvaluator, type EvalInput } from "@groundedos/evals";
 
 type RetrievedChunk = EvalInput["retrievedChunks"][number];
@@ -66,9 +67,11 @@ export async function runEvalDataset(
       reason: result.reason,
       frameworkMeta: result.details,
     }));
-    const score = outputs.reduce((sum, item) => sum + item.score, 0) / outputs.length;
-    const passed = outputs.every((item) => item.passed);
+    const score =
+      outputs.length === 0 ? 0 : outputs.reduce((sum, item) => sum + item.score, 0) / outputs.length;
+    const passed = outputs.length === 0 ? false : outputs.every((item) => item.passed);
     const latencyMs = Date.now() - start;
+    const costUsd = outputs.reduce((sum, item) => sum + (item.costUsd ?? 0), 0);
 
     if (passed) {
       passCount += 1;
@@ -88,10 +91,10 @@ export async function runEvalDataset(
       score,
       passed,
       latencyMs,
-      costUsd: 0,
+      costUsd,
       metadata: entry.metadata,
     });
-    totalCostUsd += 0;
+    totalCostUsd += costUsd;
   }
 
   const summary: EvalRunSummary = {
@@ -113,11 +116,11 @@ export async function runEvalDataset(
     ),
   };
 
-  return {
+  return EvalReportSchema.parse({
     version: "v1",
     summary,
     samples,
-  };
+  });
 }
 
 export function compareEvalRuns(runA: EvalReport, runB: EvalReport): EvalRunComparisonReport {
@@ -132,7 +135,16 @@ export function compareEvalRuns(runA: EvalReport, runB: EvalReport): EvalRunComp
     ])
   );
 
-  return {
+  const retrievalDriftRateDelta =
+    runA.summary.retrievalDriftRate === undefined && runB.summary.retrievalDriftRate === undefined
+      ? undefined
+      : (runB.summary.retrievalDriftRate ?? 0) - (runA.summary.retrievalDriftRate ?? 0);
+  const hallucinationRateDelta =
+    runA.summary.hallucinationRate === undefined && runB.summary.hallucinationRate === undefined
+      ? undefined
+      : (runB.summary.hallucinationRate ?? 0) - (runA.summary.hallucinationRate ?? 0);
+
+  return EvalRunComparisonReportSchema.parse({
     version: "v1",
     baselineRunId: runA.summary.runId,
     candidateRunId: runB.summary.runId,
@@ -142,11 +154,9 @@ export function compareEvalRuns(runA: EvalReport, runB: EvalReport): EvalRunComp
       averageScore: runB.summary.averageScore - runA.summary.averageScore,
       totalCostUsd: runB.summary.totalCostUsd - runA.summary.totalCostUsd,
       totalLatencyMs: runB.summary.totalLatencyMs - runA.summary.totalLatencyMs,
-      retrievalDriftRate:
-        (runB.summary.retrievalDriftRate ?? 0) - (runA.summary.retrievalDriftRate ?? 0),
-      hallucinationRate:
-        (runB.summary.hallucinationRate ?? 0) - (runA.summary.hallucinationRate ?? 0),
+      retrievalDriftRate: retrievalDriftRateDelta,
+      hallucinationRate: hallucinationRateDelta,
     },
     metricDeltas,
-  };
+  });
 }
