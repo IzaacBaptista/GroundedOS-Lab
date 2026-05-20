@@ -61,7 +61,13 @@ export {
   type TestQueueAdapter,
 } from "./jobs";
 
-export { captureExecutionSnapshot, replayExecution, compareReplayResults } from "./replay";
+export {
+  captureExecutionSnapshot,
+  persistExecutionSnapshot,
+  loadExecutionSnapshot,
+  replayExecution,
+  compareReplayResults,
+} from "./replay";
 
 export { executeExperiment } from "./experiments";
 
