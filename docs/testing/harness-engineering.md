@@ -36,6 +36,11 @@ Harness Engineering in GroundedOS-Lab is implemented incrementally, with transve
   - `assertEmbeddingVector()`
   - `assertDeterministicEmbedding()`
   - `runProviderCompatibilitySuite()`
+- Basic RAG harness helpers in `@groundedos/test-harness`:
+  - `makeRagTestCase()`
+  - `KeywordEmbeddingProvider`
+  - `buildTestIndex()`
+  - `resetRagRuntimeState()`
 
 ## Design Rules
 

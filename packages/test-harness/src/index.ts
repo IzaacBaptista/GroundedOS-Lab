@@ -16,11 +16,14 @@ export {
 } from "./api";
 
 export {
+  makeRagTestCase,
   KeywordEmbeddingProvider,
   DeterministicEmbeddingProvider,
   makeTestDocument,
   buildTestIndex,
   resetRagRuntimeState,
+  type RagTestCase,
+  type MakeRagTestCaseOptions,
 } from "./rag";
 
 export {

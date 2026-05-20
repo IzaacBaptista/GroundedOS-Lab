@@ -8,7 +8,7 @@ import {
   askPersistedRag,
   indexRag,
 } from "../apps/api/src/rag-service";
-import { resetRagRuntimeState } from "@groundedos/test-harness";
+import { makeRagTestCase, resetRagRuntimeState } from "@groundedos/test-harness";
 import { runReplayCli } from "./replay-rag-query";
 
 const tempDirs: string[] = [];
@@ -75,20 +75,21 @@ async function createReplayFixture(): Promise<{
   const root = await mkdtemp(join(tmpdir(), "groundedos-replay-cli-test-"));
   const indexDir = join(root, "indexes");
   const observabilityDir = join(root, "observability");
+  const testCase = makeRagTestCase({
+    title: "Replay CLI Test",
+    documentId: "replay-cli-doc",
+  });
   tempDirs.push(root);
   process.env.GROUNDEDOS_OBSERVABILITY_DIR = observabilityDir;
 
   await indexRag({
-    type: "text",
-    content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-    title: "Replay CLI Test",
-    documentId: "replay-cli-doc",
+    ...testCase,
     indexDir,
   });
   const original = await askPersistedRag({
-    documentId: "replay-cli-doc",
-    query: "What explains vector search?",
-    topK: 1,
+    documentId: testCase.documentId,
+    query: testCase.query,
+    topK: testCase.topK,
     indexDir,
   });
 

@@ -29,6 +29,34 @@ export class KeywordEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
+export interface RagTestCase {
+  type: "text";
+  content: string;
+  query: string;
+  title: string;
+  documentId: string;
+  topK: number;
+}
+
+export interface MakeRagTestCaseOptions {
+  content?: string;
+  query?: string;
+  title?: string;
+  documentId?: string;
+  topK?: number;
+}
+
+export function makeRagTestCase(options: MakeRagTestCaseOptions = {}): RagTestCase {
+  return {
+    type: "text",
+    content: options.content ?? "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+    query: options.query ?? "What explains vector search?",
+    title: options.title ?? "RAG Harness Test",
+    documentId: options.documentId ?? "rag-test-doc",
+    topK: options.topK ?? 1,
+  };
+}
+
 export interface MakeTestDocumentOptions {
   metadata?: Record<string, unknown>;
   documentId?: string;

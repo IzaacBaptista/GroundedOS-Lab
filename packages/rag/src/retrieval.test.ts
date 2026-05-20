@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { ingest } from "@groundedos/etl";
+import { KeywordEmbeddingProvider } from "@groundedos/test-harness";
 
 import {
   DeterministicEmbeddingProvider,
   type EmbeddedChunk,
   type EmbeddingProvider,
-  type EmbeddingVector,
 } from "./embeddings";
 import { InMemoryVectorStore } from "./vector-store";
 import {
@@ -15,23 +15,6 @@ import {
   retrieveFromIndex,
   type RetrievalIndex,
 } from "./retrieval";
-
-class KeywordEmbeddingProvider implements EmbeddingProvider {
-  readonly name = "keyword-test-provider";
-  readonly dimensions = 3;
-
-  async embedTexts(texts: string[]): Promise<EmbeddingVector[]> {
-    return texts.map((text) => {
-      const normalized = text.toLowerCase();
-
-      return [
-        normalized.includes("alpha") ? 1 : 0,
-        normalized.includes("beta") ? 1 : 0,
-        normalized.includes("gamma") ? 1 : 0,
-      ];
-    });
-  }
-}
 
 describe("retrieval flow", () => {
   it("indexes an ingested document and retrieves the most relevant chunk", async () => {
