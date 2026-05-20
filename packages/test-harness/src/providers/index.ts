@@ -6,6 +6,39 @@ export interface ProviderSuiteResult {
   details?: Record<string, unknown>;
 }
 
+export interface ProviderTestCase {
+  caseId: string;
+  sampleTexts: string[];
+  expectedDimensions: number;
+  providerA: EmbeddingProvider;
+  providerB?: EmbeddingProvider;
+}
+
+export interface MakeProviderTestCaseOptions {
+  caseId?: string;
+  sampleTexts?: string[];
+  expectedDimensions?: number;
+  providerB?: EmbeddingProvider;
+}
+
+export function makeProviderTestCase(
+  providerA: EmbeddingProvider,
+  options: MakeProviderTestCaseOptions = {}
+): ProviderTestCase {
+  const sampleTexts =
+    options.sampleTexts && options.sampleTexts.length > 0
+      ? options.sampleTexts
+      : ["alpha beta gamma"];
+
+  return {
+    caseId: options.caseId ?? `provider-case:${providerA.name}`,
+    sampleTexts,
+    expectedDimensions: options.expectedDimensions ?? providerA.dimensions,
+    providerA,
+    providerB: options.providerB,
+  };
+}
+
 export function assertEmbeddingVector(
   vector: number[],
   options: { expectedDimensions?: number } = {}

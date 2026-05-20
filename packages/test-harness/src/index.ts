@@ -24,12 +24,15 @@ export {
 } from "./rag";
 
 export {
+  makeProviderTestCase,
   assertEmbeddingVector,
   assertDeterministicEmbedding,
   runProviderDeterminismSuite,
   runProviderSemanticSuite,
   runProviderCompatibilitySuite,
   generateEmbeddingSnapshot,
+  type ProviderTestCase,
+  type MakeProviderTestCaseOptions,
 } from "./providers";
 
 export {

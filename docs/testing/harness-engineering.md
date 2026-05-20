@@ -32,6 +32,7 @@ Harness Engineering in GroundedOS-Lab is implemented incrementally, with transve
 - Minimal fixture dataset:
   - `datasets/golden/harness-smoke-v1/dataset.json`
 - Basic provider harness helpers in `@groundedos/test-harness`:
+  - `makeProviderTestCase()`
   - `assertEmbeddingVector()`
   - `assertDeterministicEmbedding()`
   - `runProviderCompatibilitySuite()`
