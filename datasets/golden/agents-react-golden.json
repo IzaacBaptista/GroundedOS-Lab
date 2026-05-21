@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "description": "Golden task dataset for evaluating the ReAct loop (FASE A+B). Each task tests a specific aspect of the reasoning loop: tool selection accuracy, termination quality, and answer groundedness.",
+  "entries": [
+    {
+      "id": "react-001",
+      "category": "tool-selection",
+      "query": "What are the main components of a RAG pipeline?",
+      "index_id": "groundedos-docs",
+      "expected_termination_reason": "completed",
+      "expected_tool_calls": ["retrieve-from-index", "summarize-with-context"],
+      "expected_answer_contains": ["retrieval", "chunking", "embedding"],
+      "max_steps": 5,
+      "notes": "Should call retrieve tool then summarize. Direct answer without retrieval is ungrounded and should fail grounding check."
+    },
+    {
+      "id": "react-002",
+      "category": "direct-answer",
+      "query": "What is 42 in hexadecimal?",
+      "index_id": null,
+      "expected_termination_reason": "completed",
+      "expected_tool_calls": [],
+      "expected_answer_contains": ["2A", "0x2A"],
+      "max_steps": 3,
+      "notes": "Simple factual question that should not require tool calls. Tests that the agent correctly identifies no-tool scenarios."
+    },
+    {
+      "id": "react-003",
+      "category": "loop-termination",
+      "query": "Search for everything about AI over and over",
+      "index_id": "groundedos-docs",
+      "expected_termination_reason": "repetitive-loop",
+      "expected_tool_calls": ["retrieve-from-index"],
+      "expected_answer_contains": [],
+      "max_steps": 10,
+      "notes": "Tests that the repetitive-loop detection fires when the same tool+input combination is used repeatedly."
+    },
+    {
+      "id": "react-004",
+      "category": "tool-failure-recovery",
+      "query": "Retrieve documents from a non-existent index",
+      "index_id": "non-existent-index-xyz",
+      "expected_termination_reason": "tool-failure",
+      "expected_tool_calls": ["retrieve-from-index"],
+      "expected_answer_contains": [],
+      "max_steps": 5,
+      "notes": "Tests graceful handling when the retrieval tool fails. Should not crash the loop."
+    },
+    {
+      "id": "react-005",
+      "category": "max-steps",
+      "query": "Perform a multi-step research task requiring many tool calls",
+      "index_id": "groundedos-docs",
+      "expected_termination_reason": "max-steps-reached",
+      "expected_tool_calls": ["retrieve-from-index"],
+      "expected_answer_contains": [],
+      "max_steps": 2,
+      "notes": "With maxSteps=2 the loop should terminate before completing. Tests max-steps boundary."
+    },
+    {
+      "id": "react-006",
+      "category": "answer-groundedness",
+      "query": "Explain the DocumentQAAgent implementation",
+      "index_id": "groundedos-docs",
+      "expected_termination_reason": "completed",
+      "expected_tool_calls": ["retrieve-from-index", "summarize-with-context"],
+      "expected_answer_contains": ["DocumentQAAgent", "BaseAgent"],
+      "max_steps": 5,
+      "notes": "Answer must be grounded in retrieved document content, not hallucinated."
+    },
+    {
+      "id": "react-007",
+      "category": "dev-mode-trace",
+      "query": "What safety guardrails are implemented?",
+      "index_id": "groundedos-docs",
+      "expected_termination_reason": "completed",
+      "expected_tool_calls": ["retrieve-from-index"],
+      "expected_answer_contains": ["guardrail", "safety"],
+      "max_steps": 5,
+      "dev_mode": true,
+      "notes": "With devMode=true the response must include a sanitized ReAct trace (no raw chain-of-thought)."
+    }
+  ],
+  "evaluation_metrics": {
+    "task_success_rate": {
+      "description": "Fraction of tasks where terminationReason matches expected_termination_reason",
+      "target": 0.85
+    },
+    "tool_selection_accuracy": {
+      "description": "Fraction of tasks where the correct tools were called in the correct order",
+      "target": 0.80
+    },
+    "unnecessary_tool_calls": {
+      "description": "Average number of tool calls beyond the minimum required",
+      "target_max": 1.0
+    },
+    "loop_termination_quality": {
+      "description": "Fraction of loop-termination tasks where the correct termination reason was triggered",
+      "target": 0.90
+    },
+    "answer_groundedness": {
+      "description": "Fraction of completed tasks where expected_answer_contains terms appear in the answer",
+      "target": 0.80
+    }
+  }
+}

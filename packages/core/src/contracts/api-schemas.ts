@@ -76,6 +76,189 @@ export const AgentExecuteResponseSchema = z.object({
 export type AgentExecuteResponse = z.infer<typeof AgentExecuteResponseSchema>;
 
 // ---------------------------------------------------------------------------
+// Agent endpoint — POST /agents/react
+// ---------------------------------------------------------------------------
+
+export const AgentReActRequestSchema = z
+  .object({
+    /** Natural language query to answer via the ReAct loop. */
+    query: z.string().min(1, "query must be a non-empty string"),
+    /** Persisted index document ID to query against. */
+    indexId: z.string().optional(),
+    /** Session ID for memory recall across turns. */
+    sessionId: z.string().optional(),
+    /** Maximum number of ReAct steps. */
+    maxSteps: z.number().int().positive().max(20).optional(),
+    /** Maximum total run time in milliseconds. */
+    maxLatencyMs: z.number().int().positive().optional(),
+    /** Per-tool timeout in milliseconds. */
+    toolTimeoutMs: z.number().int().positive().optional(),
+    /** Minimum confidence threshold to continue loop (0–1). */
+    minConfidenceThreshold: z.number().min(0).max(1).optional(),
+    /** Comma-separated list of allowed tool names. */
+    allowedTools: z.array(z.string()).optional(),
+    /** When true the response includes the full ReAct trace. */
+    devMode: z.boolean().optional(),
+  })
+  .strict();
+
+export type AgentReActRequest = z.infer<typeof AgentReActRequestSchema>;
+
+export const AgentReActResponseSchema = z.object({
+  success: z.boolean(),
+  answer: z.string().optional(),
+  sources: z.array(z.string()),
+  terminationReason: z.string(),
+  totalSteps: z.number(),
+  totalDurationMs: z.number(),
+  devMode: z
+    .object({
+      steps: z.array(
+        z.object({
+          stepId: z.string(),
+          stepNumber: z.number(),
+          type: z.string(),
+          content: z.string(),
+          confidence: z.number().optional(),
+          timestamp: z.number(),
+          durationMs: z.number().optional(),
+        }),
+      ),
+      confidencePerStep: z.array(z.number()),
+      terminationReason: z.string(),
+      toolCallCount: z.number(),
+      uniqueToolsUsed: z.array(z.string()),
+      loopDetected: z.boolean(),
+    })
+    .optional(),
+  error: z.string().optional(),
+});
+
+export type AgentReActResponse = z.infer<typeof AgentReActResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Agent endpoint — POST /agents/multi
+// ---------------------------------------------------------------------------
+
+export const AgentMultiRequestSchema = z
+  .object({
+    /** Natural language query to answer via multi-agent pipeline. */
+    query: z.string().min(1, "query must be a non-empty string"),
+    /** Persisted index document ID. */
+    indexId: z.string().optional(),
+    /** Session ID. */
+    sessionId: z.string().optional(),
+    /** Maximum steps across all agents. */
+    maxSteps: z.number().int().positive().max(40).optional(),
+    /** Global timeout in milliseconds. */
+    maxLatencyMs: z.number().int().positive().optional(),
+    /** When true the response includes multi-agent traces. */
+    devMode: z.boolean().optional(),
+  })
+  .strict();
+
+export type AgentMultiRequest = z.infer<typeof AgentMultiRequestSchema>;
+
+export const AgentMultiResponseSchema = z.object({
+  success: z.boolean(),
+  answer: z.string().optional(),
+  sources: z.array(z.string()),
+  totalDurationMs: z.number(),
+  devMode: z
+    .object({
+      agents: z.array(
+        z.object({
+          agentId: z.string(),
+          agentName: z.string(),
+          role: z.string(),
+          activatedAt: z.number(),
+          completedAt: z.number().optional(),
+          stepsExecuted: z.number(),
+        }),
+      ),
+      handoffs: z.array(
+        z.object({
+          from: z.string(),
+          to: z.string(),
+          reason: z.string(),
+          evidenceCount: z.number(),
+          status: z.string(),
+        }),
+      ),
+      decisions: z.array(
+        z.object({
+          decisionId: z.string(),
+          agentId: z.string(),
+          description: z.string(),
+          rationale: z.string(),
+          timestamp: z.number(),
+          outcome: z.string().optional(),
+        }),
+      ),
+      criticalGaps: z.array(z.string()),
+      evidenceSummary: z.array(z.string()),
+    })
+    .optional(),
+  error: z.string().optional(),
+});
+
+export type AgentMultiResponse = z.infer<typeof AgentMultiResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Agent endpoint — POST /agents/plan
+// ---------------------------------------------------------------------------
+
+export const AgentPlanRequestSchema = z
+  .object({
+    /** Natural language objective for the planner. */
+    query: z.string().min(1, "query must be a non-empty string"),
+    /** Persisted index document ID. */
+    indexId: z.string().optional(),
+    /** Session ID. */
+    sessionId: z.string().optional(),
+    /** Planning strategy to use. */
+    planningStrategy: z.enum(["plan-and-execute", "tree-of-plans"]).optional(),
+    /** Maximum steps for the plan executor. */
+    maxSteps: z.number().int().positive().max(40).optional(),
+    /** Maximum cost in USD. */
+    maxCostUsd: z.number().positive().optional(),
+    /** Global timeout in milliseconds. */
+    maxLatencyMs: z.number().int().positive().optional(),
+    /** When true the response includes the planning trace. */
+    devMode: z.boolean().optional(),
+  })
+  .strict();
+
+export type AgentPlanRequest = z.infer<typeof AgentPlanRequestSchema>;
+
+export const AgentPlanResponseSchema = z.object({
+  success: z.boolean(),
+  answer: z.string().optional(),
+  sources: z.array(z.string()),
+  planId: z.string().optional(),
+  totalDurationMs: z.number(),
+  replanCount: z.number(),
+  devMode: z
+    .object({
+      plan: z.record(z.string(), z.unknown()).optional(),
+      events: z.array(
+        z.object({
+          eventId: z.string(),
+          type: z.string(),
+          nodeId: z.string().optional(),
+          description: z.string(),
+          timestamp: z.number(),
+        }),
+      ),
+      planEvaluation: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
+  error: z.string().optional(),
+});
+
+export type AgentPlanResponse = z.infer<typeof AgentPlanResponseSchema>;
+
+// ---------------------------------------------------------------------------
 // RAG endpoints — POST /rag/ask  (JSON body only; multipart is separate)
 // ---------------------------------------------------------------------------
 

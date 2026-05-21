@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "description": "Golden task dataset for evaluating the multi-agent pipeline (FASE C+D). Tests handoff quality, evidence preservation, critic usefulness, and final answer improvement over single-agent runs.",
+  "entries": [
+    {
+      "id": "multi-001",
+      "category": "handoff-quality",
+      "query": "Explain the architecture of GroundedOS Lab",
+      "index_id": "groundedos-docs",
+      "expected_agents": ["planner-agent", "researcher-agent", "critic-agent", "synthesizer-agent"],
+      "expected_handoff_count": 3,
+      "expected_answer_contains": ["agent", "RAG", "pipeline"],
+      "notes": "Full four-agent pipeline must execute. Each handoff should carry forward accumulated evidence."
+    },
+    {
+      "id": "multi-002",
+      "category": "evidence-preservation",
+      "query": "What observability features does the system have?",
+      "index_id": "groundedos-docs",
+      "expected_agents": ["researcher-agent", "critic-agent", "synthesizer-agent"],
+      "expected_min_evidence_items": 1,
+      "expected_answer_contains": ["trace", "observability"],
+      "notes": "Evidence collected by ResearcherAgent must be visible in the final MultiAgentTrace."
+    },
+    {
+      "id": "multi-003",
+      "category": "critic-usefulness",
+      "query": "What are the limitations of the current agent implementation?",
+      "index_id": "groundedos-docs",
+      "expected_agents": ["critic-agent"],
+      "expected_critic_fields": ["qualityScore", "gaps", "issues", "suggestions"],
+      "notes": "CriticAgent must produce a structured critique with gaps and improvement suggestions."
+    },
+    {
+      "id": "multi-004",
+      "category": "final-answer-improvement",
+      "query": "Describe the safety guardrails in detail",
+      "index_id": "groundedos-docs",
+      "expected_agents": ["planner-agent", "researcher-agent", "critic-agent", "synthesizer-agent"],
+      "expected_answer_contains": ["guardrail", "safety", "blocked"],
+      "compare_with_single_agent": true,
+      "notes": "Multi-agent answer should be more complete than a single DocumentQAAgent answer on the same query."
+    },
+    {
+      "id": "multi-005",
+      "category": "dev-mode-trace",
+      "query": "How does the RAG retrieval pipeline work?",
+      "index_id": "groundedos-docs",
+      "dev_mode": true,
+      "expected_dev_mode_fields": ["agents", "handoffs", "decisions", "criticalGaps", "evidenceSummary"],
+      "notes": "With devMode=true the MultiAgentTrace must include the full dev mode trace (sanitized)."
+    },
+    {
+      "id": "multi-006",
+      "category": "handoff-auditability",
+      "query": "What tools are available in the agent tool registry?",
+      "index_id": "groundedos-docs",
+      "expected_handoff_fields": ["handoffId", "fromAgentId", "toAgentId", "task", "context", "reasonForHandoff", "expectedOutput", "status", "createdAt"],
+      "notes": "Every handoff must contain the required protocol fields for auditability and replay."
+    }
+  ],
+  "evaluation_metrics": {
+    "handoff_quality": {
+      "description": "Fraction of handoffs that contain all required protocol fields",
+      "target": 1.0
+    },
+    "evidence_preservation": {
+      "description": "Fraction of tasks where evidence collected by ResearcherAgent appears in final trace",
+      "target": 0.90
+    },
+    "critic_usefulness": {
+      "description": "Fraction of tasks where CriticAgent identifies at least one gap or issue",
+      "target": 0.70
+    },
+    "final_answer_improvement": {
+      "description": "Fraction of tasks where multi-agent answer scores higher on groundedness than single-agent",
+      "target": 0.70
+    },
+    "pipeline_completion_rate": {
+      "description": "Fraction of tasks where all four agents execute successfully",
+      "target": 0.90
+    }
+  }
+}
