@@ -1,6 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
+import { readFile, writeFile } from "fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -14,24 +12,21 @@ import {
   indexRag,
   listPersistedRagIndexes,
   replayRagFromSnapshot,
-  resetRagRuntimeStateForTests,
 } from "./rag-service";
+import { makeRagTestCase, resetRagRuntimeState, createTempDir } from "@groundedos/test-harness";
 
 beforeEach(async () => {
-  await resetRagRuntimeStateForTests();
+  await resetRagRuntimeState();
 });
 
 describe("askRag", () => {
   it("answers a grounded question against inline text", async () => {
-    const output = await askRag({
-      type: "text",
-      content:
-        "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-      query: "What explains vector search?",
-      title: "Inline API Test",
-      documentId: "api-test-doc",
-      topK: 1,
-    });
+    const output = await askRag(
+      makeRagTestCase({
+        title: "Inline API Test",
+        documentId: "api-test-doc",
+      })
+    );
 
     expect(output.document).toMatchObject({
       documentId: "api-test-doc",
@@ -116,14 +111,10 @@ describe("askRag", () => {
   });
 
   it("returns a semantic cache hit on repeated equivalent requests", async () => {
-    const request = {
-      type: "text" as const,
-      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-      query: "What explains vector search?",
+    const request = makeRagTestCase({
       title: "Cache API Test",
       documentId: "api-cache-doc",
-      topK: 1,
-    };
+    });
 
     const first = await askRag(request);
     const second = await askRag(request);
@@ -134,14 +125,12 @@ describe("askRag", () => {
   });
 
   it("records trade-off metrics for dashboard aggregation", async () => {
-    await askRag({
-      type: "text",
-      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-      query: "What explains vector search?",
-      title: "Metrics API Test",
-      documentId: "api-metrics-doc",
-      topK: 1,
-    });
+    await askRag(
+      makeRagTestCase({
+        title: "Metrics API Test",
+        documentId: "api-metrics-doc",
+      })
+    );
 
     const metrics = getRagTradeoffMetrics();
 
@@ -152,24 +141,20 @@ describe("askRag", () => {
 
   it("stores and recalls session memory when sessionId is provided", async () => {
     const first = await askRag({
-      type: "text",
-      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-      query: "What explains vector search?",
-      title: "Memory API Test",
-      documentId: "api-memory-doc",
-      topK: 1,
+      ...makeRagTestCase({
+        title: "Memory API Test",
+        documentId: "api-memory-doc",
+      }),
       sessionId: "session-memory-1",
     });
 
     expect(first.devMode.memory?.stored).toBe(true);
 
     const second = await askRag({
-      type: "text",
-      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-      query: "What explains vector search?",
-      title: "Memory API Test",
-      documentId: "api-memory-doc",
-      topK: 1,
+      ...makeRagTestCase({
+        title: "Memory API Test",
+        documentId: "api-memory-doc",
+      }),
       sessionId: "session-memory-1",
     });
 
@@ -210,14 +195,13 @@ describe("askRag", () => {
   });
 
   it("classifies missing evidence as not found", async () => {
-    const output = await askRag({
-      type: "text",
-      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-      query: "What does the GPU cluster autoscaler do?",
-      title: "Missing Evidence Test",
-      documentId: "missing-evidence-doc",
-      topK: 1,
-    });
+    const output = await askRag(
+      makeRagTestCase({
+        query: "What does the GPU cluster autoscaler do?",
+        title: "Missing Evidence Test",
+        documentId: "missing-evidence-doc",
+      })
+    );
 
     expect(output.devMode.evals?.taxonomy?.category).toBe("NOT_FOUND");
     expect(output.devMode.evals?.confidence?.confidenceLevel).toMatch(/LOW|UNRELIABLE/);
@@ -250,14 +234,13 @@ describe("askRagFromFile", () => {
 describe("persisted RAG indexes", () => {
   it("indexes inline text and answers later by documentId", async () => {
     const indexDir = await createTempIndexDir();
+    const testCase = makeRagTestCase({
+      title: "Persisted API Test",
+      documentId: "persisted-api-test",
+    });
 
-    try {
-      const indexed = await indexRag({
-        type: "text",
-        content:
-          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-        title: "Persisted API Test",
-        documentId: "persisted-api-test",
+    const indexed = await indexRag({
+        ...testCase,
         indexDir,
       });
 
@@ -279,9 +262,9 @@ describe("persisted RAG indexes", () => {
       expect(indexed.storage.indexPath).toContain("groundedos-api-index-test-");
 
       const output = await askRag({
-        documentId: "persisted-api-test",
-        query: "What explains vector search?",
-        topK: 1,
+        documentId: testCase.documentId,
+        query: testCase.query,
+        topK: testCase.topK,
         indexDir,
       });
 
@@ -293,28 +276,24 @@ describe("persisted RAG indexes", () => {
       expect(output.devMode.results[0]?.chunkId).toBe(
         "persisted-api-test:section-2:chunk-1"
       );
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("replays a persisted snapshot with stable output", async () => {
     const indexDir = await createTempIndexDir();
+    const testCase = makeRagTestCase({
+      title: "Replay Persisted API Test",
+      documentId: "persisted-replay-test",
+    });
 
-    try {
-      await indexRag({
-        type: "text",
-        content:
-          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-        title: "Replay Persisted API Test",
-        documentId: "persisted-replay-test",
+    await indexRag({
+        ...testCase,
         indexDir,
       });
 
       const original = await askPersistedRag({
-        documentId: "persisted-replay-test",
-        query: "What explains vector search?",
-        topK: 1,
+        documentId: testCase.documentId,
+        query: testCase.query,
+        topK: testCase.topK,
         indexDir,
       });
       const replay = await replayRagFromSnapshot(original.devMode.replay!.snapshot);
@@ -323,21 +302,17 @@ describe("persisted RAG indexes", () => {
       expect(replay.report.status).toBe("matched");
       expect(replay.report.differences.retrievalChanged).toBe(false);
       expect(replay.report.differences.responseChanged).toBe(false);
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("indexes with local-hash and answers later using the persisted provider", async () => {
     const indexDir = await createTempIndexDir();
+    const testCase = makeRagTestCase({
+      title: "Local Hash API Test",
+      documentId: "local-hash-api-test",
+    });
 
-    try {
-      const indexed = await indexRag({
-        type: "text",
-        content:
-          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-        title: "Local Hash API Test",
-        documentId: "local-hash-api-test",
+    const indexed = await indexRag({
+        ...testCase,
         embeddingProvider: "local-hash",
         indexDir,
       });
@@ -355,9 +330,9 @@ describe("persisted RAG indexes", () => {
       });
 
       const output = await askRag({
-        documentId: "local-hash-api-test",
-        query: "What explains vector search?",
-        topK: 1,
+        documentId: testCase.documentId,
+        query: testCase.query,
+        topK: testCase.topK,
         embeddingProvider: "api-lexical",
         indexDir,
       });
@@ -378,21 +353,17 @@ describe("persisted RAG indexes", () => {
           model: "local-hash-v1",
         },
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("continues to read older api-lexical indexes without embeddingModel", async () => {
     const indexDir = await createTempIndexDir();
+    const testCase = makeRagTestCase({
+      title: "Legacy API Test",
+      documentId: "legacy-api-test",
+    });
 
-    try {
-      const indexed = await indexRag({
-        type: "text",
-        content:
-          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
-        title: "Legacy API Test",
-        documentId: "legacy-api-test",
+    const indexed = await indexRag({
+        ...testCase,
         indexDir,
       });
       const raw = JSON.parse(await readFile(indexed.storage.indexPath, "utf-8")) as {
@@ -405,9 +376,9 @@ describe("persisted RAG indexes", () => {
       await writeFile(indexed.storage.indexPath, `${JSON.stringify(raw, null, 2)}\n`, "utf-8");
 
       const output = await askRag({
-        documentId: "legacy-api-test",
-        query: "What explains vector search?",
-        topK: 1,
+        documentId: testCase.documentId,
+        query: testCase.query,
+        topK: testCase.topK,
         indexDir,
       });
 
@@ -421,9 +392,6 @@ describe("persisted RAG indexes", () => {
       });
       expect(output.answer.grounded).toBe(true);
       expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("can index and ask with the Ollama provider when configured", async () => {
@@ -471,7 +439,6 @@ describe("persisted RAG indexes", () => {
       expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
     } finally {
       globalThis.fetch = originalFetch;
-      await rm(indexDir, { recursive: true, force: true });
     }
   });
 
@@ -527,15 +494,13 @@ describe("persisted RAG indexes", () => {
       } else {
         process.env.OPENAI_API_KEY = originalApiKey;
       }
-      await rm(indexDir, { recursive: true, force: true });
     }
   });
 
   it("lists and deletes persisted indexes", async () => {
     const indexDir = await createTempIndexDir();
 
-    try {
-      await indexRag({
+    await indexRag({
         type: "text",
         content:
           "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
@@ -583,16 +548,12 @@ describe("persisted RAG indexes", () => {
         count: 0,
         indexes: [],
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("returns a typed not found error for missing persisted indexes", async () => {
     const indexDir = await createTempIndexDir();
 
-    try {
-      await expect(
+    await expect(
         askRag({
           documentId: "missing-index",
           query: "What is indexed?",
@@ -602,16 +563,12 @@ describe("persisted RAG indexes", () => {
         statusCode: 404,
         message: 'No persisted RAG index found for documentId "missing-index".',
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 
   it("isolates persisted retrieval by tenant and user ownership", async () => {
     const indexDir = await createTempIndexDir();
 
-    try {
-      await indexRag({
+    await indexRag({
         type: "text",
         content: "Tenant A private document.",
         title: "Tenant A",
@@ -638,14 +595,11 @@ describe("persisted RAG indexes", () => {
       ).resolves.toMatchObject({
         count: 0,
       });
-    } finally {
-      await rm(indexDir, { recursive: true, force: true });
-    }
   });
 });
 
 async function createTempIndexDir(): Promise<string> {
-  return await mkdtemp(join(tmpdir(), "groundedos-api-index-test-"));
+  return await createTempDir("groundedos-api-index-test-");
 }
 
 function createFakeOllamaFetch(): typeof fetch {

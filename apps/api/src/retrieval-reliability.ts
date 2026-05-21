@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import { resolve } from "path";
+import type {
+  ExecutionSnapshot as ReplaySnapshot,
+  ReplayComparisonReport,
+} from "@groundedos/core";
 
 export type RetrievalFailureCategory =
   | "NOT_FOUND"
@@ -90,139 +94,7 @@ export interface ConfidenceCalibration {
   };
 }
 
-export interface ReplaySnapshot {
-  version: "v1";
-  capturedAt: string;
-  mode: "inline" | "persisted";
-  query: string;
-  correlation: {
-    requestId?: string;
-    sessionId?: string;
-    traceId?: string;
-  };
-  document: {
-    documentId: string;
-    title?: string;
-    checksum?: string;
-    persisted: boolean;
-    indexPath?: string;
-    originalFilename?: string;
-  };
-  indexRef: {
-    indexId: string;
-    indexVersion?: string;
-    snapshotId?: string;
-  };
-  parameters: {
-    topK: number;
-    reasoningEnabled: boolean;
-    useMultiModelOrchestration: boolean;
-    enableShadowRetrieval: boolean;
-  };
-  retrievalConfig: {
-    mode: string;
-    candidateCount: number;
-    returnedCount: number;
-    rerankingApplied: boolean;
-  };
-  providers: {
-    embeddingProvider: string;
-    embeddingModel?: string;
-    selectedModel?: string;
-    selectedProvider?: string;
-  };
-  generation: {
-    strategy: "extractive-grounded";
-    deterministic: boolean;
-    config: {
-      temperature: 0;
-      topP: 1;
-      maxTokens?: number;
-    };
-  };
-  prompts: {
-    systemPrompt: string;
-    answerPolicy: string;
-  };
-  policies: {
-    groundingPolicy: string;
-    refusalPolicy: string;
-    citationPolicy: string;
-  };
-  chunks: Array<{
-    chunkId: string;
-    sectionId: string;
-    rank: number;
-    score: number;
-    text: string;
-    textHash: string;
-    textPreview: string;
-  }>;
-  rerankingConfig: {
-    applied: boolean;
-    candidateCount: number;
-    returnedCount: number;
-  };
-  reranking: Array<{
-    chunkId: string;
-    beforeRank: number;
-    afterRank: number;
-    finalScore: number;
-  }>;
-  original: {
-    answer: {
-      text: string;
-      grounded: boolean;
-      citations: Array<{
-        chunkId: string;
-        documentId: string;
-        sectionId: string;
-      }>;
-    };
-    costUsd?: number;
-    latencyMs?: number;
-    groundedness?: number;
-  };
-  environment: {
-    runtime: "node";
-    nodeVersion: string;
-    platform: NodeJS.Platform;
-    nodeEnv?: string;
-  };
-}
-
-export interface ReplayComparisonReport {
-  version: "v1";
-  replayId: string;
-  originalTraceId?: string;
-  createdAt: string;
-  status: "matched" | "diverged" | "error";
-  original: ReplaySnapshot;
-  replay: ReplaySnapshot;
-  differences: {
-    responseChanged: boolean;
-    retrievalChanged: boolean;
-    chunkOrderChanged: boolean;
-    scoresChanged: boolean;
-    groundednessChanged: boolean;
-    modelChanged: boolean;
-    providerChanged: boolean;
-    embeddingProviderChanged: boolean;
-    costDeltaUsd: number;
-    latencyDeltaMs: number;
-    addedChunkIds: string[];
-    removedChunkIds: string[];
-    reorderedChunkIds: string[];
-    scoreDeltas: Array<{
-      chunkId: string;
-      originalScore?: number;
-      replayScore?: number;
-      delta?: number;
-    }>;
-  };
-  errors: string[];
-  summary: string[];
-}
+export type { ReplaySnapshot, ReplayComparisonReport };
 
 export interface CorpusDriftQuerySnapshot {
   id: string;

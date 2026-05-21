@@ -30,7 +30,7 @@ Copy the block below when creating a new concept file. Every heading is required
 
 | Package / Location | How it uses the concept |
 |---|---|
-| [`packages/<name>`](../../packages/<name>/README.md) | <One-line description of the usage.> |
+| [`packages/<name>`](../../packages/) | <One-line description of the usage.> |
 
 ## Trade-offs
 

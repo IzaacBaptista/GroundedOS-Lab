@@ -25,3 +25,48 @@ export type {
   ApiValidationErrorItem,
   ApiErrorEnvelope,
 } from "./api-schemas";
+
+export {
+  ExecutionSnapshotSchema,
+  ReplayComparisonReportSchema,
+} from "./replay-schemas";
+
+export type {
+  ExecutionSnapshot,
+  ReplaySnapshot,
+  ReplayComparisonReport,
+  ReplayComparisonResult,
+} from "./replay-schemas";
+
+export {
+  EvaluatorOutputSchema,
+  EvalRunSampleSchema,
+  EvalRunSummarySchema,
+  EvalReportSchema,
+  EvalRunComparisonReportSchema,
+  EvalMetricResultSchema,
+  EvalRunResultSchema,
+} from "./eval-schemas";
+
+export type {
+  EvaluatorOutput,
+  EvalRunSample,
+  EvalRunSummary,
+  EvalReport,
+  EvalRunComparisonReport,
+  EvalMetricResult,
+  EvalRunResult,
+} from "./eval-schemas";
+
+export { ExperimentRunMetadataSchema } from "./experiment-schemas";
+export type { ExperimentRunMetadata } from "./experiment-schemas";
+
+export { DatasetEntrySchema, DatasetSchema } from "./dataset-schemas";
+export { loadGoldenDataset } from "./dataset-loader";
+
+export type {
+  DatasetEntry,
+  DatasetSchemaType,
+  GoldenDataset,
+  GoldenDatasetItem,
+} from "./dataset-schemas";

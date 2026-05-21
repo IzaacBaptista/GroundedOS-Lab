@@ -66,6 +66,7 @@
 - API exposes `POST /agents/execute` for `document-qa`
 - `@groundedos/safety` includes prompt-injection, PII, jailbreak, hallucination, prompt-leakage and indirect-injection guardrails
 - `@groundedos/evals` includes faithfulness, relevance and recall evaluators
+- `@groundedos/test-harness` provides first-slice reusable helpers for provider, RAG, eval, agent, jobs, replay and experiment harness flows
 
 ### Phase 4 — Lab ✅ Complete
 
@@ -192,6 +193,14 @@ npm run web:dev
 ```
 
 Both CLI commands print a JSON response with the query, a grounded answer, retrieved chunk IDs, scores, source metadata and offsets. See [docs/phase-1-local-rag.md](./docs/phase-1-local-rag.md) for the full usage guide.
+
+Quick harness smoke check:
+
+```bash
+npm run eval:harness
+```
+
+This command runs a minimal deterministic eval harness pipeline and prints a compact report summary.
 
 ---
 

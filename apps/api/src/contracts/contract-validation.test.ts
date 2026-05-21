@@ -10,23 +10,10 @@
  * - Error codes are consistent with HTTP status codes.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
-import type { NestFastifyApplication } from "@nestjs/platform-fastify";
-import { createApiServer } from "../server";
-
-const servers: NestFastifyApplication[] = [];
+import { describe, expect, it } from "vitest";
+import { createTestServer } from "@groundedos/test-harness";
 
 process.env.AUTH_ENFORCEMENT = "false";
-
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((s) => s.close()));
-});
-
-async function createTestServer(): Promise<NestFastifyApplication> {
-  const server = await createApiServer();
-  servers.push(server);
-  return server;
-}
 
 // ---------------------------------------------------------------------------
 // Error envelope contract
