@@ -71,7 +71,9 @@ export {
   createRetrievalDevOutput,
   retrieveForDevMode,
   retrieveFromIndex,
+  type AdaptiveRoutingTrace,
   type BuildRetrievalIndexOptions,
+  type GraphRetrievalTrace,
   type RetrievalDevModeOutput,
   type RetrievalDevModeResult,
   type RetrievalIndex,
@@ -79,6 +81,18 @@ export {
   type RetrievalResult,
   type RetrieveFromIndexOptions,
 } from "./retrieval";
+
+export {
+  buildHypotheticalDocument,
+  buildRaptorTree,
+  retrieveFromRaptorTree,
+  type ClusterSummary,
+  type HyDETrace,
+  type RetrievalFusionTrace,
+  type RaptorNode,
+  type RaptorTrace,
+  type RaptorTree,
+} from "./advanced-retrieval";
 
 // Query Understanding (Phase 2 — Concept 1)
 export {

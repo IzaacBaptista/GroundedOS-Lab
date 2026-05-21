@@ -90,6 +90,10 @@ Some concepts appear in more than one track. The table below lists the primary l
 | [chunking.md](./chunking.md) | Chunking | Track 5 - Advanced RAG | Phase 1 - Core RAG |
 | [vector-database.md](./vector-database.md) | Vector Database | Track 5 - Advanced RAG | Phase 1 - Core RAG |
 | [hybrid-search.md](./hybrid-search.md) | Hybrid Search | Track 5 - Advanced RAG | Phase 2 - Retrieval Quality |
+| [graphrag.md](./graphrag.md) | GraphRAG | Track 5 - Advanced RAG | Advanced retrieval phase |
+| [adaptive-rag.md](./adaptive-rag.md) | Adaptive RAG | Track 5 - Advanced RAG | Advanced retrieval phase |
+| [hyde.md](./hyde.md) | HyDE | Track 5 - Advanced RAG | Advanced retrieval phase |
+| [raptor.md](./raptor.md) | RAPTOR | Track 5 - Advanced RAG | Advanced retrieval phase |
 | [re-ranking.md](./re-ranking.md) | Re-ranking | Track 5 - Advanced RAG | Phase 2 - Retrieval Quality |
 | [grounding.md](./grounding.md) | Grounding | Track 5 - Advanced RAG | Phase 3 - Intelligence |
 | [semantic-caching.md](./semantic-caching.md) | Semantic Caching | Track 5 - Advanced RAG | Phase 4 - Lab |

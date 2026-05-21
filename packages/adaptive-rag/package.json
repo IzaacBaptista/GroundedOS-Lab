@@ -1,5 +1,5 @@
 {
-  "name": "@groundedos/rag",
+  "name": "@groundedos/adaptive-rag",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,10 +10,5 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     }
-  },
-  "dependencies": {
-    "@groundedos/adaptive-rag": "0.1.0",
-    "@groundedos/core": "0.1.0",
-    "@groundedos/graphrag": "0.1.0"
   }
 }

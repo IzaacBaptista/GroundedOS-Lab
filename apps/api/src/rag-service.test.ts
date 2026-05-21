@@ -66,6 +66,13 @@ describe("askRag", () => {
       sparseScore: expect.any(Number),
       combinedScore: expect.any(Number),
     });
+    expect(output.devMode.adaptiveRoutingTrace).toMatchObject({
+      selectedPipeline: expect.any(String),
+      executedPipeline: expect.any(String),
+      reason: expect.any(Array),
+    });
+    expect(output.devMode.graphRetrievalTrace?.entityHits).toBeDefined();
+    expect(output.devMode.retrievalFusionTrace?.selectedChunkIds.length).toBeGreaterThanOrEqual(1);
     expect(output.devMode.reranking).toMatchObject({
       applied: true,
       returnedCount: 1,

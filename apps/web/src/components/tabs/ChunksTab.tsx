@@ -204,8 +204,13 @@ function extractDevMode(payload: unknown): DevModeOutput | undefined {
 function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
   const hybrid = devMode.hybrid;
   const reranking = devMode.reranking;
+  const adaptive = devMode.adaptiveRoutingTrace;
+  const graph = devMode.graphRetrievalTrace;
+  const hyde = devMode.hydeTrace;
+  const raptor = devMode.raptorTrace;
+  const fusion = devMode.retrievalFusionTrace;
 
-  if (!hybrid && !reranking) {
+  if (!hybrid && !reranking && !adaptive && !graph && !hyde && !raptor && !fusion) {
     return null;
   }
 
@@ -289,6 +294,87 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
             finalRankOne.finalScore
           )}
         </ExplainBox>
+      )}
+
+      {adaptive && (
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <SectionLabel>adaptive routing</SectionLabel>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <Pill variant="teal">{adaptive.selectedPipeline}</Pill>
+            <Pill variant="gray">executed {adaptive.executedPipeline}</Pill>
+            <Pill variant="gray">cost {adaptive.estimatedCost}</Pill>
+            <Pill variant="gray">confidence {(adaptive.confidence * 100).toFixed(0)}%</Pill>
+          </div>
+          <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
+            {adaptive.reason.join(" · ")}
+          </div>
+          {adaptive.fallbackReason && (
+            <ExplainBox variant="tip" label="fallback aplicado">
+              {adaptive.fallbackReason}
+            </ExplainBox>
+          )}
+        </div>
+      )}
+
+      {graph && (
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <SectionLabel>graph traversal</SectionLabel>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {graph.entityHits.slice(0, 4).map((hit) => (
+              <Pill key={hit.entityId} variant="blue">
+                {hit.label}
+              </Pill>
+            ))}
+          </div>
+          <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
+            {graph.traversalSteps.length} traversal steps · {graph.results.length} graph-ranked chunks
+          </div>
+        </div>
+      )}
+
+      {hyde && (
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <SectionLabel>HyDE expansion</SectionLabel>
+          <ExplainBox variant="tip" label="documento hipotético">
+            {hyde.hypotheticalDocument}
+          </ExplainBox>
+          <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
+            top score {hyde.retrievalDelta.beforeTopScore.toFixed(3)} →{" "}
+            {hyde.retrievalDelta.afterTopScore.toFixed(3)}
+          </div>
+        </div>
+      )}
+
+      {raptor && (
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <SectionLabel>RAPTOR hierarchy</SectionLabel>
+          <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
+            depth {raptor.hierarchyDepth} · selected {raptor.selectedNodes.length} summary nodes
+          </div>
+          {raptor.selectedNodes.slice(0, 2).map((node) => (
+            <ExplainBox key={node.nodeId} label={`${node.label} · level ${node.level}`}>
+              {node.summary}
+            </ExplainBox>
+          ))}
+        </div>
+      )}
+
+      {fusion && (
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <SectionLabel>fusion breakdown</SectionLabel>
+          {fusion.candidates.slice(0, 4).map((candidate) => (
+            <ScoreBreakdownRow
+              key={`${candidate.chunkId}-fusion`}
+              label={candidate.chunkId}
+              scores={[
+                { label: "semantic", value: candidate.semanticSimilarity },
+                { label: "graph", value: candidate.graphProximity },
+                { label: "hyde", value: candidate.hydeSimilarity },
+                { label: "final", value: candidate.finalScore },
+              ]}
+            />
+          ))}
+        </div>
       )}
     </section>
   );
