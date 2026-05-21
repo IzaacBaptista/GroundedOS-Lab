@@ -151,7 +151,10 @@ export function classifyAdaptiveQuery(
   }
 
   const complexity =
-    tokenCount >= 14 || categories.has("analytical") || categories.has("summarization")
+    tokenCount >= 11 ||
+    categories.has("analytical") ||
+    categories.has("summarization") ||
+    (categories.has("relational") && categories.has("retrieval-heavy"))
       ? "high"
       : tokenCount >= 7 || categories.has("relational")
         ? "medium"
