@@ -278,6 +278,113 @@ export interface DevModeOutput {
       combinedScore: number;
     }>;
   };
+  adaptiveRoutingTrace?: {
+    selectedPipeline:
+      | "DIRECT_LLM"
+      | "STANDARD_RAG"
+      | "HYBRID_RAG"
+      | "GRAPH_RAG"
+      | "HYDE_RAG"
+      | "FULL_PIPELINE";
+    executedPipeline:
+      | "DIRECT_LLM"
+      | "STANDARD_RAG"
+      | "HYBRID_RAG"
+      | "GRAPH_RAG"
+      | "HYDE_RAG"
+      | "FULL_PIPELINE";
+    reason: string[];
+    fallbackReason?: string;
+    estimatedCost: "low" | "medium" | "high";
+    confidence: number;
+    shouldRetrieve: boolean;
+    classification: {
+      categories: string[];
+      complexity: "low" | "medium" | "high";
+      ambiguity: number;
+      factualityRisk: number;
+      confidence: number;
+    };
+  };
+  graphRetrievalTrace?: {
+    entityHits: Array<{
+      entityId: string;
+      label: string;
+      type: string;
+      score: number;
+      chunkIds: string[];
+    }>;
+    traversalSteps: Array<{
+      fromEntityId: string;
+      fromLabel: string;
+      toEntityId: string;
+      toLabel: string;
+      relationType: string;
+      depth: number;
+      confidence: number;
+      chunkIds: string[];
+    }>;
+    results: Array<{
+      chunkId: string;
+      documentId: string;
+      sectionId: string;
+      score: number;
+      matchedEntities: string[];
+      depth: number;
+      edgeConfidence: number;
+      graphProximity: number;
+    }>;
+  };
+  hydeTrace?: {
+    enabled: boolean;
+    hypotheticalDocument: string;
+    embedding: {
+      provider: string;
+      dimensions: number;
+    };
+    retrievalDelta: {
+      beforeTopScore: number;
+      afterTopScore: number;
+      improvement: number;
+    };
+  };
+  raptorTrace?: {
+    enabled: boolean;
+    hierarchyDepth: number;
+    selectedNodes: Array<{
+      nodeId: string;
+      label: string;
+      level: number;
+      score: number;
+      summary: string;
+    }>;
+    retrievalPath: Array<{
+      parentNodeId: string;
+      childNodeId: string;
+      score: number;
+    }>;
+  };
+  retrievalFusionTrace?: {
+    weights: {
+      semanticSimilarity: number;
+      graphProximity: number;
+      edgeConfidence: number;
+      traversalDepth: number;
+      hydeSimilarity: number;
+      raptorSummary: number;
+    };
+    candidates: Array<{
+      chunkId: string;
+      semanticSimilarity: number;
+      graphProximity: number;
+      edgeConfidence: number;
+      traversalDepth: number;
+      hydeSimilarity: number;
+      raptorSummary: number;
+      finalScore: number;
+    }>;
+    selectedChunkIds: string[];
+  };
   reranking?: {
     applied: boolean;
     candidateCount: number;

@@ -5,7 +5,34 @@ import {
   validateRetrievalChunks,
   validateVectorSearchResults,
 } from "@groundedos/core";
+import {
+  AdaptiveRetrievalPlanner,
+  type AdaptiveRetrievalMode,
+  type AdaptiveRetrievalPlan,
+  type AdaptiveQueryClassification,
+} from "@groundedos/adaptive-rag";
+import {
+  InMemoryGraphStore,
+  buildKnowledgeGraph,
+  retrieveFromKnowledgeGraph,
+  type EntityExtractor,
+  type EntityHit,
+  type GraphRetrieverResult,
+  type GraphStore,
+  type KnowledgeGraph,
+  type TraversalStep,
+} from "@groundedos/graphrag";
 
+import {
+  buildHypotheticalDocument,
+  buildHyDETrace,
+  buildRaptorTree,
+  retrieveFromRaptorTree,
+  type HyDETrace,
+  type RetrievalFusionTrace,
+  type RaptorTrace,
+  type RaptorTree,
+} from "./advanced-retrieval";
 import {
   chunkDocument,
   type ChunkDocumentOptions,
@@ -31,6 +58,9 @@ const ERROR_PREFIX = "[rag/retrieval]";
 export interface BuildRetrievalIndexOptions {
   chunkOptions?: ChunkDocumentOptions;
   embeddingProvider?: EmbeddingProvider;
+  graphExtractors?: EntityExtractor[];
+  enableGraphRag?: boolean;
+  enableRaptor?: boolean;
   store?: VectorStore;
 }
 
@@ -38,6 +68,9 @@ export interface RetrievalIndex {
   embeddingProvider: EmbeddingProvider;
   store: VectorStore;
   embeddedChunks: EmbeddedChunk[];
+  knowledgeGraph?: KnowledgeGraph;
+  graphStore?: GraphStore;
+  raptorTree?: RaptorTree;
 }
 
 export interface RetrieveFromIndexOptions {
@@ -62,6 +95,11 @@ export interface RetrievalDevModeOutput {
     candidateCount: number;
     candidates: RetrievalHybridCandidate[];
   };
+  adaptiveRoutingTrace?: AdaptiveRoutingTrace;
+  graphRetrievalTrace?: GraphRetrievalTrace;
+  hydeTrace?: HyDETrace;
+  raptorTrace?: RaptorTrace;
+  retrievalFusionTrace?: RetrievalFusionTrace;
 }
 
 export interface RetrievalHybridCandidate {
@@ -72,6 +110,32 @@ export interface RetrievalHybridCandidate {
   denseScore: number;
   sparseScore: number;
   combinedScore: number;
+}
+
+export interface AdaptiveRoutingTrace {
+  selectedPipeline: AdaptiveRetrievalMode;
+  executedPipeline: AdaptiveRetrievalMode;
+  reason: string[];
+  fallbackReason?: string;
+  estimatedCost: "low" | "medium" | "high";
+  confidence: number;
+  shouldRetrieve: boolean;
+  classification: AdaptiveQueryClassification;
+}
+
+export interface GraphRetrievalTrace {
+  entityHits: EntityHit[];
+  traversalSteps: TraversalStep[];
+  results: Array<{
+    chunkId: string;
+    documentId: string;
+    sectionId: string;
+    score: number;
+    matchedEntities: string[];
+    depth: number;
+    edgeConfidence: number;
+    graphProximity: number;
+  }>;
 }
 
 export interface RetrievalDevModeResult {
@@ -121,11 +185,32 @@ export async function buildRetrievalIndex(
   validateEmbeddedChunks(embeddedChunks);
 
   store.insert(embeddedChunks);
+  const graphStore =
+    options.enableGraphRag === false || embeddedChunks.length === 0 ? undefined : new InMemoryGraphStore();
+  const knowledgeGraph = graphStore
+    ? buildKnowledgeGraph(
+        embeddedChunks.map((chunk) => ({
+          chunkId: chunk.id,
+          documentId: chunk.documentId,
+          sectionId: chunk.sectionId,
+          text: chunk.text,
+        })),
+        {
+          extractors: options.graphExtractors,
+        }
+      )
+    : undefined;
+  graphStore?.setGraph(knowledgeGraph!);
+  const raptorTree =
+    options.enableRaptor === false ? undefined : buildRaptorTree(embeddedChunks);
 
   return {
     embeddingProvider,
     store,
     embeddedChunks,
+    knowledgeGraph,
+    graphStore,
+    raptorTree,
   };
 }
 
@@ -157,6 +242,48 @@ export async function retrieveForDevMode(
     };
   }
 
+  if (internal.adaptivePlan) {
+    output.adaptiveRoutingTrace = {
+      selectedPipeline: internal.adaptivePlan.selectedMode,
+      executedPipeline: internal.adaptivePlan.executionMode,
+      reason: internal.adaptivePlan.reasoning,
+      fallbackReason: internal.adaptivePlan.fallbackReason,
+      estimatedCost: internal.adaptivePlan.estimatedCost,
+      confidence: internal.adaptivePlan.confidence,
+      shouldRetrieve: internal.adaptivePlan.shouldRetrieve,
+      classification: internal.adaptivePlan.classification,
+    };
+  }
+
+  if (internal.graphTrace) {
+    output.graphRetrievalTrace = {
+      entityHits: internal.graphTrace.entityHits,
+      traversalSteps: internal.graphTrace.traversalSteps,
+      results: internal.graphTrace.results.map((result) => ({
+        chunkId: result.chunkId,
+        documentId: result.documentId,
+        sectionId: result.sectionId,
+        score: result.score,
+        matchedEntities: result.matchedEntities,
+        depth: result.depth,
+        edgeConfidence: result.edgeConfidence,
+        graphProximity: result.graphProximity,
+      })),
+    };
+  }
+
+  if (internal.hydeTrace) {
+    output.hydeTrace = internal.hydeTrace;
+  }
+
+  if (internal.raptorTrace) {
+    output.raptorTrace = internal.raptorTrace;
+  }
+
+  if (internal.retrievalFusionTrace) {
+    output.retrievalFusionTrace = internal.retrievalFusionTrace;
+  }
+
   return output;
 }
 
@@ -168,6 +295,11 @@ type InternalRetrievalResult = {
     candidateCount: number;
     candidates: RetrievalHybridCandidate[];
   };
+  adaptivePlan?: AdaptiveRetrievalPlan;
+  graphTrace?: GraphRetrieverResult;
+  hydeTrace?: HyDETrace;
+  raptorTrace?: RaptorTrace;
+  retrievalFusionTrace?: RetrievalFusionTrace;
 };
 
 async function retrieveInternal(
@@ -201,6 +333,14 @@ async function retrieveInternal(
     };
   }
 
+  const adaptivePlan = new AdaptiveRetrievalPlanner().plan({
+    query,
+    queryConfidence: 0.78,
+    graphAvailable: Boolean(index.graphStore),
+    hydeAvailable: true,
+    raptorAvailable: Boolean(index.raptorTree),
+    requireGrounding: true,
+  });
   const topK = options.topK ?? 3;
   const denseWeight = resolveDenseWeight(options.hybridDenseWeight);
   const sparseWeight = 1 - denseWeight;
@@ -219,6 +359,7 @@ async function retrieveInternal(
   if (validatedDenseCandidates.length === 0) {
     return {
       results: [],
+      adaptivePlan,
       hybridMeta: {
         denseWeight,
         sparseWeight,
@@ -252,8 +393,45 @@ async function retrieveInternal(
     });
   const reranked = sortedCandidates.slice(0, topK);
 
+  const hypotheticalDocument =
+    adaptivePlan.executionMode === "HYDE_RAG" || adaptivePlan.executionMode === "FULL_PIPELINE"
+      ? buildHypotheticalDocument(query)
+      : undefined;
+  const hydeResults = hypotheticalDocument
+    ? ((await searchStore(index.store, {
+        embedding: await embedQuery(hypotheticalDocument, index.embeddingProvider),
+        topK: candidateTopK,
+        filter: options.filter,
+      })) as RetrievalResult[])
+    : [];
+  const graphTrace =
+    (adaptivePlan.executionMode === "GRAPH_RAG" ||
+      adaptivePlan.executionMode === "FULL_PIPELINE") &&
+    index.graphStore
+      ? retrieveFromKnowledgeGraph(index.graphStore, query, { topK: candidateTopK, maxDepth: 2 })
+      : undefined;
+  const raptorResult =
+    adaptivePlan.executionMode === "FULL_PIPELINE"
+      ? retrieveFromRaptorTree(index.raptorTree, query, topK)
+      : undefined;
+  const fused = fuseRetrievalSignals(
+    index,
+    reranked,
+    hydeResults,
+    graphTrace,
+    raptorResult?.results ?? [],
+    topK
+  );
+
   return {
-    results: reranked,
+    results: fused.results,
+    adaptivePlan,
+    graphTrace,
+    hydeTrace: hypotheticalDocument
+      ? buildHyDETrace(index.embeddingProvider, hypotheticalDocument, reranked, hydeResults)
+      : undefined,
+    raptorTrace: raptorResult?.trace,
+    retrievalFusionTrace: fused.trace,
     hybridMeta: {
       denseWeight,
       sparseWeight,
@@ -460,4 +638,136 @@ function buildCharacterNgrams(text: string, n = 3): Set<string> {
   }
 
   return ngrams;
+}
+
+function fuseRetrievalSignals(
+  index: RetrievalIndex,
+  baselineResults: RetrievalResult[],
+  hydeResults: RetrievalResult[],
+  graphTrace: GraphRetrieverResult | undefined,
+  raptorResults: Array<{ chunkId: string; score: number }>,
+  topK: number
+): {
+  results: RetrievalResult[];
+  trace: RetrievalFusionTrace;
+} {
+  const weights = {
+    semanticSimilarity: 0.45,
+    graphProximity: 0.15,
+    edgeConfidence: 0.1,
+    traversalDepth: 0.05,
+    hydeSimilarity: 0.15,
+    raptorSummary: 0.1,
+  } satisfies RetrievalFusionTrace["weights"];
+  const chunksById = new Map(index.embeddedChunks.map((chunk) => [chunk.id, chunk]));
+  const candidates = new Map<
+    string,
+    {
+      chunk: EmbeddedChunk;
+      semanticSimilarity: number;
+      graphProximity: number;
+      edgeConfidence: number;
+      traversalDepth: number;
+      hydeSimilarity: number;
+      raptorSummary: number;
+    }
+  >();
+
+  for (const result of baselineResults) {
+    const existing = candidates.get(result.chunk.id) ?? createFusionEntry(result.chunk);
+    existing.semanticSimilarity = normalizeDenseScore(result.score);
+    candidates.set(result.chunk.id, existing);
+  }
+
+  for (const result of hydeResults) {
+    const existing = candidates.get(result.chunk.id) ?? createFusionEntry(result.chunk);
+    existing.hydeSimilarity = Math.max(existing.hydeSimilarity, normalizeDenseScore(result.score));
+    candidates.set(result.chunk.id, existing);
+  }
+
+  for (const result of graphTrace?.results ?? []) {
+    const chunk = chunksById.get(result.chunkId);
+    if (!chunk) {
+      continue;
+    }
+    const existing = candidates.get(result.chunkId) ?? createFusionEntry(chunk);
+    existing.graphProximity = Math.max(existing.graphProximity, result.graphProximity);
+    existing.edgeConfidence = Math.max(existing.edgeConfidence, result.edgeConfidence);
+    existing.traversalDepth = Math.max(existing.traversalDepth, 1 / (result.depth + 1));
+    candidates.set(result.chunkId, existing);
+  }
+
+  for (const result of raptorResults) {
+    const chunk = chunksById.get(result.chunkId);
+    if (!chunk) {
+      continue;
+    }
+    const existing = candidates.get(result.chunkId) ?? createFusionEntry(chunk);
+    existing.raptorSummary = Math.max(existing.raptorSummary, result.score);
+    candidates.set(result.chunkId, existing);
+  }
+
+  const ranked = [...candidates.entries()]
+    .map(([chunkId, candidate]) => ({
+      chunkId,
+      chunk: candidate.chunk,
+      semanticSimilarity: roundScore(candidate.semanticSimilarity),
+      graphProximity: roundScore(candidate.graphProximity),
+      edgeConfidence: roundScore(candidate.edgeConfidence),
+      traversalDepth: roundScore(candidate.traversalDepth),
+      hydeSimilarity: roundScore(candidate.hydeSimilarity),
+      raptorSummary: roundScore(candidate.raptorSummary),
+      finalScore: roundScore(
+        candidate.semanticSimilarity * weights.semanticSimilarity +
+          candidate.graphProximity * weights.graphProximity +
+          candidate.edgeConfidence * weights.edgeConfidence +
+          candidate.traversalDepth * weights.traversalDepth +
+          candidate.hydeSimilarity * weights.hydeSimilarity +
+          candidate.raptorSummary * weights.raptorSummary
+      ),
+    }))
+    .sort((left, right) => {
+      if (right.finalScore === left.finalScore) {
+        return left.chunkId.localeCompare(right.chunkId);
+      }
+
+      return right.finalScore - left.finalScore;
+    });
+
+  return {
+    results: ranked.slice(0, topK).map((candidate) => ({
+      chunk: candidate.chunk,
+      score: candidate.finalScore,
+    })),
+    trace: {
+      weights,
+      candidates: ranked.map((candidate) => ({
+        chunkId: candidate.chunkId,
+        semanticSimilarity: candidate.semanticSimilarity,
+        graphProximity: candidate.graphProximity,
+        edgeConfidence: candidate.edgeConfidence,
+        traversalDepth: candidate.traversalDepth,
+        hydeSimilarity: candidate.hydeSimilarity,
+        raptorSummary: candidate.raptorSummary,
+        finalScore: candidate.finalScore,
+      })),
+      selectedChunkIds: ranked.slice(0, topK).map((candidate) => candidate.chunkId),
+    },
+  };
+}
+
+function createFusionEntry(chunk: EmbeddedChunk) {
+  return {
+    chunk,
+    semanticSimilarity: 0,
+    graphProximity: 0,
+    edgeConfidence: 0,
+    traversalDepth: 0,
+    hydeSimilarity: 0,
+    raptorSummary: 0,
+  };
+}
+
+function roundScore(value: number): number {
+  return Number(value.toFixed(6));
 }

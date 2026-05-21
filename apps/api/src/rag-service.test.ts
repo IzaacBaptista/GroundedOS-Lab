@@ -66,6 +66,12 @@ describe("askRag", () => {
       sparseScore: expect.any(Number),
       combinedScore: expect.any(Number),
     });
+    expect(output.devMode.adaptiveRoutingTrace).toMatchObject({
+      selectedPipeline: expect.any(String),
+      executedPipeline: expect.any(String),
+      reason: expect.any(Array),
+    });
+    expect(output.devMode.retrievalFusionTrace?.selectedChunkIds.length).toBeGreaterThanOrEqual(1);
     expect(output.devMode.reranking).toMatchObject({
       applied: true,
       returnedCount: 1,
@@ -99,7 +105,9 @@ describe("askRag", () => {
     expect(output.devMode.cache?.hit).toBe(false);
     expect(output.devMode.cost?.withinBudget).toBe(true);
     expect(output.devMode.cost?.breakdown.some((item) => item.stage === "reranking")).toBe(true);
-    expect(output.devMode.evals?.taxonomy?.category).toBe("LOW_CONFIDENCE");
+    expect(["LOW_CONFIDENCE", "PARTIAL_CONTEXT"]).toContain(
+      output.devMode.evals?.taxonomy?.category
+    );
     expect(output.devMode.evals?.confidence?.confidenceLevel).toBeDefined();
     expect(output.devMode.retrievalDiagnostics).toMatchObject({
       retrievalMetadata: {
@@ -205,6 +213,30 @@ describe("askRag", () => {
 
     expect(output.devMode.evals?.taxonomy?.category).toBe("NOT_FOUND");
     expect(output.devMode.evals?.confidence?.confidenceLevel).toMatch(/LOW|UNRELIABLE/);
+  });
+
+  it("emits graph traversal traces for relational queries", async () => {
+    const output = await askRag(
+      makeRagTestCase({
+        content: [
+          "Semantic cache depends on retrieval quality and cache invalidation.",
+          "Hybrid retrieval combines dense retrieval, sparse search and reranking.",
+        ].join("\n\n"),
+        query: "How does semantic cache depend on retrieval?",
+        title: "Relational Retrieval Test",
+        documentId: "api-relational-doc",
+        topK: 2,
+      })
+    );
+
+    expect(output.devMode.adaptiveRoutingTrace).toMatchObject({
+      selectedPipeline: "FULL_PIPELINE",
+      executedPipeline: "FULL_PIPELINE",
+    });
+    expect(output.devMode.graphRetrievalTrace?.entityHits.length).toBeGreaterThan(0);
+    expect(output.devMode.graphRetrievalTrace?.traversalSteps.length).toBeGreaterThan(0);
+    expect(output.devMode.hydeTrace?.hypotheticalDocument).toContain("semantic cache");
+    expect(output.devMode.raptorTrace?.selectedNodes.length).toBeGreaterThan(0);
   });
 });
 

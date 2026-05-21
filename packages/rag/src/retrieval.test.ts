@@ -286,6 +286,50 @@ describe("retrieval flow", () => {
     });
   });
 
+  it("adds advanced retrieval traces when hybrid mode promotes the full pipeline", async () => {
+    const document = await ingest({
+      type: "text",
+      content: [
+        "Semantic cache depends on retrieval signals and cache invalidation.",
+        "Hybrid retrieval combines dense retrieval, sparse search and reranking.",
+        "RAPTOR summaries compress retrieval context into hierarchical section summaries.",
+      ].join("\n\n"),
+      metadata: {
+        documentId: "doc-advanced-dev",
+        title: "Advanced Retrieval Dev Mode",
+      },
+    });
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: {
+        maxChunkChars: 220,
+        overlapChars: 0,
+      },
+    });
+
+    const output = await retrieveForDevMode(index, "How does semantic cache depend on retrieval?", {
+      topK: 2,
+      mode: "hybrid",
+    });
+
+    expect(output.adaptiveRoutingTrace).toMatchObject({
+      selectedPipeline: "FULL_PIPELINE",
+      executedPipeline: "FULL_PIPELINE",
+    });
+    expect(output.graphRetrievalTrace?.entityHits.length).toBeGreaterThan(0);
+    expect(output.graphRetrievalTrace?.traversalSteps.length).toBeGreaterThan(0);
+    expect(output.hydeTrace?.hypotheticalDocument).toContain(
+      "How does semantic cache depend on retrieval?"
+    );
+    expect(output.raptorTrace?.hierarchyDepth).toBeGreaterThanOrEqual(1);
+    expect(output.retrievalFusionTrace?.candidates[0]).toMatchObject({
+      chunkId: expect.any(String),
+      semanticSimilarity: expect.any(Number),
+      finalScore: expect.any(Number),
+    });
+  });
+
   it("improves smoke-style retrieval with hybrid mode when query tokenization diverges", async () => {
     const document = await ingest({
       type: "text",

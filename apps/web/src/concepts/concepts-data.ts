@@ -601,7 +601,7 @@ export const CONCEPTS: Concept[] = [
     id: "knowledge-graphs",
     title: "Knowledge Graphs / GraphRAG",
     category: "Retrieval & Data",
-    status: "planned",
+    status: "partial",
     shortDefinition:
       "Knowledge graphs structure documents as entity relationships, enabling more sophisticated retrieval patterns.",
     explanation:
@@ -614,19 +614,26 @@ export const CONCEPTS: Concept[] = [
       "Study graph traversal algorithms.",
     ],
     howToPracticeInProject: [
-      "Planned for Phase 7+.",
-      "Future: build knowledge graphs from documents automatically.",
+      "Faça perguntas relacionais e observe os entity hits no Dev Mode.",
+      "Verifique os traversal steps usados para chegar aos chunks recuperados.",
     ],
-    appliedInGroundedOS: ["Planned but not yet implemented."],
-    visibleInCurrentData: ["Not yet available."],
-    whereToSeeInUI: ["Knowledge graphs tab (planned)"],
-    suggestedExperiments: ["Planned for future phases."],
+    appliedInGroundedOS: [
+      "packages/graphrag constrói um grafo leve de entidades a partir dos chunks indexados.",
+      "packages/rag funde traversal do grafo com hybrid retrieval.",
+    ],
+    visibleInCurrentData: [
+      "Dev Mode mostra entity hits, traversal steps e chunks recuperados via grafo.",
+    ],
+    whereToSeeInUI: ["Chunks tab", "Dev Mode JSON"],
+    suggestedExperiments: [
+      "Pergunte como um subsistema depende de outro e observe o caminho percorrido.",
+    ],
     tradeoffsAndLimitations: [
       "Knowledge graph construction is complex and error-prone.",
       "Graphs can explode in complexity for large documents.",
       "Not all documents benefit from graph structure.",
     ],
-    relatedFiles: ["docs/roadmap.md"],
+    relatedFiles: ["packages/graphrag/src/index.ts", "packages/rag/src/retrieval.ts"],
     dependsOn: ["chunking"],
     nextConcepts: ["adaptive-rag"],
   },
@@ -923,20 +930,24 @@ export const CONCEPTS: Concept[] = [
       "Check if simple queries are answered without retrieval.",
     ],
     appliedInGroundedOS: [
-      "Query understanding (planned for Phase 8+) will enable adaptive RAG.",
+      "packages/adaptive-rag classifica a query e escolhe o pipeline.",
+      "packages/rag expõe adaptiveRoutingTrace no Dev Mode.",
     ],
     visibleInCurrentData: [
-      "Simple queries could skip retrieval (not implemented yet).",
+      "Dev Mode mostra selectedPipeline, executedPipeline e fallbackReason.",
     ],
-    whereToSeeInUI: ["Workflow (future)"],
-    suggestedExperiments: ["Planned for future."],
+    whereToSeeInUI: ["Chunks tab", "Dev Mode JSON"],
+    suggestedExperiments: [
+      "Compare perguntas conversacionais vs relacionais e observe a rota escolhida.",
+    ],
     tradeoffsAndLimitations: [
       "Adaptive logic adds complexity.",
       "Misclassification can hurt accuracy.",
       "Overhead may not justify savings on small queries.",
     ],
     relatedFiles: [
-      "packages/rag/src/query-understanding.ts",
+      "packages/adaptive-rag/src/index.ts",
+      "packages/rag/src/retrieval.ts",
       "docs/concepts/adaptive-rag.md",
     ],
     dependsOn: ["context-engineering", "rag"],
