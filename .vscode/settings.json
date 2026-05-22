@@ -3,6 +3,17 @@
         "true": true,
         "docker compose": true
     },
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/coverage/**": true,
+        "**/.next/**": true,
+        "**/.turbo/**": true,
+        "**/.cache/**": true
+    },
     "python.testing.pytestArgs": [
         "."
     ],
