@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "description": "Golden task dataset for evaluating long-horizon planning (FASE E+F). Tests plan completeness, execution success, replanning quality, and cost/latency efficiency.",
+  "entries": [
+    {
+      "id": "plan-001",
+      "category": "plan-completeness",
+      "query": "Research and write a comprehensive report on machine learning",
+      "index_id": "groundedos-docs",
+      "expected_min_nodes": 3,
+      "expected_node_labels_contain": ["Retrieve", "Analyze", "Synthesize"],
+      "expected_has_dependencies": true,
+      "notes": "Plan must contain at least 3 nodes covering retrieval, analysis and synthesis. Nodes must have dependency edges."
+    },
+    {
+      "id": "plan-002",
+      "category": "plan-execution-success",
+      "query": "Find information about embeddings and summarize",
+      "index_id": "groundedos-docs",
+      "expected_termination": "completed",
+      "expected_replan_count_max": 1,
+      "expected_answer_contains": ["embedding"],
+      "notes": "Simple plan should execute without replanning. Final answer should contain expected keywords."
+    },
+    {
+      "id": "plan-003",
+      "category": "replanning",
+      "query": "Analyze a complex multi-step research problem with potential failures",
+      "index_id": "groundedos-docs",
+      "simulate_node_failure": true,
+      "expected_replan_count_min": 1,
+      "notes": "When a node fails, the executor must trigger replanning. replanCount must be >= 1."
+    },
+    {
+      "id": "plan-004",
+      "category": "plan-critic-evaluation",
+      "query": "Build a detailed analysis of AI safety approaches",
+      "index_id": "groundedos-docs",
+      "expected_critic_score_min": 0.5,
+      "expected_critic_fields": ["overallScore", "completenessScore", "feasibilityScore", "efficiencyScore", "issues", "suggestions"],
+      "notes": "PlanCritic must produce a valid evaluation with all required fields and a reasonable score."
+    },
+    {
+      "id": "plan-005",
+      "category": "early-termination",
+      "query": "Short research task where goal is quickly achieved",
+      "index_id": "groundedos-docs",
+      "expected_early_termination": true,
+      "notes": "When the goal is achieved early (last node completes), the executor should stop rather than running remaining nodes."
+    },
+    {
+      "id": "plan-006",
+      "category": "cost-latency",
+      "query": "Efficient research with cost tracking",
+      "index_id": "groundedos-docs",
+      "max_cost_usd": 0.10,
+      "max_latency_ms": 60000,
+      "notes": "Plan execution must complete within cost and latency limits. Used to benchmark cost per successful task."
+    },
+    {
+      "id": "plan-007",
+      "category": "dev-mode-trace",
+      "query": "Research the tool registry architecture",
+      "index_id": "groundedos-docs",
+      "dev_mode": true,
+      "expected_dev_mode_fields": ["plan", "events", "planEvaluation"],
+      "notes": "With devMode=true the response must include the full plan, execution events, and critic evaluation."
+    }
+  ],
+  "evaluation_metrics": {
+    "plan_completeness": {
+      "description": "Fraction of plans that contain all expected node types and dependency structure",
+      "target": 0.85
+    },
+    "plan_execution_success": {
+      "description": "Fraction of plans that complete successfully (all nodes done)",
+      "target": 0.80
+    },
+    "number_of_replans": {
+      "description": "Average number of replans per successful task",
+      "target_max": 1.5
+    },
+    "cost_per_successful_task": {
+      "description": "Average estimated USD cost per successfully completed plan task",
+      "target_max_usd": 0.05
+    },
+    "latency_per_successful_task": {
+      "description": "Average wall-clock duration in milliseconds per successfully completed plan task",
+      "target_max_ms": 30000
+    }
+  }
+}
