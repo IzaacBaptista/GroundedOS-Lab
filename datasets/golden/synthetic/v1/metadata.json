@@ -1,0 +1,26 @@
+{
+  "datasetId": "synthetic",
+  "version": "v1",
+  "corpusVersion": "baseline-docs",
+  "generationDate": "2026-05-26T00:00:00.000Z",
+  "generatorConfig": {
+    "generatorModel": "mock-generator",
+    "promptVersion": "synthetic-v1"
+  },
+  "validationConfig": {
+    "validator": "SyntheticSampleValidator"
+  },
+  "numberOfSamples": 1,
+  "metricCoverage": [
+    "faithfulness",
+    "answer_correctness",
+    "context_precision",
+    "context_recall"
+  ],
+  "difficultyDistribution": {
+    "medium": 1
+  },
+  "questionTypeDistribution": {
+    "factual": 1
+  }
+}

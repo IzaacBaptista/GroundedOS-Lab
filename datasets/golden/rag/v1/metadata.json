@@ -1,0 +1,25 @@
+{
+  "datasetId": "rag",
+  "version": "v1",
+  "corpusVersion": "baseline-docs",
+  "generationDate": "2026-05-26T00:00:00.000Z",
+  "generatorConfig": {
+    "source": "manual"
+  },
+  "validationConfig": {
+    "reviewed": true
+  },
+  "numberOfSamples": 1,
+  "metricCoverage": [
+    "faithfulness",
+    "answer_correctness",
+    "context_precision",
+    "context_recall"
+  ],
+  "difficultyDistribution": {
+    "easy": 1
+  },
+  "questionTypeDistribution": {
+    "definition": 1
+  }
+}

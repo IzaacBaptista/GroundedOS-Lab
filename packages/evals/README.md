@@ -12,7 +12,7 @@ Evaluation framework for measuring AI system quality, correctness and safety acr
 
 ## Status
 
-Complete (Phase 3 baseline)
+In progress (Advanced Evals phase)
 
 ## Current implementation
 
@@ -23,11 +23,16 @@ Complete (Phase 3 baseline)
   results.
 - `EvaluatorChain` runs multiple evaluators and returns per-metric results plus
   aggregate summary data.
+- `advanced.ts` adds typed building blocks for LLM-as-judge, RAGAS mapping,
+  synthetic dataset generation, artifact writing and eval orchestration.
 
 ## Current limits
 
 - Current evaluators are deterministic lexical/heuristic scorers.
+- Judge providers and the Python RAGAS runner are integrated through adapters so
+  the core remains TypeScript-first.
 - Automated A/B prompt testing and statistical winner reporting are available
   via `@groundedos/experiment-toolkit`; this package keeps the evaluator
   primitives used by that workflow.
-- Trend reports and external eval dashboards are not implemented yet.
+- See [`docs/evals-advanced-phase.md`](../../docs/evals-advanced-phase.md) for
+  the proposed architecture, artifact layout and API payloads.
