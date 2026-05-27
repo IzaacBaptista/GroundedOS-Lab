@@ -9,6 +9,7 @@ import { AdminModule } from "./admin/admin.module";
 import { AuditModule } from "./audit/audit.module";
 import { JobsModule } from "./jobs/jobs.module";
 import { SafetyModule } from "./safety/safety.module";
+import { RealtimeModule } from "./realtime/realtime.module";
 import type { ApiConfig } from "./config/api-config";
 
 @Module({
@@ -23,6 +24,7 @@ import type { ApiConfig } from "./config/api-config";
     AdminModule,
     JobsModule,
     SafetyModule,
+    RealtimeModule,
   ],
 })
 export class AppModule {
@@ -40,7 +42,7 @@ export class AppModule {
         AdminModule,
         JobsModule,
         SafetyModule,
-    SafetyModule,
+        RealtimeModule,
       ],
     };
   }

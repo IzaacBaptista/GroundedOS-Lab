@@ -1297,6 +1297,52 @@ describe("api server", () => {
     expect(body.devMode.results[0]?.chunkId).toBe("http-api-test:section-2:chunk-1");
   });
 
+  it("serves POST /query/stream with SSE events", async () => {
+    const app = await createTestServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/query/stream",
+      headers: {
+        accept: "text/event-stream",
+      },
+      payload: {
+        type: "text",
+        content:
+          "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        query: "What explains vector search?",
+        title: "Stream API Test",
+        documentId: "stream-api-test",
+        topK: 1,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/event-stream");
+    expect(response.body).toContain("event: retrieval_started");
+    expect(response.body).toContain("event: token");
+    expect(response.body).toContain("event: completed");
+  });
+
+  it("serves GET /ws/connect", async () => {
+    const app = await createTestServer();
+    const response = await app.inject({
+      method: "GET",
+      url: "/ws/connect",
+    });
+    const body = response.json() as {
+      sessionId: string;
+      transport: string;
+      heartbeatMs: number;
+      reconnect: { supported: boolean; retryAfterMs: number };
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.sessionId).toContain("rt-");
+    expect(body.transport).toBe("websocket");
+    expect(body.heartbeatMs).toBeGreaterThan(0);
+    expect(body.reconnect.supported).toBe(true);
+  });
+
   it("serves multipart POST /rag/ask", async () => {
     const app = await createTestServer();
     await app.listen({ port: 0, host: "127.0.0.1" });

@@ -46,6 +46,20 @@ export {
 } from "./vector-store";
 
 export {
+  InMemoryProvider,
+  NoopVectorIndexManager,
+  IdentityEmbeddingStorageAdapter,
+  PgVectorProvider,
+  QdrantProvider,
+  VectorStoreCollection,
+  createDualWriteStore,
+  type EmbeddingStorageAdapter,
+  type VectorCollection,
+  type VectorIndexManager,
+  type VectorStoreProvider,
+} from "./vector-provider";
+
+export {
   PgvectorVectorStore,
   createVectorStore,
   type PgClient,
