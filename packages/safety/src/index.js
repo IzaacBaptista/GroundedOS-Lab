@@ -5,4 +5,4 @@
  */
 export * from './types.js';
 export * from './guardrails/index.js';
-//# sourceMappingURL=index.js.map
+export * from './advanced-safety.js';

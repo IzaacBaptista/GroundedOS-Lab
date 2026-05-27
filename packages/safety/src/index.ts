@@ -6,3 +6,4 @@
 
 export * from './types.js';
 export * from './guardrails/index.js';
+export * from './advanced-safety.js';
