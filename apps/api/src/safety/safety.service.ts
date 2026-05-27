@@ -299,10 +299,14 @@ export class SafetyService {
   }
 
   private resolveConstitutionPolicy(request: SafetyCritiqueRequest): ConstitutionPolicy {
-    const principles = Array.isArray(request.constitutionalPrinciples)
+    const principleIds = Array.isArray(request.constitutionalPrinciples)
+      ? request.constitutionalPrinciples.filter((item): item is string => typeof item === "string")
+      : undefined;
+
+    const principles = principleIds
       ? DEFAULT_CONSTITUTION_POLICY.principles.map((principle) => ({
           ...principle,
-          enabled: request.constitutionalPrinciples?.includes(principle.id) ?? principle.enabled,
+          enabled: principleIds.includes(principle.id),
         }))
       : DEFAULT_CONSTITUTION_POLICY.principles;
 
