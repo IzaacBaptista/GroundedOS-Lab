@@ -1,0 +1,1 @@
+{"id":"rag-v1-001","question":"What is grounded retrieval?","context":"Grounded retrieval uses retrieved evidence to support answer generation.","expectedAnswer":"Grounded retrieval uses retrieved evidence to support answer generation.","expectedChunkIds":["chunk-grounded-retrieval"],"metadata":{"difficulty":"easy","questionType":"definition"}}

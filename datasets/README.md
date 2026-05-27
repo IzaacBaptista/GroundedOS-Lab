@@ -53,6 +53,20 @@ Current artifacts:
 | Quantization | [`experiments/phase-5/quantization/scaffold-result.json`](./experiments/phase-5/quantization/scaffold-result.json) |
 | Distillation | [`experiments/phase-5/distillation/result.json`](./experiments/phase-5/distillation/result.json) |
 
+Advanced eval runs reserve:
+
+```text
+datasets/experiments/evals/ragas/
+```
+
+Versioned golden datasets now also have structured homes for manual and
+synthetic eval sets:
+
+```text
+datasets/golden/rag/v1/
+datasets/golden/synthetic/v1/
+```
+
 Fine-tuning, LoRA and distillation now have real measured artifacts.
 Quantization runs a local lexical vector quantization benchmark against
 [`golden/phase-5-retrieval.json`](./golden/phase-5-retrieval.json) and records
