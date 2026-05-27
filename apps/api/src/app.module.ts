@@ -8,6 +8,7 @@ import { AuthModule } from "./auth/auth.module";
 import { AdminModule } from "./admin/admin.module";
 import { AuditModule } from "./audit/audit.module";
 import { JobsModule } from "./jobs/jobs.module";
+import { SafetyModule } from "./safety/safety.module";
 import type { ApiConfig } from "./config/api-config";
 
 @Module({
@@ -21,6 +22,7 @@ import type { ApiConfig } from "./config/api-config";
     LabModule,
     AdminModule,
     JobsModule,
+    SafetyModule,
   ],
 })
 export class AppModule {
@@ -37,6 +39,8 @@ export class AppModule {
         LabModule,
         AdminModule,
         JobsModule,
+        SafetyModule,
+    SafetyModule,
       ],
     };
   }

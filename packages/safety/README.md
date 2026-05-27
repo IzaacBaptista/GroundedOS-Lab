@@ -34,3 +34,14 @@ Complete (Phase 3 baseline)
 - The suite is packaged and tested, but it is not yet wired across every API
   request path.
 - Audit logging and policy storage are still future infrastructure work.
+
+## Advanced safety pipeline
+
+- `SafetyAnalyzer` performs chunk-level indirect injection analysis with risk scoring
+  (`SAFE`, `SUSPICIOUS`, `HIGH_RISK`, `BLOCKED`).
+- `InjectionDetector` + `ContextSanitizer` implement detection-based, isolation-based
+  and sanitization-based defenses for untrusted retrieved context.
+- `ConstitutionalCritic` supports constitutional critique and iterative self-critique
+  loops before final answers.
+- `evaluateSafetyStrategies()` compares `none`, `regex`, `classifier` and `hybrid`
+  safety modes with benchmark-friendly metrics.

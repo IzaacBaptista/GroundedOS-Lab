@@ -6,7 +6,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./guardrails": "./dist/guardrails/index.js",
-    "./types": "./dist/types.js"
+    "./types": "./dist/types.js",
+    "./advanced-safety": "./dist/advanced-safety.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
