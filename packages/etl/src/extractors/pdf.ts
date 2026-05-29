@@ -13,16 +13,40 @@ import { PDFParse } from "pdf-parse";
 import type {
   DocumentModality,
   DocumentSection,
+  ExtractedImage,
   Extractor,
+  ImageDescription,
   IngestionInput,
   NormalizedDocument,
+  OCRResult,
 } from "@groundedos/core";
+import { buildMultimodalChunks } from "../multimodal/chunking";
+import {
+  ExtractedImageStore,
+  ImageAssetRegistry,
+  PdfImageExtractor,
+  PdfPageRenderer,
+} from "../multimodal/pdf-assets";
+import { MockOCRProvider, type OCRProvider } from "../multimodal/providers/ocr";
+import {
+  MockVisionProvider,
+  type ImageDescriptionProvider,
+} from "../multimodal/providers/vision";
 
 const EXTRACTOR_NAME = "pdf-extractor";
 const EXTRACTOR_VERSION = "0.1.0";
 
 export class PdfExtractor implements Extractor {
   readonly supportedModalities: DocumentModality[] = ["pdf"];
+
+  constructor(
+    private readonly pdfImageExtractor: PdfImageExtractor = new PdfImageExtractor(),
+    private readonly pageRenderer: PdfPageRenderer = new PdfPageRenderer(),
+    private readonly imageStore: ExtractedImageStore = new ExtractedImageStore(),
+    private readonly assetRegistry: ImageAssetRegistry = new ImageAssetRegistry(),
+    private readonly ocrProvider: OCRProvider = new MockOCRProvider(),
+    private readonly visionProvider: ImageDescriptionProvider = new MockVisionProvider()
+  ) {}
 
   async extract(input: IngestionInput): Promise<NormalizedDocument> {
     if (input.type !== "pdf") {
@@ -39,17 +63,36 @@ export class PdfExtractor implements Extractor {
       const pageTexts = result.pages
         .map((page) => ({ page: page.num, text: page.text.trim() }))
         .filter((page) => page.text.length > 0);
+      const documentId = this._resolveDocumentId(input);
       const { fullText, sections } = this._buildContent(pageTexts);
       const now = new Date().toISOString();
+      const multimodalEnabled =
+        Boolean(input.multimodal?.enableOCR) ||
+        Boolean(input.multimodal?.enableImageDescription) ||
+        Boolean(input.multimodal?.renderPdfPages);
+      const multimodal = multimodalEnabled
+        ? await this._extractMultimodal({
+            input,
+            documentId,
+            pageCount: result.total,
+            fallbackToRenderedPages:
+              Boolean(input.multimodal?.renderPdfPages) || pageTexts.length === 0,
+          })
+        : undefined;
+      const mergedSections = [...sections, ...(multimodal?.sections ?? [])];
+      const mergedFullText = [fullText, ...(multimodal?.sections ?? []).map((section) => section.text)]
+        .filter((value) => value.length > 0)
+        .join("\n\n");
 
       return {
-        documentId: this._resolveDocumentId(input),
+        documentId,
         title: this._resolveTitle(input),
         modality: "pdf",
-        language: input.metadata?.language as string | undefined,
+        language:
+          input.multimodal?.language ?? (input.metadata?.language as string | undefined),
         content: {
-          fullText,
-          sections,
+          fullText: mergedFullText,
+          sections: mergedSections,
         },
         lineage: {
           sourceType: source.sourceType,
@@ -63,6 +106,16 @@ export class PdfExtractor implements Extractor {
         metadata: {
           ...(input.metadata ?? {}),
           pageCount: result.total,
+          multimodal: multimodal
+            ? {
+                assets: multimodal.assets,
+                extractedImages: multimodal.extractedImages,
+                ocrResults: multimodal.ocrResults,
+                imageDescriptions: multimodal.imageDescriptions,
+                chunks: multimodal.chunks,
+                traces: multimodal.traces,
+              }
+            : undefined,
         },
       };
     } finally {
@@ -133,6 +186,108 @@ export class PdfExtractor implements Extractor {
       return basename(input.filePath);
     }
     return this._filenameFromUrl(input.url) ?? "Untitled PDF";
+  }
+
+  private async _extractMultimodal(params: {
+    input: IngestionInput;
+    documentId: string;
+    pageCount: number;
+    fallbackToRenderedPages: boolean;
+  }): Promise<{
+    assets: ReturnType<ImageAssetRegistry["register"]>;
+    extractedImages: ExtractedImage[];
+    ocrResults: OCRResult[];
+    imageDescriptions: ImageDescription[];
+    chunks: ReturnType<typeof buildMultimodalChunks>;
+    sections: DocumentSection[];
+    traces: Record<string, unknown>;
+  }> {
+    const input = params.input;
+    const extractionInput = {
+      documentId: params.documentId,
+      filePath: input.filePath ?? "remote.pdf",
+      pageCount: params.pageCount,
+      maxPages: input.multimodal?.maxPages,
+    };
+
+    const embedded = await this.pdfImageExtractor.extractEmbeddedImages(extractionInput);
+    const rendered = params.fallbackToRenderedPages
+      ? await this.pageRenderer.renderPages(extractionInput)
+      : [];
+    const maxImages = input.multimodal?.maxImages ?? Number.POSITIVE_INFINITY;
+    const extractedImages = await this.imageStore.save(
+      [...embedded, ...rendered].slice(0, maxImages)
+    );
+    const assets = this.assetRegistry.register(extractedImages);
+    const ocrResults = input.multimodal?.enableOCR
+      ? await Promise.all(extractedImages.map((image) => this.ocrProvider.recognize(image)))
+      : [];
+    const imageDescriptions = input.multimodal?.enableImageDescription
+      ? await Promise.all(extractedImages.map((image) => this.visionProvider.describe(image)))
+      : [];
+    const chunks = buildMultimodalChunks({
+      documentId: params.documentId,
+      ocrResults,
+      imageDescriptions,
+    });
+    const sections = this._buildMultimodalSections(ocrResults, imageDescriptions);
+
+    return {
+      assets,
+      extractedImages,
+      ocrResults,
+      imageDescriptions,
+      chunks,
+      sections,
+      traces: {
+        multimodalExtractionTrace: {
+          numberOfAssets: assets.length,
+          fallbackUsed: params.fallbackToRenderedPages,
+        },
+        ocrTrace: {
+          provider: this.ocrProvider.name,
+          numberOfBlocks: ocrResults.reduce(
+            (accumulator, current) => accumulator + (current.blocks?.length ?? 0),
+            0
+          ),
+        },
+        imageDescriptionTrace: {
+          provider: this.visionProvider.name,
+          numberOfAssets: imageDescriptions.length,
+        },
+        assetIndexingTrace: {
+          numberOfAssets: assets.length,
+        },
+      },
+    };
+  }
+
+  private _buildMultimodalSections(
+    ocrResults: OCRResult[],
+    descriptions: ImageDescription[]
+  ): DocumentSection[] {
+    const sections: DocumentSection[] = [];
+
+    for (const result of ocrResults) {
+      sections.push({
+        id: `ocr-${result.assetId}`,
+        heading: `OCR (page ${result.pageNumber ?? "?"})`,
+        text: result.text,
+        page: result.pageNumber,
+      });
+    }
+
+    for (const description of descriptions) {
+      sections.push({
+        id: `image-description-${description.assetId}`,
+        heading: "Image description",
+        text: [description.shortCaption, description.detailedDescription]
+          .filter(Boolean)
+          .join("\n"),
+      });
+    }
+
+    return sections;
   }
 
   private _resolveDocumentId(input: IngestionInput): string {

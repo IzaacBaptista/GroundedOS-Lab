@@ -16,8 +16,27 @@ export type {
 } from "./types/document";
 
 // Ingestion contract (Phase 0 — Multimodal Ingestion Standardization)
-export type { IngestionInput } from "./types/ingestion";
+export type { IngestionInput, MultimodalIngestionOptions } from "./types/ingestion";
 export type { Extractor } from "./types/extractor";
+export type {
+  ModalityType,
+  DocumentAsset,
+  ImageAsset,
+  AudioAsset,
+  ExtractedImage,
+  OCRWord,
+  OCRLine,
+  OCRBlock,
+  OCRResult,
+  ImageDescription,
+  TranscriptionSegment,
+  AudioTranscript,
+  MultimodalChunkType,
+  MultimodalChunk,
+  AssetReference,
+  MultimodalSourceDocument,
+  MultimodalNormalizedDocument,
+} from "./types/multimodal";
 
 // Query types (Phase 2 — Query Understanding)
 export type { RawQuery, ProcessedQuery, QueryIntent } from "./types/query";

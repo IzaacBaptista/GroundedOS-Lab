@@ -12,8 +12,8 @@ Extract, Transform, Load pipeline for ingesting multimodal documents into a unif
 
 ## Status
 
-Complete (Phase 0 baseline): text + PDF ingestion is complete and runnable;
-image/audio remain explicit stubs and additional modalities remain planned.
+Current baseline: text + PDF + image + audio ingestion are runnable with
+provider-based multimodal extraction hooks; additional modalities remain planned.
 
 ## Current plan
 
@@ -24,7 +24,7 @@ Execution follows the repository-level plan at
 
 1. Keep `text` ingestion stable and covered by tests
 2. ✅ Implement first functional `pdf` extractor
-3. Keep `image` and `audio` behind explicit, clear not-implemented errors
+3. ✅ Add provider-based image OCR/description and audio transcription paths
 4. ✅ Expose one local smoke command and document expected output shape
 
 ## Ingestion Flow
@@ -111,8 +111,8 @@ from `packages/etl/src/index.ts` for convenience.
 |---|---|---|---|
 | `text` | `TextExtractor` | ✅ Complete | Inline `content` or `filePath`; paragraph-based section splitting |
 | `pdf` | `PdfExtractor` | ✅ Complete | Local `filePath` or remote `url`; page-based text extraction |
-| `image` | `ImageExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
-| `audio` | `AudioExtractor` | 🚧 Stub | Registered in dispatcher, currently returns explicit NOT_IMPLEMENTED |
+| `image` | `ImageExtractor` | ✅ Baseline | OCR + image description via provider abstraction (mock/local/cloud adapters) |
+| `audio` | `AudioExtractor` | ✅ Baseline | Transcription via provider abstraction (mock/local/cloud adapters) |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
 | `markdown` | — | 🔲 Planned | Heading-aware section splitting |
 | `html` | — | 🔲 Planned | Tag-aware content extraction |

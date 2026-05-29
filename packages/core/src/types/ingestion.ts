@@ -8,6 +8,21 @@
 
 import type { DocumentModality } from "./document";
 
+export interface MultimodalIngestionOptions {
+  enableOCR?: boolean;
+  enableImageDescription?: boolean;
+  enableAudioTranscription?: boolean;
+  ocrProvider?: string;
+  visionProvider?: string;
+  transcriptionProvider?: string;
+  renderPdfPages?: boolean;
+  maxPages?: number;
+  maxImages?: number;
+  language?: string;
+  confidenceThreshold?: number;
+  devMode?: boolean;
+}
+
 /**
  * Unified input descriptor for the ingestion pipeline.
  *
@@ -53,4 +68,10 @@ export interface IngestionInput {
    * `NormalizedDocument.metadata`.
    */
   metadata?: Record<string, unknown>;
+
+  /**
+   * Optional multimodal processing controls.
+   * Keeps ingest compatibility while enabling OCR/vision/transcription flows.
+   */
+  multimodal?: MultimodalIngestionOptions;
 }

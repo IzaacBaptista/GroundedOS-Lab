@@ -109,4 +109,41 @@ describe("PdfExtractor", () => {
       })
     ).rejects.toThrow('PdfExtractor only handles "pdf"');
   });
+
+  it("adds multimodal OCR/image-description sections when enabled", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "groundedos-pdf-multimodal-"));
+    const filePath = join(dir, "multimodal.pdf");
+
+    try {
+      await writeFile(filePath, createSimplePdfBuffer(["PDF with multimodal extraction."]));
+
+      const doc = await new PdfExtractor().extract({
+        type: "pdf",
+        filePath,
+        metadata: {
+          documentId: "doc-pdf-multimodal",
+        },
+        multimodal: {
+          enableOCR: true,
+          enableImageDescription: true,
+          renderPdfPages: true,
+        },
+      });
+
+      const multimodal = (doc.metadata.multimodal ?? {}) as Record<string, unknown>;
+      expect(Array.isArray(multimodal.assets)).toBe(true);
+      expect(Array.isArray(multimodal.ocrResults)).toBe(true);
+      expect(Array.isArray(multimodal.imageDescriptions)).toBe(true);
+      expect(Array.isArray(multimodal.chunks)).toBe(true);
+
+      expect(doc.content.sections.some((section) => section.id.startsWith("ocr-"))).toBe(true);
+      expect(
+        doc.content.sections.some((section) =>
+          section.id.startsWith("image-description-")
+        )
+      ).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

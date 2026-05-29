@@ -67,4 +67,48 @@ describe("ingest", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("routes image input to multimodal image extractor", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "groundedos-dispatcher-image-"));
+    const filePath = join(dir, "sample.png");
+
+    try {
+      await writeFile(filePath, Buffer.from("image"));
+      const doc = await ingest({
+        type: "image",
+        filePath,
+        metadata: {
+          documentId: "doc-image-dispatcher",
+        },
+      });
+
+      expect(doc.documentId).toBe("doc-image-dispatcher");
+      expect(doc.modality).toBe("image");
+      expect(doc.content.fullText).toContain("OCR extracted text");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("routes audio input to transcription extractor", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "groundedos-dispatcher-audio-"));
+    const filePath = join(dir, "sample.mp3");
+
+    try {
+      await writeFile(filePath, Buffer.from("audio"));
+      const doc = await ingest({
+        type: "audio",
+        filePath,
+        metadata: {
+          documentId: "doc-audio-dispatcher",
+        },
+      });
+
+      expect(doc.documentId).toBe("doc-audio-dispatcher");
+      expect(doc.modality).toBe("audio");
+      expect(doc.content.fullText).toContain("Transcribed content");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
