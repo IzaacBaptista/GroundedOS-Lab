@@ -209,6 +209,20 @@ JSON request body:
 
 Response includes `document`, `answer`, `index`, and `devMode`.
 
+#### Realtime streaming endpoints
+
+The API exposes SSE-first realtime endpoints for progressive UX and observability:
+
+- `POST /query/stream` — stream retrieval + generation events for RAG queries
+- `POST /agents/stream` — stream ReAct/agent execution events
+- `GET /jobs/:id/stream` — stream job status events
+- `GET /evals/:id/stream` — stream eval progress events
+- `GET /ws/connect` — websocket session bootstrap metadata (heartbeat/reconnect)
+
+Use `Accept: text/event-stream` for SSE. For tooling/tests that need a single
+JSON payload, set `streamMode: "json"` in `/query/stream` requests or omit the
+SSE `Accept` header.
+
 Persisted index ask:
 
 ```bash

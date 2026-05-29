@@ -327,6 +327,78 @@ export const RagIndexRequestBodySchema = z
 export type RagIndexRequestBody = z.infer<typeof RagIndexRequestBodySchema>;
 
 // ---------------------------------------------------------------------------
+// Realtime + streaming endpoints
+// ---------------------------------------------------------------------------
+
+export const StreamModeSchema = z.enum(["sse", "json"]);
+export type StreamMode = z.infer<typeof StreamModeSchema>;
+
+export const StreamEventTypeSchema = z.enum([
+  "retrieval_started",
+  "retrieval_completed",
+  "reranking_completed",
+  "generation_started",
+  "token",
+  "citation",
+  "reasoning_summary",
+  "tool_call_started",
+  "tool_call_completed",
+  "critique_started",
+  "critique_completed",
+  "queued",
+  "started",
+  "progress",
+  "retry",
+  "step_started",
+  "observation",
+  "handoff",
+  "planning_updates",
+  "eval_progress",
+  "sample_completed",
+  "metric_updates",
+  "completed",
+  "error",
+]);
+export type StreamEventType = z.infer<typeof StreamEventTypeSchema>;
+
+export const QueryStreamRequestSchema = RagAskRequestBodySchema.extend({
+  streamMode: StreamModeSchema.optional(),
+  includeDevMode: z.boolean().optional(),
+  includeRetrievalEvents: z.boolean().optional(),
+  includeReasoningSummary: z.boolean().optional(),
+  includeCitations: z.boolean().optional(),
+  includeRealtimeMetrics: z.boolean().optional(),
+  vectorProvider: z.enum(["memory", "pgvector", "qdrant"]).optional(),
+  fallbackProviders: z.array(z.enum(["memory", "pgvector", "qdrant"])).optional(),
+}).strict();
+export type QueryStreamRequest = z.infer<typeof QueryStreamRequestSchema>;
+
+export const StreamEventSchema = z.object({
+  type: StreamEventTypeSchema,
+  timestamp: z.string(),
+  sequence: z.number().int().nonnegative(),
+  payload: z.record(z.string(), z.unknown()),
+});
+export type StreamEvent = z.infer<typeof StreamEventSchema>;
+
+export const StreamEventResponseSchema = z.object({
+  events: z.array(StreamEventSchema),
+});
+export type StreamEventResponse = z.infer<typeof StreamEventResponseSchema>;
+
+export const WsConnectResponseSchema = z.object({
+  sessionId: z.string(),
+  transport: z.literal("websocket"),
+  endpoint: z.string(),
+  heartbeatMs: z.number().int().positive(),
+  reconnect: z.object({
+    supported: z.boolean(),
+    retryAfterMs: z.number().int().positive(),
+  }),
+});
+export type WsConnectResponse = z.infer<typeof WsConnectResponseSchema>;
+
+// ---------------------------------------------------------------------------
 // Error response envelope
 // ---------------------------------------------------------------------------
 
