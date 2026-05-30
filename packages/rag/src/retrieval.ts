@@ -7,9 +7,14 @@ import {
 } from "@groundedos/core";
 import {
   AdaptiveRetrievalPlanner,
+  RetrievalEvaluator,
   type AdaptiveRetrievalMode,
   type AdaptiveRetrievalPlan,
   type AdaptiveQueryClassification,
+  type QueryRiskAssessment,
+  type RetrievalExecutionPlan,
+  type RetrievalSelfEvaluation,
+  type RetrievalSignalSummary,
 } from "@groundedos/adaptive-rag";
 import {
   InMemoryGraphStore,
@@ -79,6 +84,14 @@ export interface RetrieveFromIndexOptions {
   mode?: RetrievalMode;
   hybridDenseWeight?: number;
   hybridCandidateTopK?: number;
+  semanticCacheHit?: boolean;
+  sessionMemoryHits?: number;
+  previousRetrievalEffectiveness?: number;
+  latencyBudget?: number;
+  tokenBudget?: number;
+  costBudget?: number;
+  userMode?: "FAST" | "BALANCED" | "DEEP";
+  confidenceThreshold?: number;
 }
 
 export type RetrievalResult = VectorSearchResult;
@@ -115,12 +128,19 @@ export interface RetrievalHybridCandidate {
 export interface AdaptiveRoutingTrace {
   selectedPipeline: AdaptiveRetrievalMode;
   executedPipeline: AdaptiveRetrievalMode;
+  selectedStrategy: RetrievalExecutionPlan["strategy"];
+  policyName: string;
+  userMode: AdaptiveRetrievalPlan["policy"]["userMode"];
   reason: string[];
   fallbackReason?: string;
   estimatedCost: "low" | "medium" | "high";
+  estimatedLatency: "fast" | "balanced" | "deep";
   confidence: number;
   shouldRetrieve: boolean;
   classification: AdaptiveQueryClassification;
+  riskAssessment: QueryRiskAssessment;
+  executionPlan: RetrievalExecutionPlan;
+  retrievalEvaluation?: RetrievalSelfEvaluation;
 }
 
 export interface GraphRetrievalTrace {
@@ -246,12 +266,19 @@ export async function retrieveForDevMode(
     output.adaptiveRoutingTrace = {
       selectedPipeline: internal.adaptivePlan.selectedMode,
       executedPipeline: internal.adaptivePlan.executionMode,
+      selectedStrategy: internal.adaptivePlan.executionPlan.strategy,
+      policyName: internal.adaptivePlan.policy.name,
+      userMode: internal.adaptivePlan.policy.userMode,
       reason: internal.adaptivePlan.reasoning,
       fallbackReason: internal.adaptivePlan.fallbackReason,
       estimatedCost: internal.adaptivePlan.estimatedCost,
+      estimatedLatency: internal.adaptivePlan.estimatedLatency,
       confidence: internal.adaptivePlan.confidence,
       shouldRetrieve: internal.adaptivePlan.shouldRetrieve,
       classification: internal.adaptivePlan.classification,
+      riskAssessment: internal.adaptivePlan.riskAssessment,
+      executionPlan: internal.adaptivePlan.executionPlan,
+      retrievalEvaluation: internal.retrievalEvaluation,
     };
   }
 
@@ -296,6 +323,7 @@ type InternalRetrievalResult = {
     candidates: RetrievalHybridCandidate[];
   };
   adaptivePlan?: AdaptiveRetrievalPlan;
+  retrievalEvaluation?: RetrievalSelfEvaluation;
   graphTrace?: GraphRetrieverResult;
   hydeTrace?: HyDETrace;
   raptorTrace?: RaptorTrace;
@@ -336,30 +364,66 @@ async function retrieveInternal(
   const adaptivePlan = new AdaptiveRetrievalPlanner().plan({
     query,
     queryConfidence: 0.78,
+    semanticCacheHit: options.semanticCacheHit,
+    sessionMemoryHits: options.sessionMemoryHits,
+    previousRetrievalEffectiveness: options.previousRetrievalEffectiveness,
+    latencyBudget: options.latencyBudget,
+    tokenBudget: options.tokenBudget,
+    costBudget: options.costBudget,
     graphAvailable: Boolean(index.graphStore),
     hydeAvailable: true,
     raptorAvailable: Boolean(index.raptorTree),
     requireGrounding: true,
+    userMode: options.userMode,
+    confidenceThreshold: options.confidenceThreshold,
   });
-  const topK = options.topK ?? 3;
-  const denseWeight = resolveDenseWeight(options.hybridDenseWeight);
+  const topK = options.topK ?? adaptivePlan.executionPlan.topK;
+  const denseWeight = resolveDenseWeight(
+    options.hybridDenseWeight ??
+      (adaptivePlan.executionPlan.retrievalMode === "dense" ? 1 : undefined)
+  );
   const sparseWeight = 1 - denseWeight;
-  const candidateTopK = resolveCandidateTopK(options.hybridCandidateTopK, topK);
+  const candidateTopK = Math.max(
+    resolveCandidateTopK(options.hybridCandidateTopK, topK),
+    adaptivePlan.executionPlan.candidateTopK
+  );
+  const expansionQueries = adaptivePlan.executionPlan.queryExpansion.enabled
+    ? adaptivePlan.executionPlan.queryExpansion.queries.slice(1)
+    : [];
 
   const denseCandidates = await searchStore(index.store, {
     embedding: queryEmbedding,
     topK: candidateTopK,
     filter: options.filter,
   });
-
-  const validatedDenseCandidates = validateVectorSearchResults(
-    denseCandidates
-  ) as RetrievalResult[];
+  const expansionCandidates = await searchExpandedQueries(
+    index,
+    expansionQueries,
+    candidateTopK,
+    options.filter
+  );
+  const validatedDenseCandidates = mergeRetrievalResults(
+    validateVectorSearchResults(denseCandidates) as RetrievalResult[],
+    expansionCandidates
+  );
 
   if (validatedDenseCandidates.length === 0) {
     return {
       results: [],
       adaptivePlan,
+      retrievalEvaluation: new RetrievalEvaluator().evaluate(
+        adaptivePlan,
+        {
+          denseHits: 0,
+          expansionHits: expansionCandidates.length,
+          graphHits: 0,
+          hydeHits: 0,
+          raptorHits: 0,
+          finalHits: 0,
+        },
+        0,
+        0
+      ),
       hybridMeta: {
         denseWeight,
         sparseWeight,
@@ -371,7 +435,10 @@ async function retrieveInternal(
 
   const scoredCandidates = validatedDenseCandidates.map((candidate, index) => {
       const denseScore = normalizeDenseScore(candidate.score);
-      const sparseScore = sparseNgramCosine(query, candidate.chunk.text);
+      const sparseScore =
+        adaptivePlan.executionPlan.retrievalMode === "dense"
+          ? 0
+          : sparseNgramCosine(query, candidate.chunk.text);
       const combined = denseWeight * denseScore + sparseWeight * sparseScore;
 
       return {
@@ -394,7 +461,9 @@ async function retrieveInternal(
   const reranked = sortedCandidates.slice(0, topK);
 
   const hypotheticalDocument =
-    adaptivePlan.executionMode === "HYDE_RAG" || adaptivePlan.executionMode === "FULL_PIPELINE"
+    adaptivePlan.executionPlan.queryExpansion.strategies.includes("hyde") ||
+    adaptivePlan.executionMode === "HYDE_RAG" ||
+    adaptivePlan.executionMode === "FULL_PIPELINE"
       ? buildHypotheticalDocument(query)
       : undefined;
   const hydeResults = hypotheticalDocument
@@ -405,13 +474,14 @@ async function retrieveInternal(
       })) as RetrievalResult[])
     : [];
   const graphTrace =
-    (adaptivePlan.executionMode === "GRAPH_RAG" ||
-      adaptivePlan.executionMode === "FULL_PIPELINE") &&
+    adaptivePlan.executionPlan.graphTraversal &&
     index.graphStore
       ? retrieveFromKnowledgeGraph(index.graphStore, query, { topK: candidateTopK, maxDepth: 2 })
       : undefined;
   const raptorResult =
-    adaptivePlan.executionMode === "FULL_PIPELINE"
+    (adaptivePlan.executionMode === "FULL_PIPELINE" ||
+      adaptivePlan.executionPlan.strategy === "HierarchicalStrategy") &&
+    index.raptorTree
       ? retrieveFromRaptorTree(index.raptorTree, query, topK)
       : undefined;
   const fused = fuseRetrievalSignals(
@@ -422,10 +492,24 @@ async function retrieveInternal(
     raptorResult?.results ?? [],
     topK
   );
+  const retrievalEvaluation = new RetrievalEvaluator().evaluate(
+    adaptivePlan,
+    {
+      denseHits: reranked.length,
+      expansionHits: expansionCandidates.length,
+      graphHits: graphTrace?.results.length ?? 0,
+      hydeHits: hydeResults.length,
+      raptorHits: raptorResult?.results.length ?? 0,
+      finalHits: fused.results.length,
+    },
+    fused.results[0]?.score ?? 0,
+    averageScore(fused.results)
+  );
 
   return {
     results: fused.results,
     adaptivePlan,
+    retrievalEvaluation,
     graphTrace,
     hydeTrace: hypotheticalDocument
       ? buildHyDETrace(index.embeddingProvider, hypotheticalDocument, reranked, hydeResults)
@@ -463,6 +547,52 @@ async function searchStore(
   }
 
   return store.search(query);
+}
+
+async function searchExpandedQueries(
+  index: RetrievalIndex,
+  queries: string[],
+  topK: number,
+  filter: VectorMetadataFilter | undefined
+): Promise<RetrievalResult[]> {
+  const results: RetrievalResult[] = [];
+
+  for (const expandedQuery of queries) {
+    const embedding = await embedQuery(expandedQuery, index.embeddingProvider);
+    const searched = await searchStore(index.store, {
+      embedding,
+      topK,
+      filter,
+    });
+
+    results.push(...(validateVectorSearchResults(searched) as RetrievalResult[]));
+  }
+
+  return results;
+}
+
+function mergeRetrievalResults(...resultSets: RetrievalResult[][]): RetrievalResult[] {
+  const merged = new Map<string, RetrievalResult>();
+
+  for (const resultSet of resultSets) {
+    for (const result of resultSet) {
+      const existing = merged.get(result.chunk.id);
+
+      if (!existing || result.score > existing.score) {
+        merged.set(result.chunk.id, result);
+      }
+    }
+  }
+
+  return [...merged.values()];
+}
+
+function averageScore(results: RetrievalResult[]): number {
+  if (results.length === 0) {
+    return 0;
+  }
+
+  return results.reduce((sum, result) => sum + result.score, 0) / results.length;
 }
 
 export function createRetrievalDevOutput(

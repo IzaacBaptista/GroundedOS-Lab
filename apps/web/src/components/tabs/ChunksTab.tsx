@@ -302,12 +302,44 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <Pill variant="teal">{adaptive.selectedPipeline}</Pill>
             <Pill variant="gray">executed {adaptive.executedPipeline}</Pill>
+            <Pill variant="blue">{adaptive.selectedStrategy}</Pill>
+            <Pill variant="gray">policy {adaptive.policyName}</Pill>
+            <Pill variant="gray">mode {adaptive.userMode}</Pill>
             <Pill variant="gray">cost {adaptive.estimatedCost}</Pill>
+            <Pill variant="gray">latency {adaptive.estimatedLatency}</Pill>
             <Pill variant="gray">confidence {(adaptive.confidence * 100).toFixed(0)}%</Pill>
+            <Pill variant="gray">risk {(adaptive.riskAssessment.overallRisk * 100).toFixed(0)}%</Pill>
+            <Pill variant="gray">topK {adaptive.executionPlan.topK}</Pill>
+            <Pill variant="gray">
+              rerank {adaptive.executionPlan.rerankEnabled ? "on" : "off"}
+            </Pill>
           </div>
           <div style={{ color: "var(--color-text-secondary, var(--muted))", fontSize: 12 }}>
             {adaptive.reason.join(" · ")}
           </div>
+          <ExplainBox label="classificação">
+            {adaptive.classification.primaryIntent} · expected {adaptive.classification.expectedAnswerType}
+            {" · "}complexity {(adaptive.classification.complexityScore * 100).toFixed(0)}%
+            {" · "}ambiguity {(adaptive.classification.ambiguity * 100).toFixed(0)}%
+          </ExplainBox>
+          {adaptive.executionPlan.queryExpansion.enabled && (
+            <ExplainBox variant="tip" label="query expansion">
+              {adaptive.executionPlan.queryExpansion.queries.join(" · ")}
+            </ExplainBox>
+          )}
+          <ExplainBox label="validation">
+            {adaptive.executionPlan.validation.validationSteps.join(" · ")}
+          </ExplainBox>
+          {adaptive.retrievalEvaluation && (
+            <ExplainBox
+              variant={adaptive.retrievalEvaluation.sufficient ? "tip" : "warning"}
+              label="retrieval self-evaluation"
+            >
+              confidence {(adaptive.retrievalEvaluation.retrievalConfidence * 100).toFixed(0)}% ·
+              consensus {(adaptive.retrievalEvaluation.consensusScore * 100).toFixed(0)}% · next{" "}
+              {adaptive.retrievalEvaluation.recommendedAction}
+            </ExplainBox>
+          )}
           {adaptive.fallbackReason && (
             <ExplainBox variant="tip" label="fallback aplicado">
               {adaptive.fallbackReason}

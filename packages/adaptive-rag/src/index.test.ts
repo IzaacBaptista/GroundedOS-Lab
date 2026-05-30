@@ -10,9 +10,10 @@ describe("adaptive-rag", () => {
     });
 
     expect(classification.categories).toEqual(
-      expect.arrayContaining(["relational", "retrieval-heavy"])
+      expect.arrayContaining(["relational", "retrieval-heavy", "multi-hop"])
     );
     expect(classification.complexity).toBe("high");
+    expect(classification.primaryIntent).toBe("multi-hop");
   });
 
   it("routes relational queries to graph-aware retrieval when graph signals are available", () => {
@@ -27,7 +28,9 @@ describe("adaptive-rag", () => {
 
     expect(plan.selectedMode).toBe("FULL_PIPELINE");
     expect(plan.executionMode).toBe("FULL_PIPELINE");
-    expect(plan.reasoning).toContain("relational-query-uses-graph");
+    expect(plan.executionPlan.strategy).toBe("MultiRetrievalStrategy");
+    expect(plan.executionPlan.graphTraversal).toBe(true);
+    expect(plan.executionPlan.queryExpansion.enabled).toBe(true);
   });
 
   it("falls back from direct LLM to grounded retrieval when grounding is required", () => {
@@ -40,5 +43,42 @@ describe("adaptive-rag", () => {
     expect(plan.selectedMode).toBe("DIRECT_LLM");
     expect(plan.executionMode).toBe("STANDARD_RAG");
     expect(plan.fallbackReason).toBe("grounded-retrieval-required-by-current-pipeline");
+  });
+
+  it("enforces high-validation policies for high-risk queries", () => {
+    const planner = new AdaptiveRetrievalPlanner();
+    const plan = planner.plan({
+      query: "Is this legally compliant? Cite the evidence and explain the risks.",
+      graphAvailable: true,
+      hydeAvailable: true,
+      raptorAvailable: true,
+      requireGrounding: true,
+      userMode: "DEEP",
+    });
+
+    expect(plan.classification.categories).toEqual(
+      expect.arrayContaining(["high-risk", "citation-heavy"])
+    );
+    expect(plan.executionPlan.strategy).toBe("HighValidationStrategy");
+    expect(plan.executionPlan.multiRetrieval).toBe(true);
+    expect(plan.executionPlan.validation.citationEnforced).toBe(true);
+    expect(plan.executionPlan.validation.selfCheckEnabled).toBe(true);
+    expect(plan.executionPlan.topK).toBeGreaterThanOrEqual(20);
+  });
+
+  it("keeps simple factual fast-mode queries on cheap retrieval", () => {
+    const planner = new AdaptiveRetrievalPlanner();
+    const plan = planner.plan({
+      query: "What is semantic cache?",
+      requireGrounding: true,
+      userMode: "FAST",
+      semanticCacheHit: true,
+    });
+
+    expect(plan.classification.categories).toContain("simple-factual");
+    expect(plan.executionPlan.strategy).toBe("DenseOnlyStrategy");
+    expect(plan.executionPlan.rerankEnabled).toBe(false);
+    expect(plan.executionPlan.retrievalMode).toBe("dense");
+    expect(plan.executionPlan.topK).toBeLessThanOrEqual(4);
   });
 });

@@ -1811,23 +1811,28 @@ async function runLocalRag(
         const refinedRoutingDecision = routeModel(input.rawQuery, {
           postRetrieval: routingSignals,
         });
+        const rerankingApplied = shouldApplyAdaptiveReranking(input.devMode);
         const rerankInputTokens = estimateTokenUsage(
-          `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
+          rerankingApplied
+            ? `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
+            : input.retrievalQuery
         );
-        const rerankUnits = input.rerankCandidateCount ?? input.devMode.resultCount;
+        const rerankUnits = rerankingApplied ? input.rerankCandidateCount ?? input.devMode.resultCount : 0;
 
-        const projected =
-          input.costTracker.getTotalCostUsd() +
-          rerankUnits * resolveUnitCostUsd(input.provider.name, "reranking");
-        budgetEnforcer.validateBudget(input.document.documentId, projected, dailySpentUsd);
+        if (rerankingApplied) {
+          const projected =
+            input.costTracker.getTotalCostUsd() +
+            rerankUnits * resolveUnitCostUsd(input.provider.name, "reranking");
+          budgetEnforcer.validateBudget(input.document.documentId, projected, dailySpentUsd);
 
-        input.costTracker.trackEvent(
-          "reranking",
-          input.provider.name,
-          rerankUnits,
-          resolveUnitCostUsd(input.provider.name, "reranking"),
-          { timestamp: Date.now(), candidateCount: rerankUnits, returnedCount: reranked.resultCount }
-        );
+          input.costTracker.trackEvent(
+            "reranking",
+            input.provider.name,
+            rerankUnits,
+            resolveUnitCostUsd(input.provider.name, "reranking"),
+            { timestamp: Date.now(), candidateCount: rerankUnits, returnedCount: reranked.resultCount }
+          );
+        }
 
         return {
           ...input,
@@ -2140,8 +2145,10 @@ async function runLocalRag(
         })),
       },
       reranking: {
-        applied: true,
-        candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        applied: shouldApplyAdaptiveReranking(result.output!.devMode!),
+        candidateCount: shouldApplyAdaptiveReranking(result.output!.devMode!)
+          ? result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount
+          : result.output!.devMode!.resultCount,
         returnedCount: result.output!.devMode!.resultCount,
         candidates: rerankingCandidates,
       },
@@ -2486,23 +2493,28 @@ async function runPersistedRag(
         const refinedRoutingDecision = routeModel(input.rawQuery, {
           postRetrieval: routingSignals,
         });
+        const rerankingApplied = shouldApplyAdaptiveReranking(input.devMode);
         const rerankInputTokens = estimateTokenUsage(
-          `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
+          rerankingApplied
+            ? `${input.retrievalQuery} ${input.devMode.results.map((result) => result.text).join(" ")}`
+            : input.retrievalQuery
         );
-        const rerankUnits = input.rerankCandidateCount ?? input.devMode.resultCount;
+        const rerankUnits = rerankingApplied ? input.rerankCandidateCount ?? input.devMode.resultCount : 0;
 
-        const projected =
-          input.costTracker.getTotalCostUsd() +
-          rerankUnits * resolveUnitCostUsd(providerName, "reranking");
-        budgetEnforcer.validateBudget(persistedDocumentId, projected, dailySpentUsd);
+        if (rerankingApplied) {
+          const projected =
+            input.costTracker.getTotalCostUsd() +
+            rerankUnits * resolveUnitCostUsd(providerName, "reranking");
+          budgetEnforcer.validateBudget(persistedDocumentId, projected, dailySpentUsd);
 
-        input.costTracker.trackEvent(
-          "reranking",
-          providerName,
-          rerankUnits,
-          resolveUnitCostUsd(providerName, "reranking"),
-          { timestamp: Date.now(), candidateCount: rerankUnits, returnedCount: reranked.resultCount }
-        );
+          input.costTracker.trackEvent(
+            "reranking",
+            providerName,
+            rerankUnits,
+            resolveUnitCostUsd(providerName, "reranking"),
+            { timestamp: Date.now(), candidateCount: rerankUnits, returnedCount: reranked.resultCount }
+          );
+        }
 
         return {
           ...input,
@@ -2817,8 +2829,10 @@ async function runPersistedRag(
         })),
       },
       reranking: {
-        applied: true,
-        candidateCount: result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount,
+        applied: shouldApplyAdaptiveReranking(result.output!.devMode!),
+        candidateCount: shouldApplyAdaptiveReranking(result.output!.devMode!)
+          ? result.output!.rerankCandidateCount ?? result.output!.devMode!.resultCount
+          : result.output!.devMode!.resultCount,
         returnedCount: result.output!.devMode!.resultCount,
         candidates: rerankingCandidates,
       },
@@ -3711,6 +3725,18 @@ function rerankRetrievalOutput(
   retrievalQuery: string,
   topK: number
 ): RetrievalDevModeWithRerank {
+  if (!shouldApplyAdaptiveReranking(devMode)) {
+    return {
+      ...devMode,
+      resultCount: Math.min(devMode.results.length, topK),
+      results: devMode.results.slice(0, topK).map((result, index) => ({
+        ...result,
+        rank: index + 1,
+      })),
+      reranking: [],
+    };
+  }
+
   if (devMode.results.length <= 1) {
     return {
       ...devMode,
@@ -3790,6 +3816,10 @@ function rerankRetrievalOutput(
 type RetrievalDevModeWithRerank = RetrievalDevModeOutput & {
   reranking?: NonNullable<RagAskResponse["devMode"]["reranking"]>["candidates"];
 };
+
+function shouldApplyAdaptiveReranking(devMode: RetrievalDevModeOutput): boolean {
+  return devMode.adaptiveRoutingTrace?.executionPlan?.rerankEnabled ?? true;
+}
 
 function getRerankingCandidates(devMode: RetrievalDevModeOutput): NonNullable<
   NonNullable<RagAskResponse["devMode"]["reranking"]>["candidates"]

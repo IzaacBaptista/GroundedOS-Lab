@@ -132,6 +132,27 @@ describe("askRag", () => {
     expect(second.devMode.cache?.hits).toBeGreaterThanOrEqual(1);
   });
 
+  it("surfaces high-risk adaptive retrieval policies in dev mode", async () => {
+    const output = await askRag(
+      makeRagTestCase({
+        content:
+          "Compliance reviews require citations, evidence gathering, and explicit legal risk notes.",
+        query: "Is this legally compliant? Cite the evidence and explain the risks.",
+        title: "High Risk Adaptive Retrieval Test",
+        documentId: "api-high-risk-adaptive-doc",
+      })
+    );
+
+    expect(output.devMode.adaptiveRoutingTrace).toMatchObject({
+      selectedStrategy: "HighValidationStrategy",
+    });
+    expect(output.devMode.adaptiveRoutingTrace?.riskAssessment.highRisk).toBe(true);
+    expect(output.devMode.adaptiveRoutingTrace?.executionPlan.validation.citationEnforced).toBe(true);
+    expect(output.devMode.adaptiveRoutingTrace?.executionPlan.validation.selfCheckEnabled).toBe(
+      true
+    );
+  });
+
   it("records trade-off metrics for dashboard aggregation", async () => {
     await askRag(
       makeRagTestCase({
