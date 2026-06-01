@@ -601,6 +601,103 @@ export interface DevModeOutput {
       queryIntent?: string;
     };
   };
+  retrievalAnalysis?: {
+    failureCase: {
+      failureReason: string;
+      confidence: number;
+      diagnosis: Array<{
+        component: "query" | "chunking" | "embedding" | "retrieval" | "reranking" | "corpus" | "generation";
+        issue: string;
+        confidence: number;
+        rationale: string;
+      }>;
+      candidateFixes: Array<{
+        strategy: string;
+        estimatedImpact: number;
+        estimatedCost: "low" | "medium" | "high";
+        estimatedLatencyImpact: "low" | "medium" | "high";
+        confidence: number;
+        affectedMetrics: string[];
+        rationale: string;
+      }>;
+    };
+    diagnosticTrace: {
+      retrievalFailureDetected: boolean;
+      failureType: string;
+      confidence: number;
+      probableCauses: Array<{
+        component: string;
+        issue: string;
+        confidence: number;
+        rationale: string;
+      }>;
+      evidenceGaps: string[];
+      chunkFragmentationIndicators: string[];
+      semanticDriftIndicators: string[];
+      rerankImpact: {
+        rerankingApplied: boolean;
+        candidateCount: number;
+        returnedCount: number;
+      };
+      retrievalConfidence: number;
+      healthScore: number;
+      suggestedFixes: string[];
+    };
+    healthReport: {
+      healthScore: { overall: number };
+      qualityBreakdown: {
+        recall: number;
+        relevance: number;
+        diversity: number;
+        groundednessPotential: number;
+        retrievalConfidence: number;
+        evidenceCoverage: number;
+        redundancy: number;
+        chunkCoherence: number;
+        citationSupport: number;
+      };
+      alerts: string[];
+    };
+    simulations: Array<{
+      scenario: {
+        name: string;
+        enableHybrid?: boolean;
+        topK?: number;
+        enableReranking?: boolean;
+        enableQueryExpansion?: boolean;
+        enableHyde?: boolean;
+        enableGraphRag?: boolean;
+      };
+      estimatedRecallImprovement: number;
+      estimatedRelevanceImprovement: number;
+      estimatedLatencyImpact: number;
+      rationale: string;
+    }>;
+    explainability: {
+      whyChunksWereRetrieved: string[];
+      whyRelevantChunksMayHaveBeenMissed: string[];
+      rerankingImpact: string;
+      overlapImpact: string;
+      embeddingImpact: string;
+      topKImpact: string;
+      queryRewriteImpact: string;
+    };
+    recommendations: Array<{
+      strategy: string;
+      estimatedImpact: number;
+      estimatedCost: "low" | "medium" | "high";
+      estimatedLatencyImpact: "low" | "medium" | "high";
+      confidence: number;
+      affectedMetrics: string[];
+      rationale: string;
+    }>;
+    autoTuningRecommendations: Array<{
+      parameter: string;
+      currentValue?: number | string | boolean;
+      recommendedValue: number | string | boolean;
+      rationale: string;
+    }>;
+  };
   replay?: {
     snapshot: {
       version: "v1";

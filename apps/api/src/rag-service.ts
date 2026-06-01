@@ -61,10 +61,12 @@ import {
   classifyRetrievalFailure,
   compareReplaySnapshots,
   loadReliabilityReportSummaries,
+  RetrievalDiagnosticsEngine,
   type ConfidenceCalibration,
   type ReplayComparisonReport,
   type ReplaySnapshot,
   type ReliabilityReportSummaries,
+  type RetrievalAnalysisResult,
   type RetrievalDiagnostics,
   type RetrievalFailureClassification,
 } from "./retrieval-reliability";
@@ -412,6 +414,7 @@ export type RagAskResponse = {
       }>;
     };
     retrievalDiagnostics?: RetrievalDiagnostics;
+    retrievalAnalysis?: RetrievalAnalysisResult;
     replay?: {
       snapshot: ReplaySnapshot;
       reproducible: boolean;
@@ -2190,6 +2193,7 @@ async function runLocalRag(
         finalAnswer
       ),
       retrievalDiagnostics: reliability.retrievalDiagnostics,
+      retrievalAnalysis: reliability.retrievalAnalysis,
       replay: reliability.replay,
       reportReferences: reliability.reportReferences,
     },
@@ -2874,6 +2878,7 @@ async function runPersistedRag(
         finalAnswer
       ),
       retrievalDiagnostics: reliability.retrievalDiagnostics,
+      retrievalAnalysis: reliability.retrievalAnalysis,
       replay: reliability.replay,
       reportReferences: reliability.reportReferences,
     },
@@ -3041,6 +3046,7 @@ async function buildReliabilityAugmentation(input: {
   taxonomy: RetrievalFailureClassification;
   confidence: ConfidenceCalibration;
   retrievalDiagnostics: RetrievalDiagnostics;
+  retrievalAnalysis: RetrievalAnalysisResult;
   replay: NonNullable<RagAskResponse["devMode"]["replay"]>;
   reportReferences: ReliabilityReportSummaries;
 }> {
@@ -3074,6 +3080,30 @@ async function buildReliabilityAugmentation(input: {
   const confidence = calibrateConfidence({
     diagnostics: retrievalDiagnostics,
     evals: input.evals,
+  });
+  const retrievalAnalysis = new RetrievalDiagnosticsEngine().analyze({
+    query: input.query,
+    diagnostics: retrievalDiagnostics,
+    chunks: input.devMode.results.map((item) => ({
+      chunkId: item.chunkId,
+      documentId: item.documentId,
+      sectionId: item.sectionId,
+      score: item.score,
+      text: item.text,
+    })),
+    evals: {
+      groundedness: input.evals?.groundedness,
+      answerOverlap: input.evals?.answerOverlap,
+      retrievalAccuracy: input.evals?.retrievalAccuracy,
+    },
+    retrievalStrategy: input.devMode.hybrid?.mode ?? DEFAULT_RETRIEVAL_MODE,
+    rerankingOutput: (input.rerankingCandidates ?? []).map((candidate) => ({
+      chunkId: candidate.chunkId,
+      beforeRank: candidate.beforeRank,
+      afterRank: candidate.afterRank,
+      finalScore: candidate.finalScore,
+    })),
+    retrievalConfidence: confidence.confidenceScore,
   });
   const replaySnapshot = buildReplaySnapshot({
     query: input.query,
@@ -3149,6 +3179,7 @@ async function buildReliabilityAugmentation(input: {
     taxonomy,
     confidence,
     retrievalDiagnostics,
+    retrievalAnalysis,
     replay: {
       snapshot: replaySnapshot,
       reproducible: Boolean(input.storage?.persisted),
