@@ -1452,7 +1452,7 @@ export function buildKnowledgeGraph(
           evidenceChunkId: "validation",
           evidenceText: issue,
           extractionMethod: "validator",
-        },
+        } satisfies RelationCandidate,
         reason: issue,
       }))
     );
