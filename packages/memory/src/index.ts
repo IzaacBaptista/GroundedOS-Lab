@@ -12,7 +12,7 @@ export type {
   MemoryHierarchyRequest,
   MemoryHierarchySnapshot,
   MemoryImportanceScore,
-  MemoryManager,
+  MemoryManagerContract,
   MemoryPriority,
   MemoryRetrievalResult,
   MemoryRetrievalResultItem,

@@ -231,7 +231,7 @@ export interface MemoryRetrievalResult {
   selectionTrace: MemorySelectionTrace[];
 }
 
-export interface MemoryManager {
+export interface MemoryManagerContract {
   getHierarchy(
     sessionId: string,
     request?: MemoryHierarchyRequest

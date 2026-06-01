@@ -12,7 +12,7 @@ import type {
   MemoryHierarchyRequest,
   MemoryHierarchySnapshot,
   MemoryImportanceScore,
-  MemoryManager as MemoryManagerContract,
+  MemoryManagerContract,
   MemoryPriority,
   MemoryRetrievalResult,
   MemoryRetrievalResultItem,
@@ -27,7 +27,7 @@ import type {
 
 const DEFAULT_MEMORY_WINDOW = 6;
 const DEFAULT_MAX_WORKING_TOKENS = 240;
-const DEFAULT_IMPORTANCE_THRESHOLD = 0.55;
+const DEFAULT_IMPORTANCE_THRESHOLD = 0.4;
 const DEFAULT_RETRIEVAL_LIMIT = 6;
 const ENTRY_READ_LIMIT = 10_000;
 const STOP_WORDS = new Set([
@@ -614,8 +614,11 @@ export class MemoryConsolidator {
     );
 
     const workingMemory = buildWorkingMemory(chronological, importanceById, request);
+    const episodicSourceEntries = chronological.filter(
+      (entry) => !workingMemory.items.some((item) => item.entryId === entry.id)
+    );
     const compression = this.compressionEngine.run(
-      chronological.filter((entry) => !workingMemory.items.some((item) => item.entryId === entry.id))
+      episodicSourceEntries.length > 0 ? episodicSourceEntries : chronological
     );
     const timeline = new EpisodeTimeline(compression.episodes);
     const graphEdges = buildEpisodeGraphEdges(compression.episodes);

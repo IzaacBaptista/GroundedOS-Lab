@@ -350,6 +350,31 @@ export type RagAskResponse = {
         answer: string;
         createdAt: number;
       }>;
+      hierarchy?: {
+        workingMemorySize: number;
+        estimatedTokens: number;
+        compressionTriggered: boolean;
+        activeGoals: string[];
+        activeEntities: string[];
+        episodicCount: number;
+        extractedFacts: Array<{
+          factId: string;
+          text: string;
+          confidence: number;
+          provenance: string[];
+        }>;
+        longTermFactCount: number;
+        semanticConceptCount: number;
+        decay: {
+          archived: number;
+          compacted: number;
+        };
+        traces: Array<{
+          stage: string;
+          summary: string;
+          metrics?: Record<string, number | string | boolean>;
+        }>;
+      };
     };
     reranking?: {
       applied: boolean;
@@ -2154,8 +2179,8 @@ async function runLocalRag(
   });
   const devModeMemory = await buildDevModeMemory(
     result.output!.sessionId,
-    normalizedRequest.ownerId,
-    normalizedRequest.tenantId,
+    ownerId,
+    tenantId,
     result.output!.rawQuery,
     result.output!.memoryMatches,
     result.output!.memoryStored
@@ -2837,8 +2862,8 @@ async function runPersistedRag(
   });
   const devModeMemory = await buildDevModeMemory(
     result.output!.sessionId,
-    normalizedRequest.ownerId,
-    normalizedRequest.tenantId,
+    ownerId,
+    tenantId,
     result.output!.rawQuery,
     result.output!.memoryMatches,
     result.output!.memoryStored
