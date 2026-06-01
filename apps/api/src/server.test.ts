@@ -1682,6 +1682,78 @@ describe("api server", () => {
     expect(body.entries[0]?.query).toBeTruthy();
   });
 
+  it("serves hierarchical memory endpoints", async () => {
+    const app = await createTestServer();
+    const sessionId = `session-memory-arch-${Date.now()}`;
+
+    await app.inject({
+      method: "POST",
+      url: "/rag/ask",
+      payload: {
+        type: "text",
+        content:
+          "Working memory keeps recent context. Episodic memory stores summaries. Long-term memory stores facts.",
+        query: "How does memory hierarchy work?",
+        topK: 1,
+        sessionId,
+      },
+    });
+
+    await app.inject({
+      method: "POST",
+      url: "/rag/ask",
+      payload: {
+        type: "text",
+        content:
+          "Compression creates summaries and fact extraction keeps durable statements with provenance.",
+        query: "What does fact extraction keep?",
+        topK: 1,
+        sessionId,
+      },
+    });
+
+    const hierarchyResponse = await app.inject({
+      method: "GET",
+      url: `/memory/hierarchy?sessionId=${encodeURIComponent(sessionId)}`,
+    });
+    const hierarchy = hierarchyResponse.json() as {
+      workingMemory: { items: Array<unknown> };
+      episodicMemory: { episodes: Array<unknown> };
+      longTermMemory: { facts: Array<unknown> };
+    };
+
+    expect(hierarchyResponse.statusCode).toBe(200);
+    expect(hierarchy.workingMemory.items.length).toBeGreaterThan(0);
+    expect(hierarchy.episodicMemory.episodes.length).toBeGreaterThan(0);
+    expect(hierarchy.longTermMemory.facts.length).toBeGreaterThan(0);
+
+    const retrieveResponse = await app.inject({
+      method: "POST",
+      url: "/memory/retrieve",
+      payload: {
+        sessionId,
+        query: "durable facts",
+      },
+    });
+    const retrieveBody = retrieveResponse.json() as {
+      results: Array<{ memoryType: string }>;
+      selectionTrace: Array<unknown>;
+    };
+
+    expect(retrieveResponse.statusCode).toBe(201);
+    expect(retrieveBody.results.length).toBeGreaterThan(0);
+    expect(retrieveBody.selectionTrace.length).toBeGreaterThan(0);
+
+    const factsResponse = await app.inject({
+      method: "GET",
+      url: `/memory/facts?sessionId=${encodeURIComponent(sessionId)}`,
+    });
+    const factsBody = factsResponse.json() as { facts: Array<unknown> };
+
+    expect(factsResponse.statusCode).toBe(200);
+    expect(factsBody.facts.length).toBeGreaterThan(0);
+  });
+
   it("serves GET /lab/experiments as a concept-oriented lab catalog", async () => {
     const app = await createTestServer();
     const response = await app.inject({

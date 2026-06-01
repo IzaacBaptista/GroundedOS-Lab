@@ -84,6 +84,7 @@ import {
 } from "./rag-index-store";
 import {
   costLedger,
+  memoryManager,
   semanticCache,
   sessionMemoryStore,
   tradeoffMetricsStore,
@@ -670,6 +671,99 @@ export async function getRagSessionMemory(
     sessionId: normalized,
     count: entries.length,
     entries,
+  };
+}
+
+async function buildDevModeMemory(
+  sessionId: string | undefined,
+  ownerId: string | undefined,
+  tenantId: string | undefined,
+  query: string | undefined,
+  memoryMatches: MemorySearchResult[] | undefined,
+  memoryStored: boolean | undefined
+): Promise<
+  | {
+      sessionId?: string;
+      recalled: number;
+      stored: boolean;
+      matches: Array<{
+        score: number;
+        query: string;
+        answer: string;
+        createdAt: number;
+      }>;
+      hierarchy?: {
+        workingMemorySize: number;
+        estimatedTokens: number;
+        compressionTriggered: boolean;
+        activeGoals: string[];
+        activeEntities: string[];
+        episodicCount: number;
+        extractedFacts: Array<{
+          factId: string;
+          text: string;
+          confidence: number;
+          provenance: string[];
+        }>;
+        longTermFactCount: number;
+        semanticConceptCount: number;
+        decay: {
+          archived: number;
+          compacted: number;
+        };
+        traces: Array<{
+          stage: string;
+          summary: string;
+          metrics?: Record<string, number | string | boolean>;
+        }>;
+      };
+    }
+  | undefined
+> {
+  if (!sessionId) {
+    return undefined;
+  }
+
+  const hierarchy = await memoryManager.getHierarchy(
+    createOwnedSessionId(ownerId, sessionId, tenantId),
+    { query }
+  );
+
+  return {
+    sessionId,
+    recalled: memoryMatches?.length ?? 0,
+    stored: Boolean(memoryStored),
+    matches: (memoryMatches ?? []).map((match) => ({
+      score: match.score,
+      query: match.entry.query,
+      answer: match.entry.answer,
+      createdAt: match.entry.createdAt,
+    })),
+    hierarchy: {
+      workingMemorySize: hierarchy.workingMemory.items.length,
+      estimatedTokens: hierarchy.workingMemory.estimatedTokens,
+      compressionTriggered: hierarchy.workingMemory.compressionTriggered,
+      activeGoals: hierarchy.workingMemory.activeGoals,
+      activeEntities: hierarchy.workingMemory.activeEntities,
+      episodicCount: hierarchy.episodicMemory.episodes.length,
+      extractedFacts: hierarchy.longTermMemory.facts.slice(0, 5).map((fact) => ({
+        factId: fact.factId,
+        text: fact.text,
+        confidence: fact.confidence.score,
+        provenance: fact.provenance,
+      })),
+      longTermFactCount: hierarchy.longTermMemory.facts.length,
+      semanticConceptCount: hierarchy.semanticMemory.conceptIndex.length,
+      decay: {
+        archived: hierarchy.decay.archivedEntryIds.length,
+        compacted: hierarchy.decay.compactedEntryIds.length,
+      },
+      traces: hierarchy.traces.map((trace) => ({
+        stage: trace.stage,
+        summary: trace.summary,
+        metrics: trace.metrics,
+      })),
+    },
   };
 }
 
@@ -2058,6 +2152,14 @@ async function runLocalRag(
     latencyMs: result.totalDurationMs,
     options,
   });
+  const devModeMemory = await buildDevModeMemory(
+    result.output!.sessionId,
+    normalizedRequest.ownerId,
+    normalizedRequest.tenantId,
+    result.output!.rawQuery,
+    result.output!.memoryMatches,
+    result.output!.memoryStored
+  );
 
   const response = {
     answer: finalAnswer,
@@ -2136,17 +2238,7 @@ async function runLocalRag(
       cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
       costBreakdown: buildCostBreakdown(result.output!.costSummary),
       cost: result.output!.costSummary,
-      memory: {
-        sessionId: result.output!.sessionId,
-        recalled: result.output!.memoryMatches?.length ?? 0,
-        stored: Boolean(result.output!.memoryStored),
-        matches: (result.output!.memoryMatches ?? []).map((match) => ({
-          score: match.score,
-          query: match.entry.query,
-          answer: match.entry.answer,
-          createdAt: match.entry.createdAt,
-        })),
-      },
+      memory: devModeMemory,
       reranking: {
         applied: shouldApplyAdaptiveReranking(result.output!.devMode!),
         candidateCount: shouldApplyAdaptiveReranking(result.output!.devMode!)
@@ -2743,6 +2835,14 @@ async function runPersistedRag(
     latencyMs: result.totalDurationMs,
     options,
   });
+  const devModeMemory = await buildDevModeMemory(
+    result.output!.sessionId,
+    normalizedRequest.ownerId,
+    normalizedRequest.tenantId,
+    result.output!.rawQuery,
+    result.output!.memoryMatches,
+    result.output!.memoryStored
+  );
 
   const response = {
     answer: finalAnswer,
@@ -2821,17 +2921,7 @@ async function runPersistedRag(
       cacheAwareRetrieval: result.output!.cacheAwareRetrieval,
       costBreakdown: buildCostBreakdown(result.output!.costSummary),
       cost: result.output!.costSummary,
-      memory: {
-        sessionId: result.output!.sessionId,
-        recalled: result.output!.memoryMatches?.length ?? 0,
-        stored: Boolean(result.output!.memoryStored),
-        matches: (result.output!.memoryMatches ?? []).map((match) => ({
-          score: match.score,
-          query: match.entry.query,
-          answer: match.entry.answer,
-          createdAt: match.entry.createdAt,
-        })),
-      },
+      memory: devModeMemory,
       reranking: {
         applied: shouldApplyAdaptiveReranking(result.output!.devMode!),
         candidateCount: shouldApplyAdaptiveReranking(result.output!.devMode!)

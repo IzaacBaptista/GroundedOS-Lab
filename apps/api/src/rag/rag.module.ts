@@ -1,4 +1,6 @@
 import { Module } from "@nestjs/common";
+import { MemoryController } from "../memory/memory.controller";
+import { MemoryService } from "../memory/memory.service";
 import { RagController } from "./rag.controller";
 import { RagService } from "./rag.service";
 import { RagIndexController } from "./rag-index/rag-index.controller";
@@ -10,8 +12,15 @@ import { RagMetricsService } from "./rag-metrics/rag-metrics.service";
 import { RetrievalDiagnosticsController } from "./retrieval-diagnostics.controller";
 
 @Module({
-  controllers: [RagController, RagIndexController, RagMetricsController, RagMemoryController, RetrievalDiagnosticsController],
-  providers: [RagService, RagIndexService, RagMetricsService, RagMemoryService],
-  exports: [RagService, RagIndexService, RagMetricsService, RagMemoryService],
+  controllers: [
+    RagController,
+    RagIndexController,
+    RagMetricsController,
+    RagMemoryController,
+    RetrievalDiagnosticsController,
+    MemoryController,
+  ],
+  providers: [RagService, RagIndexService, RagMetricsService, RagMemoryService, MemoryService],
+  exports: [RagService, RagIndexService, RagMetricsService, RagMemoryService, MemoryService],
 })
 export class RagModule {}

@@ -188,6 +188,8 @@ describe("askRag", () => {
     });
 
     expect(second.devMode.memory?.recalled).toBeGreaterThanOrEqual(1);
+    expect(second.devMode.memory?.hierarchy?.workingMemorySize).toBeGreaterThan(0);
+    expect(second.devMode.memory?.hierarchy?.traces.length).toBeGreaterThan(0);
 
     const memory = await getRagSessionMemory("session-memory-1");
     expect(memory.count).toBeGreaterThanOrEqual(2);

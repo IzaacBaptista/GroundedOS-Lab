@@ -263,6 +263,42 @@ export interface DevModeOutput {
     generationUsd: number;
     totalUsd: number;
   };
+  memory?: {
+    sessionId?: string;
+    recalled: number;
+    stored: boolean;
+    matches: Array<{
+      score: number;
+      query: string;
+      answer: string;
+      createdAt: number;
+    }>;
+    hierarchy?: {
+      workingMemorySize: number;
+      estimatedTokens: number;
+      compressionTriggered: boolean;
+      activeGoals: string[];
+      activeEntities: string[];
+      episodicCount: number;
+      extractedFacts: Array<{
+        factId: string;
+        text: string;
+        confidence: number;
+        provenance: string[];
+      }>;
+      longTermFactCount: number;
+      semanticConceptCount: number;
+      decay: {
+        archived: number;
+        compacted: number;
+      };
+      traces: Array<{
+        stage: string;
+        summary: string;
+        metrics?: Record<string, string | number | boolean>;
+      }>;
+    };
+  };
   hybrid?: {
     mode: "hybrid";
     denseWeight: number;
