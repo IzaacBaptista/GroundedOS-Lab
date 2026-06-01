@@ -245,6 +245,724 @@ export interface ReliabilityReportSummaries {
   };
 }
 
+export type RetrievalFailureReason =
+  | "ambiguous_query"
+  | "underspecified_query"
+  | "semantic_drift"
+  | "missing_entities"
+  | "poor_query_rewrite"
+  | "multi_hop_failure"
+  | "chunk_too_small"
+  | "chunk_too_large"
+  | "insufficient_overlap"
+  | "boundary_fragmentation"
+  | "context_split"
+  | "lost_context"
+  | "embedding_mismatch"
+  | "semantic_collapse"
+  | "low_embedding_separation"
+  | "provider_quality_issue"
+  | "embedding_noise"
+  | "low_recall"
+  | "lexical_miss"
+  | "dense_retrieval_failure"
+  | "hybrid_disabled"
+  | "graph_retrieval_missing"
+  | "poor_candidate_pool"
+  | "reranker_demoted_relevant_chunk"
+  | "reranker_bias"
+  | "reranker_overfit"
+  | "insufficient_rerank_depth"
+  | "missing_document"
+  | "stale_document"
+  | "duplicated_chunks"
+  | "ingestion_failure"
+  | "OCR_failure"
+  | "metadata_missing"
+  | "groundedness_loss"
+  | "unsupported_claim"
+  | "citation_mismatch"
+  | "answer_overgeneralization";
+
+export interface RetrievalDiagnosticFinding {
+  component: "query" | "chunking" | "embedding" | "retrieval" | "reranking" | "corpus" | "generation";
+  issue: RetrievalFailureReason;
+  confidence: number;
+  rationale: string;
+}
+
+export type RetrievalRecoveryStrategy =
+  | "increase_overlap"
+  | "decrease_chunk_size"
+  | "increase_chunk_size"
+  | "enable_hybrid"
+  | "enable_reranking"
+  | "increase_top_k"
+  | "rewrite_query"
+  | "enable_hyde"
+  | "enable_graphrag"
+  | "use_hierarchical_retrieval"
+  | "improve_metadata"
+  | "reindex_documents"
+  | "switch_embedding_provider"
+  | "enable_query_expansion"
+  | "add_multi_retrieval"
+  | "reduce_score_threshold";
+
+export interface CandidateFix {
+  strategy: RetrievalRecoveryStrategy;
+  estimatedImpact: number;
+  estimatedCost: "low" | "medium" | "high";
+  estimatedLatencyImpact: "low" | "medium" | "high";
+  confidence: number;
+  affectedMetrics: Array<
+    | "recall"
+    | "relevance"
+    | "diversity"
+    | "groundedness"
+    | "retrieval_confidence"
+    | "evidence_coverage"
+    | "redundancy"
+    | "chunk_coherence"
+    | "citation_support"
+  >;
+  rationale: string;
+}
+
+export interface RetrievalOptimizationSuggestion extends CandidateFix {}
+
+export interface AutoTuningRecommendation {
+  parameter: string;
+  currentValue?: number | string | boolean;
+  recommendedValue: number | string | boolean;
+  rationale: string;
+}
+
+export interface RetrievalFailureCase {
+  failureReason: RetrievalFailureReason;
+  confidence: number;
+  diagnosis: RetrievalDiagnosticFinding[];
+  candidateFixes: CandidateFix[];
+}
+
+export interface RetrievalHealthScore {
+  overall: number;
+}
+
+export interface RetrievalQualityBreakdown {
+  recall: number;
+  relevance: number;
+  diversity: number;
+  groundednessPotential: number;
+  retrievalConfidence: number;
+  evidenceCoverage: number;
+  redundancy: number;
+  chunkCoherence: number;
+  citationSupport: number;
+}
+
+export interface RetrievalHealthReport {
+  healthScore: RetrievalHealthScore;
+  qualityBreakdown: RetrievalQualityBreakdown;
+  alerts: string[];
+}
+
+export interface RetrievalDiagnosticTrace {
+  retrievalFailureDetected: boolean;
+  failureType: RetrievalFailureReason;
+  confidence: number;
+  probableCauses: RetrievalDiagnosticFinding[];
+  evidenceGaps: string[];
+  chunkFragmentationIndicators: string[];
+  semanticDriftIndicators: string[];
+  rerankImpact: {
+    rerankingApplied: boolean;
+    candidateCount: number;
+    returnedCount: number;
+  };
+  retrievalConfidence: number;
+  healthScore: number;
+  suggestedFixes: RetrievalRecoveryStrategy[];
+}
+
+export interface RetrievalSimulationScenario {
+  name: string;
+  enableHybrid?: boolean;
+  topK?: number;
+  enableReranking?: boolean;
+  enableQueryExpansion?: boolean;
+  enableHyde?: boolean;
+  enableGraphRag?: boolean;
+}
+
+export interface RetrievalSimulationResult {
+  scenario: RetrievalSimulationScenario;
+  estimatedRecallImprovement: number;
+  estimatedRelevanceImprovement: number;
+  estimatedLatencyImpact: number;
+  rationale: string;
+}
+
+export interface RetrievalFailureAnalyzerInput {
+  query: string;
+  diagnostics: RetrievalDiagnostics;
+  chunks: RetrievalEvidenceChunk[];
+  evals?: {
+    groundedness?: number;
+    answerOverlap?: number;
+    retrievalAccuracy?: number;
+  };
+  overlapConfig?: {
+    chunkSize?: number;
+    overlapTokens?: number;
+  };
+  retrievalStrategy?: string;
+  rerankingOutput?: Array<{ chunkId: string; beforeRank: number; afterRank: number; finalScore: number }>;
+  retrievalConfidence?: number;
+}
+
+export interface RetrievalExplainabilityReport {
+  whyChunksWereRetrieved: string[];
+  whyRelevantChunksMayHaveBeenMissed: string[];
+  rerankingImpact: string;
+  overlapImpact: string;
+  embeddingImpact: string;
+  topKImpact: string;
+  queryRewriteImpact: string;
+}
+
+export interface RetrievalAnalysisResult {
+  failureCase: RetrievalFailureCase;
+  diagnosticTrace: RetrievalDiagnosticTrace;
+  healthReport: RetrievalHealthReport;
+  simulations: RetrievalSimulationResult[];
+  explainability: RetrievalExplainabilityReport;
+  recommendations: RetrievalOptimizationSuggestion[];
+  autoTuningRecommendations: AutoTuningRecommendation[];
+}
+
+export class RetrievalFailureClassifier {
+  classify(input: RetrievalFailureAnalyzerInput): {
+    failureReason: RetrievalFailureReason;
+    confidence: number;
+    semanticDriftIndicators: string[];
+    chunkFragmentationIndicators: string[];
+  } {
+    const query = normalizeWhitespace(input.query.toLowerCase());
+    const avgLexicalOverlap = averageLexicalOverlap(query, input.chunks);
+    const topScore = normalizeScore(input.diagnostics.topScore);
+    const answerOverlap = input.evals?.answerOverlap ?? input.diagnostics.evidenceCoverage;
+    const groundedness = input.evals?.groundedness ?? input.diagnostics.groundedConsistency;
+    const semanticDriftIndicators: string[] = [];
+    const chunkFragmentationIndicators: string[] = [];
+    const rerankDemotion = (input.rerankingOutput ?? []).some(
+      (item) => item.beforeRank <= 3 && item.afterRank - item.beforeRank >= 5
+    );
+    const overlapTokens = input.overlapConfig?.overlapTokens ?? 0;
+    const chunkSize = input.overlapConfig?.chunkSize ?? 0;
+    const retrievalMode = input.diagnostics.retrievalMetadata.retrievalMode.toLowerCase();
+
+    if (topScore > 0.55 && answerOverlap < 0.4 && avgLexicalOverlap < 0.25) {
+      semanticDriftIndicators.push("high_similarity_low_task_relevance", "low_entity_overlap");
+      return {
+        failureReason: "semantic_drift",
+        confidence: round(Math.max(0.65, Math.min(0.95, topScore * 0.8 + (1 - answerOverlap) * 0.2)), 3),
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (query.split(" ").length <= 3) {
+      return {
+        failureReason: "underspecified_query",
+        confidence: 0.74,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (avgLexicalOverlap > 0.35 && topScore < 0.2) {
+      semanticDriftIndicators.push("high_lexical_overlap_low_embedding_similarity");
+      return {
+        failureReason: "embedding_mismatch",
+        confidence: 0.78,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (overlapTokens > 0 && overlapTokens < 30 && input.diagnostics.citationCoverage < 0.5) {
+      chunkFragmentationIndicators.push("low_overlap", "fragmented_citations");
+      return {
+        failureReason: "insufficient_overlap",
+        confidence: 0.7,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (chunkSize > 0 && chunkSize < 180) {
+      chunkFragmentationIndicators.push("small_chunk_size", "context_split");
+      return {
+        failureReason: "chunk_too_small",
+        confidence: 0.66,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (rerankDemotion) {
+      return {
+        failureReason: "reranker_demoted_relevant_chunk",
+        confidence: 0.73,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (retrievalMode.includes("dense") && topScore < 0.2) {
+      return {
+        failureReason: "dense_retrieval_failure",
+        confidence: 0.71,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (!retrievalMode.includes("hybrid") && topScore < 0.3) {
+      return {
+        failureReason: "hybrid_disabled",
+        confidence: 0.68,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    if (groundedness < 0.45) {
+      return {
+        failureReason: "groundedness_loss",
+        confidence: 0.72,
+        semanticDriftIndicators,
+        chunkFragmentationIndicators,
+      };
+    }
+
+    return {
+      failureReason: "low_recall",
+      confidence: 0.62,
+      semanticDriftIndicators,
+      chunkFragmentationIndicators,
+    };
+  }
+}
+
+export class RetrievalRootCauseAnalyzer {
+  analyze(input: {
+    failureReason: RetrievalFailureReason;
+    diagnostics: RetrievalDiagnostics;
+    classifierConfidence: number;
+  }): RetrievalDiagnosticFinding[] {
+    const finding = (component: RetrievalDiagnosticFinding["component"], issue: RetrievalFailureReason, rationale: string) =>
+      ({
+        component,
+        issue,
+        confidence: round(input.classifierConfidence, 3),
+        rationale,
+      }) satisfies RetrievalDiagnosticFinding;
+
+    switch (input.failureReason) {
+      case "semantic_drift":
+        return [
+          finding("embedding", "embedding_mismatch", "Retrieved chunks scored well but diverged from query intent."),
+          finding("retrieval", "hybrid_disabled", "Hybrid retrieval could improve lexical anchoring."),
+        ];
+      case "insufficient_overlap":
+      case "chunk_too_small":
+        return [finding("chunking", input.failureReason, "Chunk boundaries likely split required context.")];
+      case "reranker_demoted_relevant_chunk":
+        return [finding("reranking", "reranker_demoted_relevant_chunk", "Reranker reordered relevant chunks downward.")];
+      case "dense_retrieval_failure":
+      case "hybrid_disabled":
+      case "low_recall":
+        return [finding("retrieval", input.failureReason, "Primary retrieval strategy did not surface enough evidence.")];
+      case "groundedness_loss":
+        return [finding("generation", "groundedness_loss", "Answer grounding weakened relative to retrieved evidence.")];
+      case "embedding_mismatch":
+        return [finding("embedding", "embedding_mismatch", "Embedding space appears misaligned with query intent.")];
+      default:
+        return [finding("retrieval", "poor_candidate_pool", "Candidate pool quality appears insufficient.")];
+    }
+  }
+}
+
+export class RetrievalRecoveryAdvisor {
+  advise(input: {
+    failureReason: RetrievalFailureReason;
+    diagnostics: RetrievalDiagnostics;
+    findings: RetrievalDiagnosticFinding[];
+  }): CandidateFix[] {
+    const makeFix = (
+      strategy: RetrievalRecoveryStrategy,
+      estimatedImpact: number,
+      estimatedCost: CandidateFix["estimatedCost"],
+      estimatedLatencyImpact: CandidateFix["estimatedLatencyImpact"],
+      confidence: number,
+      affectedMetrics: CandidateFix["affectedMetrics"],
+      rationale: string
+    ): CandidateFix => ({
+      strategy,
+      estimatedImpact: round(estimatedImpact, 3),
+      estimatedCost,
+      estimatedLatencyImpact,
+      confidence: round(confidence, 3),
+      affectedMetrics,
+      rationale,
+    });
+
+    switch (input.failureReason) {
+      case "semantic_drift":
+        return [
+          makeFix("enable_hybrid", 0.22, "low", "low", 0.82, ["recall", "relevance"], "Hybrid can recover lexical anchors."),
+          makeFix("rewrite_query", 0.14, "low", "low", 0.74, ["relevance"], "Query rewrite can reduce topic drift."),
+          makeFix("enable_hyde", 0.16, "medium", "medium", 0.68, ["recall", "evidence_coverage"], "HyDE can bridge semantic gap."),
+        ];
+      case "embedding_mismatch":
+        return [
+          makeFix("switch_embedding_provider", 0.21, "medium", "low", 0.75, ["relevance", "retrieval_confidence"], "Embedding provider may be underperforming for this corpus."),
+          makeFix("enable_hybrid", 0.15, "low", "low", 0.73, ["recall"], "Sparse signal can mitigate embedding mismatch."),
+        ];
+      case "insufficient_overlap":
+      case "chunk_too_small":
+        return [
+          makeFix("increase_overlap", 0.2, "low", "low", 0.8, ["chunk_coherence", "evidence_coverage"], "Higher overlap restores cross-chunk continuity."),
+          makeFix("increase_chunk_size", 0.16, "medium", "low", 0.7, ["chunk_coherence", "recall"], "Larger chunks can preserve definitions and long context."),
+        ];
+      case "reranker_demoted_relevant_chunk":
+        return [
+          makeFix("increase_top_k", 0.13, "low", "medium", 0.72, ["recall"], "Deeper candidate pool reduces harmful demotions."),
+          makeFix("enable_query_expansion", 0.1, "low", "low", 0.64, ["relevance"], "Expanded terms can stabilize reranking."),
+        ];
+      case "dense_retrieval_failure":
+      case "hybrid_disabled":
+      case "low_recall":
+        return [
+          makeFix("enable_hybrid", 0.18, "low", "low", 0.77, ["recall", "retrieval_confidence"], "Hybrid retrieval usually improves candidate recall."),
+          makeFix("increase_top_k", 0.12, "low", "medium", 0.69, ["recall", "evidence_coverage"], "More candidates improve evidence coverage."),
+          makeFix("reduce_score_threshold", 0.08, "low", "low", 0.63, ["recall"], "Lower threshold allows borderline evidence through."),
+        ];
+      case "groundedness_loss":
+        return [
+          makeFix("enable_reranking", 0.11, "low", "medium", 0.66, ["groundedness", "citation_support"], "Reranking can prioritize directly supportive chunks."),
+          makeFix("improve_metadata", 0.09, "medium", "low", 0.61, ["relevance", "citation_support"], "Metadata improves evidence selection quality."),
+        ];
+      default:
+        return [
+          makeFix("add_multi_retrieval", 0.12, "medium", "high", 0.6, ["recall", "diversity"], "Fallback multi-retrieval improves robustness."),
+        ];
+    }
+  }
+}
+
+export class RetrievalFailureAnalyzer {
+  constructor(
+    private readonly classifier = new RetrievalFailureClassifier(),
+    private readonly rootCauseAnalyzer = new RetrievalRootCauseAnalyzer(),
+    private readonly recoveryAdvisor = new RetrievalRecoveryAdvisor()
+  ) {}
+
+  analyze(input: RetrievalFailureAnalyzerInput): {
+    failureCase: RetrievalFailureCase;
+    semanticDriftIndicators: string[];
+    chunkFragmentationIndicators: string[];
+  } {
+    const classification = this.classifier.classify(input);
+    const diagnosis = this.rootCauseAnalyzer.analyze({
+      failureReason: classification.failureReason,
+      diagnostics: input.diagnostics,
+      classifierConfidence: classification.confidence,
+    });
+    const candidateFixes = this.recoveryAdvisor.advise({
+      failureReason: classification.failureReason,
+      diagnostics: input.diagnostics,
+      findings: diagnosis,
+    });
+
+    return {
+      failureCase: {
+        failureReason: classification.failureReason,
+        confidence: classification.confidence,
+        diagnosis,
+        candidateFixes,
+      },
+      semanticDriftIndicators: classification.semanticDriftIndicators,
+      chunkFragmentationIndicators: classification.chunkFragmentationIndicators,
+    };
+  }
+}
+
+export class RetrievalWhatIfEngine {
+  simulate(input: {
+    failureCase: RetrievalFailureCase;
+    diagnostics: RetrievalDiagnostics;
+    scenarios?: RetrievalSimulationScenario[];
+  }): RetrievalSimulationResult[] {
+    const defaultScenarios: RetrievalSimulationScenario[] = [
+      { name: "hybrid_enabled", enableHybrid: true },
+      { name: "topk_20_rerank", topK: 20, enableReranking: true },
+      { name: "query_expansion_hyde", enableQueryExpansion: true, enableHyde: true },
+    ];
+    const scenarios = input.scenarios?.length ? input.scenarios : defaultScenarios;
+
+    return scenarios.map((scenario) => {
+      let estimatedRecallImprovement = 0;
+      let estimatedRelevanceImprovement = 0;
+      let estimatedLatencyImpact = 0;
+      const reasons: string[] = [];
+
+      if (scenario.enableHybrid) {
+        estimatedRecallImprovement += 0.12;
+        estimatedRelevanceImprovement += 0.08;
+        estimatedLatencyImpact += 6;
+        reasons.push("hybrid retrieval adds lexical fallback");
+      }
+      if (scenario.topK && scenario.topK > Math.max(5, input.diagnostics.returnedCount)) {
+        estimatedRecallImprovement += 0.08;
+        estimatedLatencyImpact += 5;
+        reasons.push("larger topK increases candidate coverage");
+      }
+      if (scenario.enableReranking) {
+        estimatedRelevanceImprovement += 0.1;
+        estimatedLatencyImpact += 9;
+        reasons.push("reranking improves ordering quality");
+      }
+      if (scenario.enableQueryExpansion) {
+        estimatedRecallImprovement += 0.07;
+        reasons.push("query expansion improves lexical matching");
+      }
+      if (scenario.enableHyde) {
+        estimatedRecallImprovement += 0.06;
+        estimatedLatencyImpact += 8;
+        reasons.push("HyDE strengthens semantic retrieval bridge");
+      }
+      if (scenario.enableGraphRag) {
+        estimatedRecallImprovement += 0.05;
+        estimatedRelevanceImprovement += 0.04;
+        estimatedLatencyImpact += 10;
+        reasons.push("graph traversal can recover connected evidence");
+      }
+
+      return {
+        scenario,
+        estimatedRecallImprovement: round(estimatedRecallImprovement, 3),
+        estimatedRelevanceImprovement: round(estimatedRelevanceImprovement, 3),
+        estimatedLatencyImpact: round(estimatedLatencyImpact, 3),
+        rationale: reasons.join("; ") || "No meaningful change configured.",
+      };
+    });
+  }
+}
+
+export class RetrievalSimulationRunner {
+  constructor(private readonly whatIfEngine = new RetrievalWhatIfEngine()) {}
+
+  run(input: {
+    failureCase: RetrievalFailureCase;
+    diagnostics: RetrievalDiagnostics;
+    scenarios?: RetrievalSimulationScenario[];
+  }): RetrievalSimulationResult[] {
+    return this.whatIfEngine.simulate(input);
+  }
+}
+
+export class StrategyComparator {
+  compare(results: RetrievalSimulationResult[]): RetrievalSimulationResult[] {
+    return [...results].sort((left, right) => {
+      const leftScore = left.estimatedRecallImprovement + left.estimatedRelevanceImprovement - left.estimatedLatencyImpact / 100;
+      const rightScore =
+        right.estimatedRecallImprovement + right.estimatedRelevanceImprovement - right.estimatedLatencyImpact / 100;
+      return rightScore - leftScore;
+    });
+  }
+}
+
+export class ChunkSelectionExplainer {
+  explain(query: string, chunks: RetrievalEvidenceChunk[]): string[] {
+    const normalizedQuery = normalizeWhitespace(query.toLowerCase());
+    return chunks.slice(0, 3).map((chunk) => {
+      const overlap = round(tokenOverlapRatio(normalizedQuery, chunk.text.toLowerCase()), 3);
+      return `Chunk ${chunk.chunkId} selected with score=${round(chunk.score, 3)} and lexical overlap=${overlap}.`;
+    });
+  }
+}
+
+export class ScoreBreakdownExplainer {
+  explain(diagnostics: RetrievalDiagnostics): string[] {
+    return [
+      `topScore=${diagnostics.topScore} avgScore=${diagnostics.avgScore} spread=${diagnostics.scoreSpread}`,
+      `evidenceCoverage=${diagnostics.evidenceCoverage} groundedConsistency=${diagnostics.groundedConsistency}`,
+      `citationCoverage=${diagnostics.citationCoverage} sourceDiversity=${diagnostics.sourceDiversity}`,
+    ];
+  }
+}
+
+export class RetrievalExplainer {
+  constructor(
+    private readonly chunkExplainer = new ChunkSelectionExplainer(),
+    private readonly scoreExplainer = new ScoreBreakdownExplainer()
+  ) {}
+
+  explain(input: {
+    query: string;
+    diagnostics: RetrievalDiagnostics;
+    chunks: RetrievalEvidenceChunk[];
+    failureCase: RetrievalFailureCase;
+  }): RetrievalExplainabilityReport {
+    return {
+      whyChunksWereRetrieved: this.chunkExplainer.explain(input.query, input.chunks),
+      whyRelevantChunksMayHaveBeenMissed: [
+        `Detected failure reason: ${input.failureCase.failureReason}.`,
+        ...input.failureCase.diagnosis.map(
+          (item) => `${item.component}: ${item.issue} (confidence ${item.confidence}) - ${item.rationale}`
+        ),
+      ],
+      rerankingImpact: input.diagnostics.retrievalMetadata.rerankingApplied
+        ? "Reranking was enabled and likely changed final chunk order."
+        : "Reranking was disabled; initial retrieval ranking was kept.",
+      overlapImpact:
+        input.failureCase.failureReason === "insufficient_overlap" || input.failureCase.failureReason === "chunk_too_small"
+          ? "Chunk overlap appears insufficient for context continuity."
+          : "No strong overlap issue detected from current diagnostics.",
+      embeddingImpact:
+        input.failureCase.failureReason === "embedding_mismatch"
+          ? "Embedding mismatch detected between query intent and retrieved vectors."
+          : "Embedding signals look broadly consistent with retrieval outcome.",
+      topKImpact:
+        input.diagnostics.candidateCount <= input.diagnostics.returnedCount + 2
+          ? "Candidate depth is shallow; increasing topK may improve recall."
+          : "Current topK appears sufficient for this retrieval depth.",
+      queryRewriteImpact: this.scoreExplainer.explain(input.diagnostics).join(" | "),
+    };
+  }
+}
+
+export class RetrievalHealthScorer {
+  score(input: {
+    diagnostics: RetrievalDiagnostics;
+    retrievalConfidence?: number;
+  }): RetrievalHealthReport {
+    const recall = normalizeScore(input.diagnostics.evidenceCoverage);
+    const relevance = normalizeScore(input.diagnostics.avgScore);
+    const diversity = Math.min(1, input.diagnostics.sourceDiversity / 3);
+    const groundednessPotential = normalizeScore(input.diagnostics.groundedConsistency);
+    const retrievalConfidence = normalizeScore(input.retrievalConfidence ?? input.diagnostics.topScore);
+    const evidenceCoverage = normalizeScore(input.diagnostics.evidenceCoverage);
+    const redundancy = normalizeScore(
+      1 - Math.max(0, input.diagnostics.resultCount - input.diagnostics.sourceDiversity) / Math.max(1, input.diagnostics.resultCount)
+    );
+    const chunkCoherence = normalizeScore((input.diagnostics.citationCoverage + input.diagnostics.groundedConsistency) / 2);
+    const citationSupport = normalizeScore(input.diagnostics.citationCoverage);
+
+    const qualityBreakdown: RetrievalQualityBreakdown = {
+      recall: round(recall, 3),
+      relevance: round(relevance, 3),
+      diversity: round(diversity, 3),
+      groundednessPotential: round(groundednessPotential, 3),
+      retrievalConfidence: round(retrievalConfidence, 3),
+      evidenceCoverage: round(evidenceCoverage, 3),
+      redundancy: round(redundancy, 3),
+      chunkCoherence: round(chunkCoherence, 3),
+      citationSupport: round(citationSupport, 3),
+    };
+
+    const overall = round(
+      recall * 0.2 +
+        relevance * 0.14 +
+        diversity * 0.08 +
+        groundednessPotential * 0.14 +
+        retrievalConfidence * 0.14 +
+        evidenceCoverage * 0.12 +
+        redundancy * 0.06 +
+        chunkCoherence * 0.06 +
+        citationSupport * 0.06,
+      3
+    );
+
+    const alerts = [
+      ...(recall < 0.45 ? ["low_recall"] : []),
+      ...(relevance < 0.45 ? ["low_relevance"] : []),
+      ...(citationSupport < 0.45 ? ["low_citation_support"] : []),
+      ...(chunkCoherence < 0.45 ? ["low_chunk_coherence"] : []),
+    ];
+
+    return {
+      healthScore: {
+        overall,
+      },
+      qualityBreakdown,
+      alerts,
+    };
+  }
+}
+
+export class RetrievalDiagnosticsEngine {
+  constructor(
+    private readonly failureAnalyzer = new RetrievalFailureAnalyzer(),
+    private readonly healthScorer = new RetrievalHealthScorer(),
+    private readonly simulationRunner = new RetrievalSimulationRunner(),
+    private readonly comparator = new StrategyComparator(),
+    private readonly explainer = new RetrievalExplainer()
+  ) {}
+
+  analyze(input: RetrievalFailureAnalyzerInput & { scenarios?: RetrievalSimulationScenario[] }): RetrievalAnalysisResult {
+    const failure = this.failureAnalyzer.analyze(input);
+    const healthReport = this.healthScorer.score({
+      diagnostics: input.diagnostics,
+      retrievalConfidence: input.retrievalConfidence,
+    });
+    const simulations = this.comparator.compare(
+      this.simulationRunner.run({
+        failureCase: failure.failureCase,
+        diagnostics: input.diagnostics,
+        scenarios: input.scenarios,
+      })
+    );
+    const explainability = this.explainer.explain({
+      query: input.query,
+      diagnostics: input.diagnostics,
+      chunks: input.chunks,
+      failureCase: failure.failureCase,
+    });
+
+    const diagnosticTrace: RetrievalDiagnosticTrace = {
+      retrievalFailureDetected: true,
+      failureType: failure.failureCase.failureReason,
+      confidence: failure.failureCase.confidence,
+      probableCauses: failure.failureCase.diagnosis,
+      evidenceGaps: buildEvidenceGaps(input),
+      chunkFragmentationIndicators: failure.chunkFragmentationIndicators,
+      semanticDriftIndicators: failure.semanticDriftIndicators,
+      rerankImpact: {
+        rerankingApplied: input.diagnostics.retrievalMetadata.rerankingApplied,
+        candidateCount: input.diagnostics.candidateCount,
+        returnedCount: input.diagnostics.returnedCount,
+      },
+      retrievalConfidence: round(input.retrievalConfidence ?? input.diagnostics.topScore, 3),
+      healthScore: healthReport.healthScore.overall,
+      suggestedFixes: failure.failureCase.candidateFixes.map((fix) => fix.strategy),
+    };
+
+    return {
+      failureCase: failure.failureCase,
+      diagnosticTrace,
+      healthReport,
+      simulations,
+      explainability,
+      recommendations: failure.failureCase.candidateFixes,
+      autoTuningRecommendations: buildAutoTuningRecommendations(input, failure.failureCase),
+    };
+  }
+}
+
 export function buildRetrievalDiagnostics(input: {
   results: RetrievalEvidenceChunk[];
   candidateCount?: number;
@@ -1062,6 +1780,81 @@ function detectConflictingChunks(results: RetrievalEvidenceChunk[]): string[] {
   }
 
   return [...conflictingChunkIds];
+}
+
+function averageLexicalOverlap(query: string, chunks: RetrievalEvidenceChunk[]): number {
+  if (chunks.length === 0) {
+    return 0;
+  }
+  const total = chunks.reduce((sum, chunk) => sum + tokenOverlapRatio(query, chunk.text.toLowerCase()), 0);
+  return total / chunks.length;
+}
+
+function tokenOverlapRatio(query: string, text: string): number {
+  const queryTokens = new Set((query.match(/[a-z0-9]{3,}/g) ?? []).filter(Boolean));
+  if (queryTokens.size === 0) {
+    return 0;
+  }
+  const textTokens = new Set((text.match(/[a-z0-9]{3,}/g) ?? []).filter(Boolean));
+  let overlap = 0;
+  for (const token of queryTokens) {
+    if (textTokens.has(token)) {
+      overlap += 1;
+    }
+  }
+  return overlap / queryTokens.size;
+}
+
+function buildEvidenceGaps(input: RetrievalFailureAnalyzerInput): string[] {
+  const gaps: string[] = [];
+  if (input.diagnostics.resultCount === 0) {
+    gaps.push("no_retrieved_chunks");
+  }
+  if (input.diagnostics.citationCoverage < 0.5) {
+    gaps.push("low_citation_coverage");
+  }
+  if (input.diagnostics.evidenceCoverage < 0.5) {
+    gaps.push("low_evidence_coverage");
+  }
+  if (input.diagnostics.sourceDiversity <= 1 && input.diagnostics.resultCount > 1) {
+    gaps.push("low_source_diversity");
+  }
+  if (input.diagnostics.conflictCount > 0) {
+    gaps.push("conflicting_evidence");
+  }
+  return gaps;
+}
+
+function buildAutoTuningRecommendations(
+  input: RetrievalFailureAnalyzerInput,
+  failureCase: RetrievalFailureCase
+): AutoTuningRecommendation[] {
+  const recommendations: AutoTuningRecommendation[] = [];
+  if (failureCase.failureReason === "insufficient_overlap") {
+    recommendations.push({
+      parameter: "overlapTokens",
+      currentValue: input.overlapConfig?.overlapTokens,
+      recommendedValue: Math.max(30, (input.overlapConfig?.overlapTokens ?? 20) + 10),
+      rationale: "Increase overlap to reduce boundary fragmentation and context loss.",
+    });
+  }
+  if (failureCase.failureReason === "chunk_too_small") {
+    recommendations.push({
+      parameter: "chunkSize",
+      currentValue: input.overlapConfig?.chunkSize,
+      recommendedValue: Math.max(300, (input.overlapConfig?.chunkSize ?? 180) + 120),
+      rationale: "Increase chunk size to keep cohesive evidence in a single retrieval unit.",
+    });
+  }
+  if (failureCase.failureReason === "low_recall" || failureCase.failureReason === "dense_retrieval_failure") {
+    recommendations.push({
+      parameter: "topK",
+      currentValue: input.diagnostics.returnedCount,
+      recommendedValue: Math.max(10, input.diagnostics.returnedCount + 5),
+      rationale: "Increase topK to widen the candidate pool and improve recall.",
+    });
+  }
+  return recommendations;
 }
 
 function normalizeScore(score: number): number {

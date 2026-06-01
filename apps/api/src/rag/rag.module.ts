@@ -7,9 +7,10 @@ import { RagMemoryController } from "./rag-memory/rag-memory.controller";
 import { RagMemoryService } from "./rag-memory/rag-memory.service";
 import { RagMetricsController } from "./rag-metrics/rag-metrics.controller";
 import { RagMetricsService } from "./rag-metrics/rag-metrics.service";
+import { RetrievalDiagnosticsController } from "./retrieval-diagnostics.controller";
 
 @Module({
-  controllers: [RagController, RagIndexController, RagMetricsController, RagMemoryController],
+  controllers: [RagController, RagIndexController, RagMetricsController, RagMemoryController, RetrievalDiagnosticsController],
   providers: [RagService, RagIndexService, RagMetricsService, RagMemoryService],
   exports: [RagService, RagIndexService, RagMetricsService, RagMemoryService],
 })

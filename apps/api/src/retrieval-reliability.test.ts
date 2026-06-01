@@ -9,6 +9,7 @@ import {
   compareReplaySnapshots,
   createCorpusDriftReport,
   createPromptPolicyDiffReport,
+  RetrievalDiagnosticsEngine,
 } from "./retrieval-reliability";
 
 describe("retrieval reliability", () => {
@@ -50,7 +51,7 @@ describe("retrieval reliability", () => {
           text: "The dispatcher routes plain text input.",
         },
       ],
-      citations: [],
+      citations: [{ chunkId: "doc:section-1:chunk-1" }],
       evals: {
         groundedness: 0.2,
         answerOverlap: 0.1,
@@ -289,6 +290,114 @@ describe("retrieval reliability", () => {
 
     expect(confidence.evidenceSignals.missingCitations).toBe(true);
     expect(confidence.confidenceReasoning.join(" ")).toContain("FLAG missing-citations");
+  });
+
+  it("builds formal retrieval failure analysis for semantic drift", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.82,
+          text: "Redis stores keys, values, and cache expiration settings.",
+        },
+      ],
+      citations: [],
+      evals: {
+        groundedness: 0.45,
+        answerOverlap: 0.25,
+      },
+      retrievalMode: "dense",
+      rerankingApplied: false,
+      queryIntent: "architecture",
+    });
+
+    const analysis = new RetrievalDiagnosticsEngine().analyze({
+      query: "How does semantic cache work in GroundedOS Lab?",
+      diagnostics,
+      chunks: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.82,
+          text: "Redis stores keys, values, and cache expiration settings.",
+        },
+      ],
+      evals: {
+        groundedness: 0.45,
+        answerOverlap: 0.25,
+      },
+      retrievalConfidence: 0.41,
+    });
+
+    expect(analysis.failureCase.failureReason).toBe("semantic_drift");
+    expect(analysis.failureCase.candidateFixes.map((item) => item.strategy)).toContain("enable_hybrid");
+    expect(analysis.healthReport.healthScore.overall).toBeLessThan(0.7);
+    expect(analysis.diagnosticTrace.semanticDriftIndicators.length).toBeGreaterThan(0);
+  });
+
+  it("detects overlap fragmentation and proposes overlap tuning", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.52,
+          text: "Semantic cache stores retrieval fingerprints.",
+        },
+        {
+          chunkId: "doc:section-1:chunk-2",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.49,
+          text: "It also stores query embeddings for future reuse.",
+        },
+      ],
+      citations: [],
+      evals: {
+        groundedness: 0.56,
+        answerOverlap: 0.39,
+      },
+      retrievalMode: "hybrid",
+      rerankingApplied: true,
+    });
+
+    const analysis = new RetrievalDiagnosticsEngine().analyze({
+      query: "Explain semantic cache eviction policy and retrieval fingerprint lifecycle",
+      diagnostics,
+      chunks: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.52,
+          text: "Semantic cache stores retrieval fingerprints.",
+        },
+        {
+          chunkId: "doc:section-1:chunk-2",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.49,
+          text: "It also stores query embeddings for future reuse.",
+        },
+      ],
+      overlapConfig: {
+        chunkSize: 160,
+        overlapTokens: 12,
+      },
+      evals: {
+        groundedness: 0.56,
+        answerOverlap: 0.39,
+      },
+      retrievalConfidence: 0.58,
+    });
+
+    expect(analysis.failureCase.failureReason).toBe("insufficient_overlap");
+    expect(analysis.autoTuningRecommendations.map((item) => item.parameter)).toContain("overlapTokens");
+    expect(analysis.diagnosticTrace.chunkFragmentationIndicators).toContain("low_overlap");
   });
 
   it("compares deterministic replay snapshots", () => {

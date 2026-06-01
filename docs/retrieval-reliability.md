@@ -11,6 +11,13 @@ without replacing the current pipeline.
   - `PARTIAL_CONTEXT`
   - `UNGROUNDED_ANSWER`
   - `LOW_CONFIDENCE`
+- **Formal Retrieval Diagnostics Engine**
+  - `RetrievalDiagnosticsEngine`
+  - `RetrievalFailureAnalyzer`, `RetrievalFailureClassifier`, `RetrievalRootCauseAnalyzer`
+  - `RetrievalRecoveryAdvisor` with structured `CandidateFix` recommendations
+  - `RetrievalHealthScorer` with `RetrievalHealthReport` / `RetrievalQualityBreakdown`
+  - `RetrievalWhatIfEngine`, `RetrievalSimulationRunner`, `StrategyComparator`
+  - `RetrievalExplainer`, `ChunkSelectionExplainer`, `ScoreBreakdownExplainer`
 - **Confidence Calibration**
   - `confidenceScore`
   - `confidenceLevel`
@@ -24,6 +31,13 @@ without replacing the current pipeline.
   - golden-query snapshot + temporal comparison report
 - **Prompt / Policy Diff Testing**
   - structured comparison report for prompt, policy, and retrieval variants
+- **Retrieval Diagnostics API**
+  - `POST /retrieval/diagnose`
+  - `POST /retrieval/replay`
+  - `POST /retrieval/simulate`
+  - `POST /retrieval/explain`
+  - `GET /retrieval/failures`
+  - `GET /retrieval/health`
 
 ## Architecture
 
