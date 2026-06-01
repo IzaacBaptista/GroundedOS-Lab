@@ -1,4 +1,4 @@
-import { FileSessionMemoryStore } from "@groundedos/memory";
+import { FileMemoryManager, FileSessionMemoryStore } from "@groundedos/memory";
 import { CostLedger, TradeoffMetricsStore } from "@groundedos/observability";
 import { SemanticCache } from "@groundedos/rag";
 
@@ -8,3 +8,4 @@ export const tradeoffMetricsStore = new TradeoffMetricsStore();
 export const sessionMemoryStore = new FileSessionMemoryStore(
   process.env.GROUNDEDOS_MEMORY_DIR ?? ".groundedos/memory/sessions"
 );
+export const memoryManager = new FileMemoryManager(sessionMemoryStore);

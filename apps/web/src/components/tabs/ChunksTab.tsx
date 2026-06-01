@@ -209,8 +209,9 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
   const hyde = devMode.hydeTrace;
   const raptor = devMode.raptorTrace;
   const fusion = devMode.retrievalFusionTrace;
+  const memory = devMode.memory?.hierarchy;
 
-  if (!hybrid && !reranking && !adaptive && !graph && !hyde && !raptor && !fusion) {
+  if (!hybrid && !reranking && !adaptive && !graph && !hyde && !raptor && !fusion && !memory) {
     return null;
   }
 
@@ -372,6 +373,45 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
           {adaptive.fallbackReason && (
             <ExplainBox variant="tip" label="fallback aplicado">
               {adaptive.fallbackReason}
+            </ExplainBox>
+          )}
+        </div>
+      )}
+
+      {memory && (
+        <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+          <SectionLabel>memory hierarchy</SectionLabel>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <Pill variant="teal">working {memory.workingMemorySize}</Pill>
+            <Pill variant="gray">tokens {memory.estimatedTokens}</Pill>
+            <Pill variant={memory.compressionTriggered ? "blue" : "gray"}>
+              compression {memory.compressionTriggered ? "on" : "idle"}
+            </Pill>
+            <Pill variant="gray">episodes {memory.episodicCount}</Pill>
+            <Pill variant="gray">facts {memory.longTermFactCount}</Pill>
+            <Pill variant="gray">concepts {memory.semanticConceptCount}</Pill>
+          </div>
+          {memory.activeGoals.length > 0 && (
+            <ExplainBox label="active goals">{memory.activeGoals.join(" · ")}</ExplainBox>
+          )}
+          {memory.activeEntities.length > 0 && (
+            <ExplainBox variant="tip" label="active entities">
+              {memory.activeEntities.join(" · ")}
+            </ExplainBox>
+          )}
+          {memory.extractedFacts.length > 0 && (
+            <ExplainBox label="extracted facts">
+              {memory.extractedFacts
+                .map((fact) => `${fact.text} (${Math.round(fact.confidence * 100)}%)`)
+                .join(" · ")}
+            </ExplainBox>
+          )}
+          <ExplainBox variant="tip" label="memory decay">
+            archived {memory.decay.archived} · compacted {memory.decay.compacted}
+          </ExplainBox>
+          {memory.traces.length > 0 && (
+            <ExplainBox label="memory trace">
+              {memory.traces.map((trace) => trace.summary).join(" · ")}
             </ExplainBox>
           )}
         </div>
