@@ -356,6 +356,91 @@ export interface DevModeOutput {
       latencyProfile: "fast" | "balanced" | "deep";
       costProfile: "low" | "medium" | "high";
     };
+    retrievalPlan: {
+      planId: string;
+      planningEnabled: boolean;
+      requiresClarification: boolean;
+      decompositionTypes: string[];
+      evidenceGoals: Array<{
+        goalId: string;
+        description: string;
+        priority: "primary" | "supporting";
+        target?: string;
+      }>;
+      subQueries: Array<{
+        subQueryId: string;
+        text: string;
+        type: string;
+        purpose: string;
+        evidenceGoalIds: string[];
+        dependsOn: string[];
+        stage: "broad" | "focused" | "validation";
+        useGraphRag: boolean;
+        useHyDE: boolean;
+        useRAPTOR: boolean;
+        useMemory: boolean;
+      }>;
+      tasks: Array<{
+        taskId: string;
+        title: string;
+        type: string;
+        subQueryId?: string;
+        evidenceGoalIds: string[];
+        dependencyIds: string[];
+        executionMode: "parallel" | "sequential";
+      }>;
+      steps: Array<{
+        stepId: string;
+        title: string;
+        stage: "decomposition" | "retrieval" | "synthesis" | "validation";
+        taskIds: string[];
+        executionMode: "parallel" | "sequential";
+        stopCondition: string;
+      }>;
+      dependencies: Array<{
+        dependencyId: string;
+        fromTaskId: string;
+        toTaskId: string;
+        relation: string;
+      }>;
+    };
+    retrievalPlanTrace: {
+      plannerDecisions: string[];
+      retrievalStrategy: "direct" | "staged-hybrid" | "hierarchical" | "agentic";
+      createdSubqueries: number;
+      decompositionTypes: string[];
+      executionOrder: string[];
+      executedSteps: Array<{
+        stepId: string;
+        title: string;
+        executionMode: "parallel" | "sequential";
+        taskIds: string[];
+        executedQueries: string[];
+        resultCount: number;
+      }>;
+      coverage: number;
+      missingEvidence: string[];
+      evidenceSynthesis: {
+        coverage: number;
+        consensusScore: number;
+        missingEvidence: string[];
+        clusters: Array<{
+          clusterId: string;
+          label: string;
+          theme: string;
+          chunkIds: string[];
+          subQueryIds: string[];
+          evidenceCount: number;
+        }>;
+        conflicts: Array<{
+          conflictType: string;
+          description: string;
+          affectedGoalIds: string[];
+          severity: "low" | "medium" | "high";
+        }>;
+      };
+      refinementQueries: string[];
+    };
     retrievalEvaluation?: {
       retrievalConfidence: number;
       contextCoverage: number;

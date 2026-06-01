@@ -207,6 +207,213 @@ export interface RetrievalSignalSummary {
   finalHits: number;
 }
 
+export type RetrievalDecompositionType =
+  | "temporal"
+  | "comparative"
+  | "multi-hop"
+  | "dependency-based"
+  | "causal"
+  | "analytical";
+
+export type RetrievalTaskType =
+  | "retrieval"
+  | "synthesis"
+  | "validation"
+  | "rerank"
+  | "graph-traversal"
+  | "critique"
+  | "merge";
+
+export type RetrievalDependencyRelation =
+  | "requires"
+  | "supports"
+  | "refines"
+  | "validates"
+  | "synthesizes";
+
+export interface EvidenceGoal {
+  goalId: string;
+  description: string;
+  priority: "primary" | "supporting";
+  target?: string;
+}
+
+export interface SubQuery {
+  subQueryId: string;
+  text: string;
+  type: RetrievalDecompositionType | "supporting";
+  purpose: string;
+  evidenceGoalIds: string[];
+  dependsOn: string[];
+  stage: "broad" | "focused" | "validation";
+  useGraphRag: boolean;
+  useHyDE: boolean;
+  useRAPTOR: boolean;
+  useMemory: boolean;
+}
+
+export interface RetrievalTask {
+  taskId: string;
+  title: string;
+  type: RetrievalTaskType;
+  subQueryId?: string;
+  evidenceGoalIds: string[];
+  dependencyIds: string[];
+  executionMode: "parallel" | "sequential";
+}
+
+export interface RetrievalDependency {
+  dependencyId: string;
+  fromTaskId: string;
+  toTaskId: string;
+  relation: RetrievalDependencyRelation;
+}
+
+export interface RetrievalStep {
+  stepId: string;
+  title: string;
+  stage: "decomposition" | "retrieval" | "synthesis" | "validation";
+  taskIds: string[];
+  executionMode: "parallel" | "sequential";
+  stopCondition: string;
+}
+
+export interface RetrievalNode {
+  nodeId: string;
+  taskId: string;
+  nodeType: RetrievalTaskType;
+}
+
+export interface RetrievalEdge {
+  edgeId: string;
+  fromNodeId: string;
+  toNodeId: string;
+  relation: RetrievalDependencyRelation;
+}
+
+export type EvidenceDependency = RetrievalDependency;
+
+export interface RetrievalExecutionGraph {
+  nodes: RetrievalNode[];
+  edges: RetrievalEdge[];
+  parallelTaskGroups: string[][];
+}
+
+export interface RetrievalContextState {
+  entities: string[];
+  temporalAnchors: string[];
+  comparisonTargets: string[];
+  missingEvidence: string[];
+}
+
+export interface RetrievalWorkingMemory {
+  executedQueries: string[];
+  retrievedChunkIds: string[];
+  missingEvidence: string[];
+  discoveredEntities: string[];
+  retrievalFailures: string[];
+}
+
+export interface EvidenceMemory {
+  chunkIds: string[];
+  coverageByGoal: Record<string, number>;
+}
+
+export interface QueryContextAccumulator {
+  normalizedTokens: string[];
+  entities: string[];
+  temporalAnchors: string[];
+}
+
+export interface RetrievalSessionState {
+  planId: string;
+  workingMemory: RetrievalWorkingMemory;
+  context: QueryContextAccumulator;
+  evidenceMemory: EvidenceMemory;
+}
+
+export interface PlanExecutionState {
+  status: "planned" | "executed";
+  completedTaskIds: string[];
+  pendingTaskIds: string[];
+  expandedQueries: string[];
+  executedQueries: string[];
+  evidenceCoverage: number;
+  missingEvidence: string[];
+}
+
+export interface RetrievalPlan {
+  planId: string;
+  planningEnabled: boolean;
+  requiresClarification: boolean;
+  decompositionTypes: RetrievalDecompositionType[];
+  evidenceGoals: EvidenceGoal[];
+  subQueries: SubQuery[];
+  tasks: RetrievalTask[];
+  steps: RetrievalStep[];
+  dependencies: RetrievalDependency[];
+  executionGraph: RetrievalExecutionGraph;
+  contextState: RetrievalContextState;
+  executionState: PlanExecutionState;
+  workingMemory: RetrievalWorkingMemory;
+  sessionState: RetrievalSessionState;
+}
+
+export interface RetrievalEvidenceRecord {
+  evidenceId: string;
+  chunkId: string;
+  subQueryId: string;
+  taskId: string;
+  text: string;
+  metadata?: Record<string, string | number | boolean | undefined>;
+}
+
+export interface EvidenceCluster {
+  clusterId: string;
+  label: string;
+  theme: "temporal" | "architectural" | "entity" | "query-stage";
+  chunkIds: string[];
+  subQueryIds: string[];
+  evidenceCount: number;
+}
+
+export interface EvidenceConflict {
+  conflictType: "missing-evidence" | "coverage-gap" | "weak-consensus";
+  description: string;
+  affectedGoalIds: string[];
+  severity: "low" | "medium" | "high";
+}
+
+export interface EvidenceSynthesisResult {
+  clusters: EvidenceCluster[];
+  coverage: number;
+  consensusScore: number;
+  missingEvidence: string[];
+  conflicts: EvidenceConflict[];
+}
+
+export interface RetrievalStepTrace {
+  stepId: string;
+  title: string;
+  executionMode: "parallel" | "sequential";
+  taskIds: string[];
+  executedQueries: string[];
+  resultCount: number;
+}
+
+export interface RetrievalPlanTrace {
+  plannerDecisions: string[];
+  retrievalStrategy: "direct" | "staged-hybrid" | "hierarchical" | "agentic";
+  createdSubqueries: number;
+  decompositionTypes: RetrievalDecompositionType[];
+  executionOrder: string[];
+  executedSteps: RetrievalStepTrace[];
+  coverage: number;
+  missingEvidence: string[];
+  evidenceSynthesis: EvidenceSynthesisResult;
+  refinementQueries: string[];
+}
+
 export interface AdaptiveRetrievalPlan {
   selectedMode: AdaptiveRetrievalMode;
   executionMode: AdaptiveRetrievalMode;
@@ -220,6 +427,8 @@ export interface AdaptiveRetrievalPlan {
   policy: RetrievalPolicy;
   riskAssessment: QueryRiskAssessment;
   executionPlan: RetrievalExecutionPlan;
+  retrievalPlan: RetrievalPlan;
+  planTrace: RetrievalPlanTrace;
   decision: RetrievalDecision;
 }
 
@@ -489,6 +698,249 @@ export class RetrievalPlanner {
             : userModeConfig.costProfile,
     };
   }
+
+  createRetrievalPlan(
+    classification: AdaptiveQueryClassification,
+    executionPlan: RetrievalExecutionPlan,
+    input: AdaptiveRetrievalPlannerInput
+  ): RetrievalPlan {
+    const planId = buildPlanId(input.query);
+    const decompositionTypes = detectDecompositionTypes(input.query, classification);
+    const planningEnabled = shouldEnablePlanning(classification, decompositionTypes);
+    const contextState = buildContextState(input.query);
+    const evidenceGoals = buildEvidenceGoals(input.query, contextState, decompositionTypes);
+    const subQueries = buildSubQueries(
+      input.query,
+      classification,
+      executionPlan,
+      contextState,
+      evidenceGoals,
+      decompositionTypes,
+      input
+    );
+    const taskBundle = buildRetrievalTasks(subQueries, evidenceGoals, executionPlan);
+    const workingMemory: RetrievalWorkingMemory = {
+      executedQueries: [],
+      retrievedChunkIds: [],
+      missingEvidence: evidenceGoals.map((goal) => goal.description),
+      discoveredEntities: [],
+      retrievalFailures: [],
+    };
+
+    return {
+      planId,
+      planningEnabled,
+      requiresClarification:
+        classification.categories.includes("ambiguous") && contextState.temporalAnchors.length === 0,
+      decompositionTypes,
+      evidenceGoals,
+      subQueries,
+      tasks: taskBundle.tasks,
+      steps: taskBundle.steps,
+      dependencies: taskBundle.dependencies,
+      executionGraph: taskBundle.executionGraph,
+      contextState,
+      executionState: {
+        status: "planned",
+        completedTaskIds: [],
+        pendingTaskIds: taskBundle.tasks.map((task) => task.taskId),
+        expandedQueries: subQueries
+          .map((subQuery) => subQuery.text)
+          .filter((text) => text !== input.query),
+        executedQueries: [],
+        evidenceCoverage: 0,
+        missingEvidence: workingMemory.missingEvidence,
+      },
+      workingMemory,
+      sessionState: {
+        planId,
+        workingMemory,
+        context: {
+          normalizedTokens: tokenize(input.query),
+          entities: contextState.entities,
+          temporalAnchors: contextState.temporalAnchors,
+        },
+        evidenceMemory: {
+          chunkIds: [],
+          coverageByGoal: Object.fromEntries(evidenceGoals.map((goal) => [goal.goalId, 0])),
+        },
+      },
+    };
+  }
+}
+
+export class EvidenceAggregator {
+  aggregate(
+    plan: RetrievalPlan,
+    evidence: RetrievalEvidenceRecord[]
+  ): Pick<EvidenceSynthesisResult, "clusters" | "coverage" | "missingEvidence"> {
+    const subQueriesById = new Map(plan.subQueries.map((subQuery) => [subQuery.subQueryId, subQuery]));
+    const coverageByGoal = new Map(plan.evidenceGoals.map((goal) => [goal.goalId, 0]));
+
+    for (const record of evidence) {
+      const subQuery = subQueriesById.get(record.subQueryId);
+      for (const goalId of subQuery?.evidenceGoalIds ?? []) {
+        coverageByGoal.set(goalId, (coverageByGoal.get(goalId) ?? 0) + 1);
+      }
+    }
+
+    const clusters = plan.subQueries
+      .map((subQuery) => {
+        const relatedEvidence = evidence.filter((record) => record.subQueryId === subQuery.subQueryId);
+        if (relatedEvidence.length === 0) {
+          return undefined;
+        }
+
+        return {
+          clusterId: `cluster:${subQuery.subQueryId}`,
+          label: subQuery.purpose,
+          theme: resolveClusterTheme(subQuery.type),
+          chunkIds: [...new Set(relatedEvidence.map((record) => record.chunkId))],
+          subQueryIds: [subQuery.subQueryId],
+          evidenceCount: relatedEvidence.length,
+        } satisfies EvidenceCluster;
+      })
+      .filter((cluster): cluster is EvidenceCluster => Boolean(cluster));
+
+    const coveredGoals = [...coverageByGoal.values()].filter((count) => count > 0).length;
+    const coverage =
+      coverageByGoal.size === 0 ? 1 : roundScore(coveredGoals / coverageByGoal.size);
+    const missingEvidence = plan.evidenceGoals
+      .filter((goal) => (coverageByGoal.get(goal.goalId) ?? 0) === 0)
+      .map((goal) => goal.description);
+
+    return {
+      clusters,
+      coverage,
+      missingEvidence,
+    };
+  }
+}
+
+export class RetrievalConsensusEngine {
+  score(clusters: EvidenceCluster[], coverage: number): number {
+    if (clusters.length === 0) {
+      return 0;
+    }
+
+    return roundScore(clamp01(coverage * 0.65 + Math.min(clusters.length, 4) / 4 * 0.35));
+  }
+}
+
+export class EvidenceConflictAnalyzer {
+  analyze(
+    plan: RetrievalPlan,
+    aggregation: Pick<EvidenceSynthesisResult, "coverage" | "missingEvidence" | "clusters">,
+    consensusScore: number
+  ): EvidenceConflict[] {
+    const conflicts: EvidenceConflict[] = [];
+
+    if (aggregation.missingEvidence.length > 0) {
+      conflicts.push({
+        conflictType: "missing-evidence",
+        description: `Missing evidence for ${aggregation.missingEvidence.join(", ")}`,
+        affectedGoalIds: plan.evidenceGoals
+          .filter((goal) => aggregation.missingEvidence.includes(goal.description))
+          .map((goal) => goal.goalId),
+        severity: aggregation.coverage < 0.5 ? "high" : "medium",
+      });
+    }
+
+    if (aggregation.coverage < 0.75) {
+      conflicts.push({
+        conflictType: "coverage-gap",
+        description: "Planner coverage is below the expected threshold for a grounded answer.",
+        affectedGoalIds: plan.evidenceGoals.map((goal) => goal.goalId),
+        severity: aggregation.coverage < 0.4 ? "high" : "medium",
+      });
+    }
+
+    if (consensusScore < 0.55 && aggregation.clusters.length > 1) {
+      conflicts.push({
+        conflictType: "weak-consensus",
+        description: "Evidence clusters are too weakly aligned to trust a synthesized answer.",
+        affectedGoalIds: plan.evidenceGoals.map((goal) => goal.goalId),
+        severity: consensusScore < 0.35 ? "high" : "low",
+      });
+    }
+
+    return conflicts;
+  }
+}
+
+export class EvidenceSynthesizer {
+  private readonly aggregator = new EvidenceAggregator();
+  private readonly consensus = new RetrievalConsensusEngine();
+  private readonly conflicts = new EvidenceConflictAnalyzer();
+
+  synthesize(plan: RetrievalPlan, evidence: RetrievalEvidenceRecord[]): EvidenceSynthesisResult {
+    const aggregation = this.aggregator.aggregate(plan, evidence);
+    const consensusScore = this.consensus.score(aggregation.clusters, aggregation.coverage);
+
+    return {
+      clusters: aggregation.clusters,
+      coverage: aggregation.coverage,
+      consensusScore,
+      missingEvidence: aggregation.missingEvidence,
+      conflicts: this.conflicts.analyze(plan, aggregation, consensusScore),
+    };
+  }
+}
+
+export class RetrievalCoordinator {
+  coordinate(plan: RetrievalPlan): RetrievalStep[] {
+    return plan.steps;
+  }
+}
+
+export class EvidenceResearcher {
+  suggest(plan: RetrievalPlan, missingEvidence: string[]): string[] {
+    return plan.subQueries
+      .filter((subQuery) =>
+        subQuery.evidenceGoalIds.some((goalId) =>
+          plan.evidenceGoals.some(
+            (goal) => goal.goalId === goalId && missingEvidence.includes(goal.description)
+          )
+        )
+      )
+      .map((subQuery) => `${subQuery.text} evidence`)
+      .slice(0, 3);
+  }
+}
+
+export class RetrievalCritic {
+  critique(trace: RetrievalPlanTrace) {
+    return {
+      needsMoreEvidence: trace.coverage < 0.75 || trace.evidenceSynthesis.conflicts.length > 0,
+      reasons: trace.evidenceSynthesis.conflicts.map((conflict) => conflict.description),
+      suggestedQueries: trace.refinementQueries,
+    };
+  }
+}
+
+export class RetrievalSynthesizer {
+  private readonly synthesizer = new EvidenceSynthesizer();
+
+  synthesize(plan: RetrievalPlan, evidence: RetrievalEvidenceRecord[]): EvidenceSynthesisResult {
+    return this.synthesizer.synthesize(plan, evidence);
+  }
+}
+
+export class RetrievalAgent {
+  private readonly planner: AdaptiveRetrievalPlanner;
+  private readonly synthesizer = new RetrievalSynthesizer();
+
+  constructor(config: RetrievalPolicyConfig = DEFAULT_POLICY_CONFIG) {
+    this.planner = new AdaptiveRetrievalPlanner(config);
+  }
+
+  plan(input: AdaptiveRetrievalPlannerInput): AdaptiveRetrievalPlan {
+    return this.planner.plan(input);
+  }
+
+  synthesize(plan: RetrievalPlan, evidence: RetrievalEvidenceRecord[]): EvidenceSynthesisResult {
+    return this.synthesizer.synthesize(plan, evidence);
+  }
 }
 
 export class RetrievalConsensusScorer {
@@ -648,6 +1100,7 @@ export class AdaptiveRetrievalEngine {
       riskAssessment,
       input
     );
+    const retrievalPlan = this.planner.createRetrievalPlan(classification, executionPlan, input);
     const userMode = input.userMode ?? this.config.defaultUserMode;
     const riskProfile = riskAssessment.highRisk
       ? this.config.riskProfiles.highRisk
@@ -686,9 +1139,42 @@ export class AdaptiveRetrievalEngine {
     if (executionPlan.validation.selfCheckEnabled) {
       reasoning.push("self-check-enabled");
     }
+    if (retrievalPlan.planningEnabled) {
+      reasoning.push(`retrieval-plan=${retrievalPlan.subQueries.length}-subqueries`);
+    }
 
     const selectedMode = resolveSelectedMode(classification, executionPlan, input);
     const { executionMode, fallbackReason } = resolveExecutionMode(selectedMode, input, reasoning);
+    const planTrace: RetrievalPlanTrace = {
+      plannerDecisions: [
+        `intent=${classification.primaryIntent}`,
+        `planning=${retrievalPlan.planningEnabled ? "enabled" : "disabled"}`,
+        `subqueries=${retrievalPlan.subQueries.length}`,
+        `steps=${retrievalPlan.steps.length}`,
+      ],
+      retrievalStrategy:
+        executionPlan.strategy === "HierarchicalStrategy"
+          ? "hierarchical"
+          : executionPlan.multiRetrieval || executionPlan.validation.critiqueEnabled
+            ? "agentic"
+            : retrievalPlan.planningEnabled
+              ? "staged-hybrid"
+              : "direct",
+      createdSubqueries: retrievalPlan.subQueries.length,
+      decompositionTypes: retrievalPlan.decompositionTypes,
+      executionOrder: retrievalPlan.steps.map((step) => step.title),
+      executedSteps: [],
+      coverage: 0,
+      missingEvidence: retrievalPlan.evidenceGoals.map((goal) => goal.description),
+      evidenceSynthesis: {
+        clusters: [],
+        coverage: 0,
+        consensusScore: 0,
+        missingEvidence: retrievalPlan.evidenceGoals.map((goal) => goal.description),
+        conflicts: [],
+      },
+      refinementQueries: retrievalPlan.executionState.expandedQueries,
+    };
 
     const decision: RetrievalDecision = {
       policy,
@@ -714,6 +1200,8 @@ export class AdaptiveRetrievalEngine {
       policy,
       riskAssessment,
       executionPlan,
+      retrievalPlan,
+      planTrace,
       decision,
     };
   }
@@ -1101,6 +1589,372 @@ function buildValidationPlan(
       classification.categories.includes("multi-hop"),
     validationSteps,
   };
+}
+
+function buildPlanId(query: string): string {
+  const normalized = tokenize(query).slice(0, 6).join("-");
+  return `plan:${normalized || "retrieval"}`;
+}
+
+function detectDecompositionTypes(
+  query: string,
+  classification: AdaptiveQueryClassification
+): RetrievalDecompositionType[] {
+  const types = new Set<RetrievalDecompositionType>();
+
+  if (/\b(phase|version|release|sprint)\s+\w+/i.test(query)) {
+    types.add("temporal");
+  }
+  if (classification.categories.includes("comparative")) {
+    types.add("comparative");
+  }
+  if (classification.categories.includes("multi-hop")) {
+    types.add("multi-hop");
+  }
+  if (/\b(depends?|dependency|impact|affect|influence|connected)\b/i.test(query)) {
+    types.add("dependency-based");
+  }
+  if (/\b(why|because|caused?|reason)\b/i.test(query)) {
+    types.add("causal");
+  }
+  if (classification.categories.includes("analytical")) {
+    types.add("analytical");
+  }
+
+  return [...types];
+}
+
+function shouldEnablePlanning(
+  classification: AdaptiveQueryClassification,
+  decompositionTypes: RetrievalDecompositionType[]
+): boolean {
+  return (
+    classification.complexity !== "low" ||
+    classification.categories.includes("retrieval-heavy") ||
+    classification.categories.includes("comparative") ||
+    classification.categories.includes("multi-hop") ||
+    decompositionTypes.length > 0
+  );
+}
+
+function buildContextState(query: string): RetrievalContextState {
+  const temporalAnchors = query.match(/\b(?:phase|version|release|sprint)\s+\w+/gi) ?? [];
+  const entities = tokenize(query)
+    .filter(
+      (token) =>
+        token.length > 3 &&
+        !STOP_WORDS.has(token) &&
+        !["phase", "version", "release", "sprint", "between"].includes(token)
+    )
+    .slice(0, 6);
+
+  return {
+    entities,
+    temporalAnchors,
+    comparisonTargets: temporalAnchors.length > 1 ? temporalAnchors : entities.slice(0, 2),
+    missingEvidence: [],
+  };
+}
+
+function buildEvidenceGoals(
+  query: string,
+  context: RetrievalContextState,
+  decompositionTypes: RetrievalDecompositionType[]
+): EvidenceGoal[] {
+  const focus = context.entities.slice(0, 3).join(" ") || query;
+  const goals: EvidenceGoal[] = [];
+
+  if (decompositionTypes.includes("temporal") && context.temporalAnchors.length > 0) {
+    goals.push(
+      ...context.temporalAnchors.map((anchor, index) => ({
+        goalId: `goal:temporal:${index + 1}`,
+        description: `${focus} evidence for ${anchor}`,
+        priority: "primary" as const,
+        target: anchor,
+      }))
+    );
+  }
+
+  if (decompositionTypes.includes("comparative")) {
+    goals.push({
+      goalId: "goal:comparison",
+      description: `Compare ${focus} across the retrieved contexts`,
+      priority: "primary",
+      target: focus,
+    });
+  }
+
+  if (decompositionTypes.includes("dependency-based")) {
+    goals.push({
+      goalId: "goal:dependency",
+      description: `Dependency evidence for ${focus}`,
+      priority: "supporting",
+      target: focus,
+    });
+  }
+
+  if (decompositionTypes.includes("analytical") || goals.length === 0) {
+    goals.push({
+      goalId: "goal:analysis",
+      description: `Architectural evidence for ${focus}`,
+      priority: goals.length === 0 ? "primary" : "supporting",
+      target: focus,
+    });
+  }
+
+  goals.push({
+    goalId: "goal:synthesis",
+    description: "Synthesize the strongest grounded answer from the retrieved evidence",
+    priority: "supporting",
+  });
+
+  return goals;
+}
+
+function buildSubQueries(
+  query: string,
+  classification: AdaptiveQueryClassification,
+  executionPlan: RetrievalExecutionPlan,
+  context: RetrievalContextState,
+  evidenceGoals: EvidenceGoal[],
+  decompositionTypes: RetrievalDecompositionType[],
+  input: AdaptiveRetrievalPlannerInput
+): SubQuery[] {
+  const focusTerms = context.entities.join(" ");
+  const subQueries: SubQuery[] = [];
+  const createSubQuery = (
+    subQueryId: string,
+    text: string,
+    type: SubQuery["type"],
+    purpose: string,
+    evidenceGoalIds: string[],
+    stage: SubQuery["stage"] = "focused",
+    dependsOn: string[] = []
+  ) => {
+    subQueries.push({
+      subQueryId,
+      text,
+      type,
+      purpose,
+      evidenceGoalIds,
+      dependsOn,
+      stage,
+      useGraphRag: executionPlan.graphTraversal,
+      useHyDE: executionPlan.queryExpansion.strategies.includes("hyde") || input.hydeAvailable === true,
+      useRAPTOR:
+        executionPlan.strategy === "HierarchicalStrategy" || input.raptorAvailable === true,
+      useMemory: classification.categories.includes("memory-dependent"),
+    });
+  };
+
+  createSubQuery(
+    "subquery:overview",
+    query,
+    decompositionTypes[0] ?? "analytical",
+    "Retrieve the broad overview before drilling into focused evidence",
+    evidenceGoals.filter((goal) => goal.priority === "primary").map((goal) => goal.goalId),
+    "broad"
+  );
+
+  for (const [index, anchor] of context.temporalAnchors.entries()) {
+    createSubQuery(
+      `subquery:temporal:${index + 1}`,
+      `${focusTerms} ${anchor}`.trim(),
+      "temporal",
+      `Retrieve focused evidence for ${anchor}`,
+      evidenceGoals.filter((goal) => goal.target === anchor).map((goal) => goal.goalId),
+      "focused",
+      ["subquery:overview"]
+    );
+  }
+
+  if (decompositionTypes.includes("comparative")) {
+    createSubQuery(
+      "subquery:comparison-adr",
+      `ADR ${focusTerms} changes`,
+      "comparative",
+      "Retrieve ADRs or decision records that explain the comparison",
+      evidenceGoals
+        .filter((goal) => goal.goalId === "goal:comparison" || goal.goalId === "goal:analysis")
+        .map((goal) => goal.goalId),
+      "focused",
+      ["subquery:overview"]
+    );
+  }
+
+  if (decompositionTypes.includes("dependency-based")) {
+    createSubQuery(
+      "subquery:dependency",
+      `${focusTerms} dependencies architecture`,
+      "dependency-based",
+      "Retrieve dependency and architectural relationship evidence",
+      evidenceGoals.filter((goal) => goal.goalId === "goal:dependency").map((goal) => goal.goalId),
+      "focused",
+      ["subquery:overview"]
+    );
+  }
+
+  if (
+    decompositionTypes.includes("analytical") ||
+    classification.categories.includes("retrieval-heavy")
+  ) {
+    createSubQuery(
+      "subquery:analysis",
+      `${focusTerms} architecture evolution`,
+      "analytical",
+      "Retrieve architectural change evidence to support synthesis",
+      evidenceGoals.filter((goal) => goal.goalId === "goal:analysis").map((goal) => goal.goalId),
+      "validation",
+      ["subquery:overview"]
+    );
+  }
+
+  return subQueries
+    .filter((subQuery, index, items) => items.findIndex((item) => item.text === subQuery.text) === index)
+    .slice(0, executionPlan.multiRetrieval ? 5 : 4);
+}
+
+function buildRetrievalTasks(
+  subQueries: SubQuery[],
+  evidenceGoals: EvidenceGoal[],
+  executionPlan: RetrievalExecutionPlan
+): Pick<RetrievalPlan, "tasks" | "steps" | "dependencies" | "executionGraph"> {
+  const dependencies: RetrievalDependency[] = [];
+  const retrievalTasks: RetrievalTask[] = subQueries.map((subQuery) => ({
+    taskId: `task:${subQuery.subQueryId}`,
+    title: subQuery.purpose,
+    type: subQuery.useGraphRag && subQuery.stage !== "broad" ? ("graph-traversal" as const) : ("retrieval" as const),
+    subQueryId: subQuery.subQueryId,
+    evidenceGoalIds: subQuery.evidenceGoalIds,
+    dependencyIds: [],
+    executionMode: subQuery.dependsOn.length > 0 ? ("parallel" as const) : ("sequential" as const),
+  }));
+  const retrievalTaskIds = new Map(retrievalTasks.map((task) => [task.subQueryId!, task.taskId]));
+
+  for (const task of retrievalTasks) {
+    const subQuery = subQueries.find((item) => item.subQueryId === task.subQueryId);
+    const dependencyIds = (subQuery?.dependsOn ?? [])
+      .map((dependencySubQueryId) => retrievalTaskIds.get(dependencySubQueryId))
+      .filter((value): value is string => Boolean(value));
+
+    task.dependencyIds.push(...dependencyIds);
+    dependencies.push(
+      ...dependencyIds.map((dependencyId, index) => ({
+        dependencyId: `dependency:${task.taskId}:${index + 1}`,
+        fromTaskId: dependencyId,
+        toTaskId: task.taskId,
+        relation: "requires" as const,
+      }))
+    );
+  }
+
+  const synthesisTask: RetrievalTask = {
+    taskId: "task:synthesis",
+    title: "Synthesize grounded evidence",
+    type: "synthesis",
+    evidenceGoalIds: evidenceGoals.filter((goal) => goal.goalId === "goal:synthesis").map((goal) => goal.goalId),
+    dependencyIds: retrievalTasks.map((task) => task.taskId),
+    executionMode: "sequential",
+  };
+  const validationTask: RetrievalTask = {
+    taskId: "task:validation",
+    title: "Validate coverage and consensus",
+    type: "validation",
+    evidenceGoalIds: evidenceGoals.map((goal) => goal.goalId),
+    dependencyIds: [synthesisTask.taskId],
+    executionMode: "sequential",
+  };
+
+  dependencies.push(
+    ...retrievalTasks.map((task, index) => ({
+      dependencyId: `dependency:${synthesisTask.taskId}:${index + 1}`,
+      fromTaskId: task.taskId,
+      toTaskId: synthesisTask.taskId,
+      relation: "synthesizes" as const,
+    })),
+    {
+      dependencyId: `dependency:${validationTask.taskId}:1`,
+      fromTaskId: synthesisTask.taskId,
+      toTaskId: validationTask.taskId,
+      relation: "validates",
+    }
+  );
+
+  const tasks = [...retrievalTasks, synthesisTask, validationTask];
+  const steps: RetrievalStep[] = [
+    {
+      stepId: "step:decomposition",
+      title: "Decompose query into focused retrieval tasks",
+      stage: "decomposition",
+      taskIds: [],
+      executionMode: "sequential",
+      stopCondition: "subqueries-created",
+    },
+    {
+      stepId: "step:retrieval",
+      title: "Execute staged retrieval",
+      stage: "retrieval",
+      taskIds: retrievalTasks.map((task) => task.taskId),
+      executionMode:
+        executionPlan.multiRetrieval || retrievalTasks.length > 2 ? "parallel" : "sequential",
+      stopCondition: "evidence-goals-partially-covered",
+    },
+    {
+      stepId: "step:synthesis",
+      title: "Merge and synthesize evidence",
+      stage: "synthesis",
+      taskIds: [synthesisTask.taskId],
+      executionMode: "sequential",
+      stopCondition: "evidence-clusters-built",
+    },
+    {
+      stepId: "step:validation",
+      title: "Validate coverage and consensus",
+      stage: "validation",
+      taskIds: [validationTask.taskId],
+      executionMode: "sequential",
+      stopCondition: "coverage-checked",
+    },
+  ];
+  const nodes = tasks.map((task) => ({
+    nodeId: `node:${task.taskId}`,
+    taskId: task.taskId,
+    nodeType: task.type,
+  }));
+  const edges = dependencies.map((dependency) => ({
+    edgeId: `edge:${dependency.dependencyId}`,
+    fromNodeId: `node:${dependency.fromTaskId}`,
+    toNodeId: `node:${dependency.toTaskId}`,
+    relation: dependency.relation,
+  }));
+
+  return {
+    tasks,
+    steps,
+    dependencies,
+    executionGraph: {
+      nodes,
+      edges,
+      parallelTaskGroups:
+        steps[1]?.executionMode === "parallel"
+          ? [retrievalTasks.map((task) => task.taskId)]
+          : [],
+    },
+  };
+}
+
+function resolveClusterTheme(type: SubQuery["type"]): EvidenceCluster["theme"] {
+  switch (type) {
+    case "temporal":
+      return "temporal";
+    case "comparative":
+    case "analytical":
+      return "architectural";
+    case "dependency-based":
+      return "entity";
+    default:
+      return "query-stage";
+  }
 }
 
 function resolveSelectedMode(

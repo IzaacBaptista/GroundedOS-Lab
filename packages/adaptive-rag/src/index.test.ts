@@ -81,4 +81,37 @@ describe("adaptive-rag", () => {
     expect(plan.executionPlan.retrievalMode).toBe("dense");
     expect(plan.executionPlan.topK).toBeLessThanOrEqual(4);
   });
+
+  it("builds an explicit retrieval plan for temporal comparisons", () => {
+    const planner = new AdaptiveRetrievalPlanner();
+    const plan = planner.plan({
+      query: "Compare auth strategy changes between phase 5 and phase 6",
+      graphAvailable: true,
+      hydeAvailable: true,
+      raptorAvailable: true,
+      requireGrounding: true,
+      userMode: "DEEP",
+    });
+
+    expect(plan.retrievalPlan.planningEnabled).toBe(true);
+    expect(plan.retrievalPlan.decompositionTypes).toEqual(
+      expect.arrayContaining(["temporal", "comparative", "analytical"])
+    );
+    expect(plan.retrievalPlan.subQueries.map((subQuery) => subQuery.text)).toEqual(
+      expect.arrayContaining([
+        "Compare auth strategy changes between phase 5 and phase 6",
+        "compare auth strategy changes phase 5",
+        "compare auth strategy changes phase 6",
+        "ADR compare auth strategy changes changes",
+      ])
+    );
+    expect(plan.retrievalPlan.steps.map((step) => step.stage)).toEqual([
+      "decomposition",
+      "retrieval",
+      "synthesis",
+      "validation",
+    ]);
+    expect(plan.planTrace.retrievalStrategy).toBe("agentic");
+    expect(plan.planTrace.createdSubqueries).toBeGreaterThanOrEqual(4);
+  });
 });
