@@ -293,17 +293,78 @@ export interface DevModeOutput {
       | "GRAPH_RAG"
       | "HYDE_RAG"
       | "FULL_PIPELINE";
+    selectedStrategy:
+      | "DenseOnlyStrategy"
+      | "HybridStrategy"
+      | "HybridRerankStrategy"
+      | "MultiRetrievalStrategy"
+      | "HyDEStrategy"
+      | "GraphEnhancedStrategy"
+      | "HierarchicalStrategy"
+      | "HighValidationStrategy";
+    policyName: string;
+    userMode: "FAST" | "BALANCED" | "DEEP";
     reason: string[];
     fallbackReason?: string;
     estimatedCost: "low" | "medium" | "high";
+    estimatedLatency: "fast" | "balanced" | "deep";
     confidence: number;
     shouldRetrieve: boolean;
     classification: {
       categories: string[];
+      primaryIntent: string;
+      expectedAnswerType: string;
       complexity: "low" | "medium" | "high";
+      complexityScore: number;
       ambiguity: number;
       factualityRisk: number;
+      hallucinationRisk: number;
       confidence: number;
+    };
+    riskAssessment: {
+      ambiguityScore: number;
+      complexityScore: number;
+      factualityRisk: number;
+      hallucinationRisk: number;
+      overallRisk: number;
+      highRisk: boolean;
+      citationRequired: boolean;
+      reasons: string[];
+    };
+    executionPlan: {
+      strategy: string;
+      retrievalMode: "dense" | "hybrid";
+      topK: number;
+      candidateTopK: number;
+      rerankEnabled: boolean;
+      rerankDepth: number;
+      queryExpansion: {
+        enabled: boolean;
+        strategies: string[];
+        queries: string[];
+        reason?: string;
+      };
+      graphTraversal: boolean;
+      multiRetrieval: boolean;
+      validation: {
+        citationEnforced: boolean;
+        selfCheckEnabled: boolean;
+        critiqueEnabled: boolean;
+        consensusRequired: boolean;
+        validationSteps: string[];
+      };
+      latencyProfile: "fast" | "balanced" | "deep";
+      costProfile: "low" | "medium" | "high";
+    };
+    retrievalEvaluation?: {
+      retrievalConfidence: number;
+      contextCoverage: number;
+      evidenceQuality: number;
+      sourceDiversity: number;
+      consensusScore: number;
+      sufficient: boolean;
+      recommendedAction: string;
+      missingEvidenceLikelihood: number;
     };
   };
   graphRetrievalTrace?: {

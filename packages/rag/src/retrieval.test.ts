@@ -316,7 +316,10 @@ describe("retrieval flow", () => {
     expect(output.adaptiveRoutingTrace).toMatchObject({
       selectedPipeline: "FULL_PIPELINE",
       executedPipeline: "FULL_PIPELINE",
+      selectedStrategy: "MultiRetrievalStrategy",
     });
+    expect(output.adaptiveRoutingTrace?.executionPlan.queryExpansion.enabled).toBe(true);
+    expect(output.adaptiveRoutingTrace?.retrievalEvaluation?.consensusScore).toBeGreaterThan(0);
     expect(output.graphRetrievalTrace?.entityHits.length).toBeGreaterThan(0);
     expect(output.graphRetrievalTrace?.traversalSteps.length).toBeGreaterThan(0);
     expect(output.hydeTrace?.hypotheticalDocument).toContain(
@@ -363,6 +366,33 @@ describe("retrieval flow", () => {
 
     expect(denseOnly[0]?.chunk.sectionId).toBe("section-2");
     expect(hybrid[0]?.chunk.sectionId).toBe("section-2");
+  });
+
+  it("records dense-only adaptive plans for simple factual queries", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Semantic cache stores previous grounded answers to avoid repeated retrieval.",
+      metadata: {
+        documentId: "doc-simple-adaptive",
+        title: "Simple Adaptive Retrieval",
+      },
+    });
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+    });
+
+    const output = await retrieveForDevMode(index, "What is semantic cache?", {
+      mode: "hybrid",
+      userMode: "FAST",
+      semanticCacheHit: true,
+    });
+
+    expect(output.adaptiveRoutingTrace).toMatchObject({
+      selectedStrategy: "DenseOnlyStrategy",
+    });
+    expect(output.adaptiveRoutingTrace?.executionPlan.rerankEnabled).toBe(false);
+    expect(output.adaptiveRoutingTrace?.executionPlan.topK).toBeLessThanOrEqual(4);
   });
 
   it("rejects invalid retrieval inputs and provider query embeddings", async () => {
