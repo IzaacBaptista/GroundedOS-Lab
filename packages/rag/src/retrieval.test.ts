@@ -318,6 +318,17 @@ describe("retrieval flow", () => {
       executedPipeline: "FULL_PIPELINE",
       selectedStrategy: "MultiRetrievalStrategy",
     });
+    expect(output.adaptiveRoutingTrace?.retrievalPlan.planningEnabled).toBe(true);
+    expect(output.adaptiveRoutingTrace?.retrievalPlan.subQueries.length).toBeGreaterThanOrEqual(3);
+    expect(output.adaptiveRoutingTrace?.retrievalPlanTrace.executedSteps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          stepId: "step:retrieval",
+          resultCount: expect.any(Number),
+        }),
+      ])
+    );
+    expect(output.adaptiveRoutingTrace?.retrievalPlanTrace.evidenceSynthesis.coverage).toBeGreaterThan(0);
     expect(output.adaptiveRoutingTrace?.executionPlan.queryExpansion.enabled).toBe(true);
     expect(output.adaptiveRoutingTrace?.retrievalEvaluation?.consensusScore).toBeGreaterThan(0);
     expect(output.graphRetrievalTrace?.entityHits.length).toBeGreaterThan(0);

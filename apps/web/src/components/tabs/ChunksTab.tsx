@@ -327,6 +327,35 @@ function RetrievalPipelinePanel({ devMode }: { devMode: DevModeOutput }) {
               {adaptive.executionPlan.queryExpansion.queries.join(" · ")}
             </ExplainBox>
           )}
+          {adaptive.retrievalPlan?.planningEnabled && adaptive.retrievalPlanTrace && (
+            <>
+              <ExplainBox label="retrieval planning">
+                {adaptive.retrievalPlan.decompositionTypes.join(" · ") || "planned"} ·{" "}
+                {adaptive.retrievalPlan.subQueries.length} subqueries ·{" "}
+                {adaptive.retrievalPlan.steps.length} stages
+              </ExplainBox>
+              <ExplainBox variant="tip" label="staged subqueries">
+                {adaptive.retrievalPlan.subQueries.map((subQuery) => subQuery.text).join(" · ")}
+              </ExplainBox>
+              <ExplainBox
+                variant={
+                  adaptive.retrievalPlanTrace.evidenceSynthesis.conflicts.length > 0
+                    ? "warning"
+                    : "tip"
+                }
+                label="plan trace"
+              >
+                coverage {(adaptive.retrievalPlanTrace.coverage * 100).toFixed(0)}% · consensus{" "}
+                {(adaptive.retrievalPlanTrace.evidenceSynthesis.consensusScore * 100).toFixed(0)}% ·
+                executed {adaptive.retrievalPlanTrace.executedSteps.length} steps
+              </ExplainBox>
+              {adaptive.retrievalPlanTrace.missingEvidence.length > 0 && (
+                <ExplainBox variant="warning" label="missing evidence">
+                  {adaptive.retrievalPlanTrace.missingEvidence.join(" · ")}
+                </ExplainBox>
+              )}
+            </>
+          )}
           <ExplainBox label="validation">
             {adaptive.executionPlan.validation.validationSteps.join(" · ")}
           </ExplainBox>

@@ -7,14 +7,22 @@ import {
 } from "@groundedos/core";
 import {
   AdaptiveRetrievalPlanner,
+  EvidenceSynthesizer,
   RetrievalEvaluator,
   type AdaptiveRetrievalMode,
   type AdaptiveRetrievalPlan,
   type AdaptiveQueryClassification,
+  type EvidenceSynthesisResult,
   type QueryRiskAssessment,
+  type RetrievalDependency,
+  type RetrievalEvidenceRecord,
   type RetrievalExecutionPlan,
+  type RetrievalPlan,
+  type RetrievalPlanTrace,
   type RetrievalSelfEvaluation,
   type RetrievalSignalSummary,
+  type RetrievalTask,
+  type RetrievalWorkingMemory,
 } from "@groundedos/adaptive-rag";
 import {
   InMemoryGraphStore,
@@ -140,6 +148,8 @@ export interface AdaptiveRoutingTrace {
   classification: AdaptiveQueryClassification;
   riskAssessment: QueryRiskAssessment;
   executionPlan: RetrievalExecutionPlan;
+  retrievalPlan: RetrievalPlan;
+  retrievalPlanTrace: RetrievalPlanTrace;
   retrievalEvaluation?: RetrievalSelfEvaluation;
 }
 
@@ -278,6 +288,8 @@ export async function retrieveForDevMode(
       classification: internal.adaptivePlan.classification,
       riskAssessment: internal.adaptivePlan.riskAssessment,
       executionPlan: internal.adaptivePlan.executionPlan,
+      retrievalPlan: internal.adaptivePlan.retrievalPlan,
+      retrievalPlanTrace: internal.retrievalPlanTrace ?? internal.adaptivePlan.planTrace,
       retrievalEvaluation: internal.retrievalEvaluation,
     };
   }
@@ -323,6 +335,7 @@ type InternalRetrievalResult = {
     candidates: RetrievalHybridCandidate[];
   };
   adaptivePlan?: AdaptiveRetrievalPlan;
+  retrievalPlanTrace?: RetrievalPlanTrace;
   retrievalEvaluation?: RetrievalSelfEvaluation;
   graphTrace?: GraphRetrieverResult;
   hydeTrace?: HyDETrace;
@@ -390,6 +403,12 @@ async function retrieveInternal(
   const expansionQueries = adaptivePlan.executionPlan.queryExpansion.enabled
     ? adaptivePlan.executionPlan.queryExpansion.queries.slice(1)
     : [];
+  const planExecution = await executeRetrievalPlan(
+    index,
+    adaptivePlan.retrievalPlan,
+    candidateTopK,
+    options.filter
+  );
 
   const denseCandidates = await searchStore(index.store, {
     embedding: queryEmbedding,
@@ -404,18 +423,27 @@ async function retrieveInternal(
   );
   const validatedDenseCandidates = mergeRetrievalResults(
     validateVectorSearchResults(denseCandidates) as RetrievalResult[],
-    expansionCandidates
+    expansionCandidates,
+    planExecution.results
   );
 
   if (validatedDenseCandidates.length === 0) {
+    const retrievalPlanTrace = finalizeRetrievalPlanTrace(
+      adaptivePlan.planTrace,
+      planExecution.stepTraces,
+      planExecution.workingMemory,
+      planExecution.synthesis
+    );
+
     return {
       results: [],
       adaptivePlan,
+      retrievalPlanTrace,
       retrievalEvaluation: new RetrievalEvaluator().evaluate(
         adaptivePlan,
         {
           denseHits: 0,
-          expansionHits: expansionCandidates.length,
+          expansionHits: expansionCandidates.length + planExecution.results.length,
           graphHits: 0,
           hydeHits: 0,
           raptorHits: 0,
@@ -496,7 +524,7 @@ async function retrieveInternal(
     adaptivePlan,
     {
       denseHits: reranked.length,
-      expansionHits: expansionCandidates.length,
+      expansionHits: expansionCandidates.length + planExecution.results.length,
       graphHits: graphTrace?.results.length ?? 0,
       hydeHits: hydeResults.length,
       raptorHits: raptorResult?.results.length ?? 0,
@@ -505,10 +533,25 @@ async function retrieveInternal(
     fused.results[0]?.score ?? 0,
     averageScore(fused.results)
   );
+  const retrievalPlanTrace = finalizeRetrievalPlanTrace(
+    adaptivePlan.planTrace,
+    planExecution.stepTraces,
+    {
+      ...planExecution.workingMemory,
+      retrievedChunkIds: [
+        ...new Set([
+          ...planExecution.workingMemory.retrievedChunkIds,
+          ...fused.results.map((result) => result.chunk.id),
+        ]),
+      ],
+    },
+    planExecution.synthesis
+  );
 
   return {
     results: fused.results,
     adaptivePlan,
+    retrievalPlanTrace,
     retrievalEvaluation,
     graphTrace,
     hydeTrace: hypotheticalDocument
@@ -569,6 +612,211 @@ async function searchExpandedQueries(
   }
 
   return results;
+}
+
+type PlannedRetrievalExecution = {
+  results: RetrievalResult[];
+  stepTraces: RetrievalPlanTrace["executedSteps"];
+  workingMemory: RetrievalWorkingMemory;
+  synthesis: EvidenceSynthesisResult;
+};
+
+async function executeRetrievalPlan(
+  index: RetrievalIndex,
+  plan: RetrievalPlan,
+  topK: number,
+  filter: VectorMetadataFilter | undefined
+): Promise<PlannedRetrievalExecution> {
+  const taskMap = new Map(plan.tasks.map((task) => [task.taskId, task]));
+  const subQueryMap = new Map(plan.subQueries.map((subQuery) => [subQuery.subQueryId, subQuery]));
+  const evidenceRecords: RetrievalEvidenceRecord[] = [];
+  const collectedResults: RetrievalResult[] = [];
+  const stepTraces: RetrievalPlanTrace["executedSteps"] = [];
+  const workingMemory: RetrievalWorkingMemory = {
+    executedQueries: [],
+    retrievedChunkIds: [],
+    missingEvidence: [...plan.workingMemory.missingEvidence],
+    discoveredEntities: [...plan.contextState.entities],
+    retrievalFailures: [],
+  };
+
+  for (const step of plan.steps) {
+    const retrievalTasks = step.taskIds
+      .map((taskId) => taskMap.get(taskId))
+      .filter((task): task is RetrievalTask => {
+        if (!task) {
+          return false;
+        }
+
+        return task.type === "retrieval" || task.type === "graph-traversal";
+      });
+
+    if (retrievalTasks.length === 0) {
+      stepTraces.push({
+        stepId: step.stepId,
+        title: step.title,
+        executionMode: step.executionMode,
+        taskIds: step.taskIds,
+        executedQueries: [],
+        resultCount: 0,
+      });
+      continue;
+    }
+
+    const taskExecutions =
+      step.executionMode === "parallel"
+        ? await Promise.all(
+            retrievalTasks.map((task) =>
+              executeRetrievalTask(index, task, subQueryMap.get(task.subQueryId ?? ""), topK, filter)
+            )
+          )
+        : await executeSequentialRetrievalTasks(index, retrievalTasks, subQueryMap, topK, filter);
+
+    for (const execution of taskExecutions) {
+      if (!execution) {
+        continue;
+      }
+
+      workingMemory.executedQueries.push(execution.query);
+      workingMemory.retrievedChunkIds.push(...execution.results.map((result) => result.chunk.id));
+      workingMemory.discoveredEntities.push(
+        ...extractDiscoveredEntities(execution.results, plan.contextState.entities)
+      );
+      collectedResults.push(...execution.results);
+      evidenceRecords.push(
+        ...execution.results.map((result, index) => ({
+          evidenceId: `${execution.task.taskId}:evidence:${index + 1}`,
+          chunkId: result.chunk.id,
+          subQueryId: execution.subQuery.subQueryId,
+          taskId: execution.task.taskId,
+          text: result.chunk.text,
+          metadata: {
+            sectionId: result.chunk.sectionId,
+            documentId: result.chunk.documentId,
+          },
+        }))
+      );
+    }
+
+    stepTraces.push({
+      stepId: step.stepId,
+      title: step.title,
+      executionMode: step.executionMode,
+      taskIds: step.taskIds,
+      executedQueries: taskExecutions.filter(Boolean).map((execution) => execution!.query),
+      resultCount: taskExecutions.reduce(
+        (sum, execution) => sum + (execution?.results.length ?? 0),
+        0
+      ),
+    });
+  }
+
+  const synthesis = new EvidenceSynthesizer().synthesize(plan, evidenceRecords);
+  workingMemory.missingEvidence = synthesis.missingEvidence;
+  workingMemory.executedQueries = [...new Set(workingMemory.executedQueries)];
+  workingMemory.retrievedChunkIds = [...new Set(workingMemory.retrievedChunkIds)];
+  workingMemory.discoveredEntities = [...new Set(workingMemory.discoveredEntities)];
+
+  return {
+    results: mergeRetrievalResults(collectedResults),
+    stepTraces,
+    workingMemory,
+    synthesis,
+  };
+}
+
+async function executeSequentialRetrievalTasks(
+  index: RetrievalIndex,
+  tasks: RetrievalTask[],
+  subQueryMap: Map<string, RetrievalPlan["subQueries"][number]>,
+  topK: number,
+  filter: VectorMetadataFilter | undefined
+) {
+  const executions: Array<
+    | {
+        task: RetrievalTask;
+        subQuery: RetrievalPlan["subQueries"][number];
+        query: string;
+        results: RetrievalResult[];
+      }
+    | undefined
+  > = [];
+
+  for (const task of tasks) {
+    executions.push(
+      await executeRetrievalTask(index, task, subQueryMap.get(task.subQueryId ?? ""), topK, filter)
+    );
+  }
+
+  return executions;
+}
+
+async function executeRetrievalTask(
+  index: RetrievalIndex,
+  task: RetrievalTask,
+  subQuery: RetrievalPlan["subQueries"][number] | undefined,
+  topK: number,
+  filter: VectorMetadataFilter | undefined
+) {
+  if (!subQuery) {
+    return undefined;
+  }
+
+  const embedding = await embedQuery(subQuery.text, index.embeddingProvider);
+  const searched = await searchStore(index.store, {
+    embedding,
+    topK,
+    filter,
+  });
+
+  return {
+    task,
+    subQuery,
+    query: subQuery.text,
+    results: validateVectorSearchResults(searched) as RetrievalResult[],
+  };
+}
+
+function finalizeRetrievalPlanTrace(
+  trace: RetrievalPlanTrace,
+  executedSteps: RetrievalPlanTrace["executedSteps"],
+  workingMemory: RetrievalWorkingMemory,
+  synthesis: EvidenceSynthesisResult
+): RetrievalPlanTrace {
+  return {
+    ...trace,
+    executedSteps,
+    coverage: synthesis.coverage,
+    missingEvidence: synthesis.missingEvidence,
+    evidenceSynthesis: synthesis,
+    refinementQueries: [
+      ...new Set([
+        ...trace.refinementQueries,
+        ...synthesis.missingEvidence.map((missing) => `${missing} evidence`),
+      ]),
+    ],
+    plannerDecisions: [
+      ...trace.plannerDecisions,
+      `coverage=${synthesis.coverage.toFixed(2)}`,
+      `consensus=${synthesis.consensusScore.toFixed(2)}`,
+      `executedQueries=${workingMemory.executedQueries.length}`,
+    ],
+  };
+}
+
+function extractDiscoveredEntities(
+  results: RetrievalResult[],
+  knownEntities: string[]
+): string[] {
+  const entities = new Set<string>();
+
+  for (const entity of knownEntities) {
+    if (results.some((result) => result.chunk.text.toLowerCase().includes(entity.toLowerCase()))) {
+      entities.add(entity);
+    }
+  }
+
+  return [...entities];
 }
 
 function mergeRetrievalResults(...resultSets: RetrievalResult[][]): RetrievalResult[] {
