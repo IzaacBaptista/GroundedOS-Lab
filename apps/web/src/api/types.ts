@@ -225,6 +225,31 @@ export interface DevModeOutput {
       confidenceScore: number;
       confidenceLevel: "HIGH" | "MEDIUM" | "LOW" | "UNRELIABLE";
       confidenceReasoning: string[];
+      overallConfidence?: number;
+      label?: "very_low" | "low" | "moderate" | "high" | "very_high";
+      uncertaintyLevel?: "low" | "medium" | "high";
+      uncertaintyReasons?: string[];
+      recommendedAction?:
+        | "answer_normally"
+        | "answer_with_uncertainty"
+        | "request_clarification"
+        | "run_additional_retrieval"
+        | "run_self_check"
+        | "run_contradiction_check"
+        | "refuse_due_to_insufficient_evidence"
+        | "cite_limitations"
+        | "escalate_to_deep_retrieval";
+      breakdown?: {
+        retrievalConfidence: number;
+        evidenceCoverage: number;
+        chunkAgreement: number;
+        sourceDiversity: number;
+        contradictionRisk: number;
+        groundedness: number;
+        rerankStability: number;
+        citationConfidence: number;
+        answerConfidence: number;
+      };
       evidenceSignals: {
         retrievalScore: number;
         sourceDiversity: number;

@@ -3066,8 +3066,25 @@ function EvalsView({ response }: { response: RagAskResponse | undefined }) {
                 <MetricCard label="Retrieval" value={confidence.factors.retrievalScore.toFixed(3)} />
                 <MetricCard label="Coverage" value={confidence.factors.questionCoverage.toFixed(3)} />
                 <MetricCard label="Conflict penalty" value={confidence.factors.conflictPenalty.toFixed(3)} />
+                {confidence.overallConfidence !== undefined ? (
+                  <MetricCard label="Calibrated overall" value={confidence.overallConfidence.toFixed(3)} />
+                ) : null}
+                {confidence.breakdown ? (
+                  <>
+                    <MetricCard label="Agreement" value={confidence.breakdown.chunkAgreement.toFixed(3)} />
+                    <MetricCard label="Source diversity" value={confidence.breakdown.sourceDiversity.toFixed(3)} />
+                    <MetricCard label="Rerank stability" value={confidence.breakdown.rerankStability.toFixed(3)} />
+                    <MetricCard label="Contradiction risk" value={confidence.breakdown.contradictionRisk.toFixed(3)} />
+                  </>
+                ) : null}
               </div>
               <p className="chunk-text">{confidence.confidenceReasoning.join(" · ")}</p>
+              {confidence.recommendedAction ? (
+                <p className="chunk-text">Policy action: {confidence.recommendedAction}</p>
+              ) : null}
+              {confidence.uncertaintyReasons && confidence.uncertaintyReasons.length > 0 ? (
+                <p className="chunk-text">Uncertainty: {confidence.uncertaintyReasons.join(" · ")}</p>
+              ) : null}
             </>
           ) : null}
         </section>

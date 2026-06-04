@@ -10,6 +10,7 @@ import { RagMemoryService } from "./rag-memory/rag-memory.service";
 import { RagMetricsController } from "./rag-metrics/rag-metrics.controller";
 import { RagMetricsService } from "./rag-metrics/rag-metrics.service";
 import { RetrievalDiagnosticsController } from "./retrieval-diagnostics.controller";
+import { ConfidenceController } from "./confidence.controller";
 
 @Module({
   controllers: [
@@ -18,6 +19,7 @@ import { RetrievalDiagnosticsController } from "./retrieval-diagnostics.controll
     RagMetricsController,
     RagMemoryController,
     RetrievalDiagnosticsController,
+    ConfidenceController,
     MemoryController,
   ],
   providers: [RagService, RagIndexService, RagMetricsService, RagMemoryService, MemoryService],
