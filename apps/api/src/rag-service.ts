@@ -3193,7 +3193,21 @@ async function buildReliabilityAugmentation(input: {
     evals: input.evals,
   });
   const confidence = calibrateConfidence({
+    query: input.query,
     diagnostics: retrievalDiagnostics,
+    chunks: input.devMode.results.map((item) => ({
+      chunkId: item.chunkId,
+      documentId: item.documentId,
+      sectionId: item.sectionId,
+      score: item.score,
+      text: item.text,
+    })),
+    rerankTrace: (input.rerankingCandidates ?? []).map((candidate) => ({
+      chunkId: candidate.chunkId,
+      beforeRank: candidate.beforeRank,
+      afterRank: candidate.afterRank,
+      finalScore: candidate.finalScore,
+    })),
     evals: input.evals,
   });
   const retrievalAnalysis = new RetrievalDiagnosticsEngine().analyze({

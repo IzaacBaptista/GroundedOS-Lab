@@ -10,6 +10,8 @@ import {
   createCorpusDriftReport,
   createPromptPolicyDiffReport,
   RetrievalDiagnosticsEngine,
+  ConfidenceCalibrationEngine,
+  ConfidencePolicyEngine,
 } from "./retrieval-reliability";
 
 describe("retrieval reliability", () => {
@@ -290,6 +292,90 @@ describe("retrieval reliability", () => {
 
     expect(confidence.evidenceSignals.missingCitations).toBe(true);
     expect(confidence.confidenceReasoning.join(" ")).toContain("FLAG missing-citations");
+  });
+
+  it("builds calibrated confidence breakdown with policy action", () => {
+    const diagnostics = buildRetrievalDiagnostics({
+      results: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.83,
+          text: "Phase 6 auth uses JWT with signed tokens and expiry metadata.",
+        },
+        {
+          chunkId: "doc:section-2:chunk-1",
+          documentId: "doc",
+          sectionId: "section-2",
+          score: 0.77,
+          text: "Phase 5 auth used session tokens with server-side state.",
+        },
+      ],
+      citations: [{ chunkId: "doc:section-1:chunk-1" }, { chunkId: "doc:section-2:chunk-1" }],
+      evals: {
+        groundedness: 0.88,
+        answerOverlap: 0.82,
+      },
+      retrievalMode: "hybrid",
+      rerankingApplied: true,
+    });
+
+    const calibrated = new ConfidenceCalibrationEngine().calibrate({
+      query: "Compare auth changes between phase 5 and phase 6",
+      diagnostics,
+      chunks: [
+        {
+          chunkId: "doc:section-1:chunk-1",
+          documentId: "doc",
+          sectionId: "section-1",
+          score: 0.83,
+          text: "Phase 6 auth uses JWT with signed tokens and expiry metadata.",
+        },
+        {
+          chunkId: "doc:section-2:chunk-1",
+          documentId: "doc",
+          sectionId: "section-2",
+          score: 0.77,
+          text: "Phase 5 auth used session tokens with server-side state.",
+        },
+      ],
+      rerankTrace: [
+        { chunkId: "doc:section-1:chunk-1", beforeRank: 2, afterRank: 1 },
+        { chunkId: "doc:section-2:chunk-1", beforeRank: 1, afterRank: 2 },
+      ],
+      evals: {
+        groundedness: 0.88,
+        answerOverlap: 0.82,
+        scorerResults: {
+          faithfulness: { score: 0.86 },
+          relevance: { score: 0.82 },
+        },
+      },
+    });
+
+    expect(calibrated.breakdown.retrievalConfidence).toBeGreaterThan(0.6);
+    expect(calibrated.breakdown.evidenceCoverage).toBeGreaterThanOrEqual(0.5);
+    expect(calibrated.recommendedAction).toMatch(
+      /answer_normally|answer_with_uncertainty|run_additional_retrieval|request_clarification/
+    );
+  });
+
+  it("selects contradiction check when contradiction risk is high", () => {
+    const action = new ConfidencePolicyEngine().selectAction({
+      score: 0.58,
+      contradictionRisk: 0.8,
+      evidenceCoverage: 0.7,
+      sourceDiversity: 0.6,
+      queryRisk: {
+        ambiguous: false,
+        critical: false,
+        multiHop: false,
+        normative: false,
+        precisionRequired: false,
+      },
+    });
+    expect(action).toBe("run_contradiction_check");
   });
 
   it("builds formal retrieval failure analysis for semantic drift", () => {

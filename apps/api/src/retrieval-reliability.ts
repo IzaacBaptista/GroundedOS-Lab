@@ -14,6 +14,41 @@ export type RetrievalFailureCategory =
   | "LOW_CONFIDENCE";
 
 export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW" | "UNRELIABLE";
+export type ConfidenceLabel = "very_low" | "low" | "moderate" | "high" | "very_high";
+export type UncertaintyLevel = "low" | "medium" | "high";
+export type ConfidenceAction =
+  | "answer_normally"
+  | "answer_with_uncertainty"
+  | "request_clarification"
+  | "run_additional_retrieval"
+  | "run_self_check"
+  | "run_contradiction_check"
+  | "refuse_due_to_insufficient_evidence"
+  | "cite_limitations"
+  | "escalate_to_deep_retrieval";
+
+export interface ConfidenceThresholds {
+  veryLow: number;
+  low: number;
+  moderate: number;
+  high: number;
+}
+
+export interface ConfidencePolicy {
+  thresholds: ConfidenceThresholds;
+  contradictionRiskThreshold: number;
+  minimumEvidenceCoverage: number;
+  minimumSourceDiversity: number;
+}
+
+export interface CalibrationProfile {
+  retrievalWeight?: number;
+  evidenceWeight?: number;
+  answerWeight?: number;
+  citationWeight?: number;
+  contradictionPenaltyWeight?: number;
+  policy?: Partial<ConfidencePolicy>;
+}
 
 export interface RetrievalEvidenceChunk {
   chunkId: string;
@@ -92,6 +127,150 @@ export interface ConfidenceCalibration {
     answerConsistency: number;
     conflictPenalty: number;
   };
+  overallConfidence?: number;
+  label?: ConfidenceLabel;
+  breakdown?: ConfidenceBreakdown;
+  retrievalConfidence?: number;
+  evidenceConfidence?: number;
+  answerConfidence?: number;
+  citationConfidence?: number;
+  contradictionRisk?: number;
+  uncertaintyLevel?: UncertaintyLevel;
+  uncertaintyReasons?: string[];
+  recommendedAction?: ConfidenceAction;
+  confidenceTrace?: ConfidenceTrace;
+}
+
+export interface ConfidenceFactor {
+  name: string;
+  score: number;
+  weight: number;
+  impact: "positive" | "negative";
+  reason?: string;
+}
+
+export interface ConfidenceBreakdown {
+  retrievalConfidence: number;
+  evidenceCoverage: number;
+  chunkAgreement: number;
+  sourceDiversity: number;
+  contradictionRisk: number;
+  groundedness: number;
+  rerankStability: number;
+  citationConfidence: number;
+  answerConfidence: number;
+}
+
+export interface ConfidenceTrace {
+  overallConfidence: number;
+  label: ConfidenceLabel;
+  uncertaintyLevel: UncertaintyLevel;
+  factors: ConfidenceFactor[];
+  uncertaintyReasons: string[];
+  policyAction: ConfidenceAction;
+}
+
+export interface ConfidenceScore {
+  overallConfidence: number;
+  label: ConfidenceLabel;
+  breakdown: ConfidenceBreakdown;
+  retrievalConfidence: number;
+  evidenceConfidence: number;
+  answerConfidence: number;
+  citationConfidence: number;
+  contradictionRisk: number;
+  uncertaintyLevel: UncertaintyLevel;
+  uncertaintyReasons: string[];
+  recommendedAction: ConfidenceAction;
+  trace: ConfidenceTrace;
+}
+
+export interface RetrievalScoreSignals {
+  topChunkScore: number;
+  averageTopKScore: number;
+  scoreDistribution: number;
+  scoreGap: number;
+  thresholdMargin: number;
+  retrievalSaturation: number;
+}
+
+export interface QueryRiskSignals {
+  ambiguous: boolean;
+  critical: boolean;
+  multiHop: boolean;
+  normative: boolean;
+  precisionRequired: boolean;
+}
+
+export interface FacetCoverageResult {
+  facets: string[];
+  facetScores: Record<string, number>;
+  coveredFacets: string[];
+  missingFacets: string[];
+  coverageBySource: Record<string, number>;
+  coverageScore: number;
+}
+
+export interface ConsensusScore {
+  score: number;
+  supportedByMultiple: number;
+  supportedBySingle: number;
+  unsupported: number;
+  conflictingClaims: number;
+}
+
+export interface EvidenceCluster {
+  claim: string;
+  supportingChunkIds: string[];
+  confidence: number;
+}
+
+export type ConflictSeverity = "low" | "medium" | "high";
+export type ConflictResolutionHint =
+  | "prefer_newer_source"
+  | "check_timeline"
+  | "verify_authoritative_source"
+  | "request_more_evidence";
+
+export interface ConflictPair {
+  leftChunkId: string;
+  rightChunkId: string;
+  type:
+    | "value_conflict"
+    | "date_conflict"
+    | "version_conflict"
+    | "status_conflict"
+    | "decision_conflict"
+    | "source_conflict"
+    | "semantic_conflict";
+  severity: ConflictSeverity;
+  hint: ConflictResolutionHint;
+}
+
+export interface SourceIndependenceScore {
+  score: number;
+  distinctDocuments: number;
+  distinctSections: number;
+  documentConcentration: number;
+}
+
+export interface RankingDelta {
+  chunkId: string;
+  beforeRank: number;
+  afterRank: number;
+  delta: number;
+}
+
+export interface RankCorrelationScore {
+  score: number;
+}
+
+export interface RetrievalStabilityReport {
+  deltas: RankingDelta[];
+  correlation: RankCorrelationScore;
+  averageDelta: number;
+  rerankDependency: number;
+  stability: number;
 }
 
 export type { ReplaySnapshot, ReplayComparisonReport };
@@ -439,6 +618,555 @@ export interface RetrievalAnalysisResult {
   explainability: RetrievalExplainabilityReport;
   recommendations: RetrievalOptimizationSuggestion[];
   autoTuningRecommendations: AutoTuningRecommendation[];
+}
+
+export class QueryFacetExtractor {
+  extractFacets(query: string): string[] {
+    const normalized = normalizeWhitespace(query.toLowerCase());
+    if (!normalized) {
+      return [];
+    }
+    const coarseFacets = normalized
+      .split(/\b(?:and|or|vs|versus|between|compare|difference|differences)\b/g)
+      .map((facet) => normalizeWhitespace(facet))
+      .filter((facet) => facet.length > 2);
+    const tokens = normalized.match(/[a-z0-9]{4,}/g) ?? [];
+    const keywordFacets = tokens.slice(0, 4);
+    return [...new Set([...coarseFacets, ...keywordFacets])].slice(0, 8);
+  }
+}
+
+export class MissingEvidenceDetector {
+  detect(facetScores: Record<string, number>): string[] {
+    return Object.entries(facetScores)
+      .filter(([, score]) => score < 0.4)
+      .map(([facet]) => facet);
+  }
+}
+
+export class EvidenceCoverageEstimator {
+  constructor(
+    private readonly facetExtractor = new QueryFacetExtractor(),
+    private readonly missingDetector = new MissingEvidenceDetector()
+  ) {}
+
+  estimate(input: { query: string; chunks: RetrievalEvidenceChunk[] }): FacetCoverageResult {
+    const facets = this.facetExtractor.extractFacets(input.query);
+    if (facets.length === 0) {
+      return {
+        facets: [],
+        facetScores: {},
+        coveredFacets: [],
+        missingFacets: [],
+        coverageBySource: {},
+        coverageScore: 0,
+      };
+    }
+
+    const facetScores = Object.fromEntries(
+      facets.map((facet) => {
+        const best = input.chunks.reduce((max, chunk) => {
+          return Math.max(max, tokenOverlapRatio(facet, chunk.text.toLowerCase()));
+        }, 0);
+        return [facet, round(best, 3)];
+      })
+    );
+    const missingFacets = this.missingDetector.detect(facetScores);
+    const coveredFacets = facets.filter((facet) => !missingFacets.includes(facet));
+    const coverageBySource: Record<string, number> = {};
+    for (const chunk of input.chunks) {
+      const key = chunk.documentId;
+      const sourceMax = facets.reduce((max, facet) => {
+        return Math.max(max, tokenOverlapRatio(facet, chunk.text.toLowerCase()));
+      }, 0);
+      coverageBySource[key] = round(Math.max(coverageBySource[key] ?? 0, sourceMax), 3);
+    }
+    const coverageScore =
+      facets.length === 0
+        ? 0
+        : round(Object.values(facetScores).reduce((sum, score) => sum + score, 0) / facets.length, 3);
+
+    return {
+      facets,
+      facetScores,
+      coveredFacets,
+      missingFacets,
+      coverageBySource,
+      coverageScore,
+    };
+  }
+}
+
+export class ClaimExtractor {
+  extractClaims(chunks: RetrievalEvidenceChunk[]): string[] {
+    return [
+      ...new Set(
+        chunks
+          .flatMap((chunk) =>
+            chunk.text
+              .split(/[.!?]/g)
+              .map((sentence) => normalizeWhitespace(sentence))
+              .filter((sentence) => sentence.length >= 24)
+              .slice(0, 2)
+          )
+          .slice(0, 12)
+      ),
+    ];
+  }
+}
+
+export class ClaimSupportMapper {
+  mapClaimsToChunks(claims: string[], chunks: RetrievalEvidenceChunk[]): Map<string, string[]> {
+    const support = new Map<string, string[]>();
+    for (const claim of claims) {
+      const chunkIds = chunks
+        .filter((chunk) => tokenOverlapRatio(claim.toLowerCase(), chunk.text.toLowerCase()) >= 0.35)
+        .map((chunk) => chunk.chunkId);
+      support.set(claim, chunkIds);
+    }
+    return support;
+  }
+}
+
+export class EvidenceAgreementAnalyzer {
+  constructor(
+    private readonly claimExtractor = new ClaimExtractor(),
+    private readonly claimSupportMapper = new ClaimSupportMapper()
+  ) {}
+
+  analyze(chunks: RetrievalEvidenceChunk[]): { consensus: ConsensusScore; clusters: EvidenceCluster[] } {
+    const claims = this.claimExtractor.extractClaims(chunks);
+    const support = this.claimSupportMapper.mapClaimsToChunks(claims, chunks);
+    let supportedByMultiple = 0;
+    let supportedBySingle = 0;
+    let unsupported = 0;
+    const clusters: EvidenceCluster[] = [];
+
+    for (const claim of claims) {
+      const supporters = support.get(claim) ?? [];
+      if (supporters.length >= 2) {
+        supportedByMultiple += 1;
+      } else if (supporters.length === 1) {
+        supportedBySingle += 1;
+      } else {
+        unsupported += 1;
+      }
+      clusters.push({
+        claim,
+        supportingChunkIds: supporters,
+        confidence: round(Math.min(1, supporters.length / 3), 3),
+      });
+    }
+
+    const total = Math.max(1, claims.length);
+    const score = round((supportedByMultiple * 1 + supportedBySingle * 0.6) / total, 3);
+
+    return {
+      consensus: {
+        score,
+        supportedByMultiple,
+        supportedBySingle,
+        unsupported,
+        conflictingClaims: 0,
+      },
+      clusters,
+    };
+  }
+}
+
+export class ContradictionDetector {
+  detect(chunks: RetrievalEvidenceChunk[]): ConflictPair[] {
+    const pairs: ConflictPair[] = [];
+    for (let leftIndex = 0; leftIndex < chunks.length; leftIndex += 1) {
+      const left = chunks[leftIndex];
+      if (!left) continue;
+      const leftText = normalizeWhitespace(left.text.toLowerCase());
+      const leftHasNegation = hasNegation(leftText);
+      const leftYears = new Set(leftText.match(/\b(19|20)\d{2}\b/g) ?? []);
+      const leftKeywords = extractConflictKeywords(leftText);
+
+      for (let rightIndex = leftIndex + 1; rightIndex < chunks.length; rightIndex += 1) {
+        const right = chunks[rightIndex];
+        if (!right) continue;
+        const rightText = normalizeWhitespace(right.text.toLowerCase());
+        const rightHasNegation = hasNegation(rightText);
+        const rightYears = new Set(rightText.match(/\b(19|20)\d{2}\b/g) ?? []);
+        const rightKeywords = extractConflictKeywords(rightText);
+        const sharedKeywords = [...leftKeywords].filter((token) => rightKeywords.has(token));
+        const yearConflict = leftYears.size > 0 && rightYears.size > 0 && !sameSet(leftYears, rightYears);
+        const negationConflict = leftHasNegation !== rightHasNegation && sharedKeywords.length >= 2;
+        if (!yearConflict && !negationConflict) {
+          continue;
+        }
+        pairs.push({
+          leftChunkId: left.chunkId,
+          rightChunkId: right.chunkId,
+          type: yearConflict ? "date_conflict" : "semantic_conflict",
+          severity: yearConflict ? "high" : "medium",
+          hint: yearConflict ? "check_timeline" : "verify_authoritative_source",
+        });
+      }
+    }
+    return pairs;
+  }
+}
+
+export class EvidenceProvenanceAnalyzer {
+  analyze(chunks: RetrievalEvidenceChunk[]): SourceIndependenceScore {
+    const byDocument = new Map<string, number>();
+    const sections = new Set<string>();
+    for (const chunk of chunks) {
+      byDocument.set(chunk.documentId, (byDocument.get(chunk.documentId) ?? 0) + 1);
+      sections.add(`${chunk.documentId}:${chunk.sectionId}`);
+    }
+    const total = Math.max(1, chunks.length);
+    const maxConcentration = Math.max(0, ...byDocument.values()) / total;
+    const score = round(Math.max(0, 1 - maxConcentration * 0.75 + Math.min(0.25, sections.size / 20)), 3);
+    return {
+      score,
+      distinctDocuments: byDocument.size,
+      distinctSections: sections.size,
+      documentConcentration: round(maxConcentration, 3),
+    };
+  }
+}
+
+export class SourceDiversityAnalyzer {
+  constructor(private readonly provenanceAnalyzer = new EvidenceProvenanceAnalyzer()) {}
+  analyze(chunks: RetrievalEvidenceChunk[]): SourceIndependenceScore {
+    return this.provenanceAnalyzer.analyze(chunks);
+  }
+}
+
+export class RerankStabilityAnalyzer {
+  analyze(input: {
+    rerankTrace?: Array<{ chunkId: string; beforeRank: number; afterRank: number; finalScore?: number }>;
+  }): RetrievalStabilityReport {
+    const deltas: RankingDelta[] = (input.rerankTrace ?? []).map((item) => ({
+      chunkId: item.chunkId,
+      beforeRank: item.beforeRank,
+      afterRank: item.afterRank,
+      delta: item.afterRank - item.beforeRank,
+    }));
+    if (deltas.length === 0) {
+      return {
+        deltas: [],
+        correlation: { score: 1 },
+        averageDelta: 0,
+        rerankDependency: 0,
+        stability: 1,
+      };
+    }
+    const averageDelta = round(
+      deltas.reduce((sum, delta) => sum + Math.abs(delta.delta), 0) / Math.max(1, deltas.length),
+      3
+    );
+    const maxPossibleShift = Math.max(...deltas.map((delta) => Math.max(delta.beforeRank, delta.afterRank)), 1);
+    const normalizedShift = Math.min(1, averageDelta / maxPossibleShift);
+    const correlation = round(1 - normalizedShift, 3);
+    return {
+      deltas,
+      correlation: { score: correlation },
+      averageDelta,
+      rerankDependency: round(normalizedShift, 3),
+      stability: correlation,
+    };
+  }
+}
+
+export interface ConfidenceSignalCollection {
+  retrieval: RetrievalScoreSignals;
+  coverage: FacetCoverageResult;
+  agreement: { consensus: ConsensusScore; clusters: EvidenceCluster[] };
+  contradictions: ConflictPair[];
+  source: SourceIndependenceScore;
+  rerank: RetrievalStabilityReport;
+  queryRisk: QueryRiskSignals;
+  groundedness: number;
+  answerConsistency: number;
+  citationCoverage: number;
+}
+
+export class ConfidenceSignalCollector {
+  constructor(
+    private readonly coverageEstimator = new EvidenceCoverageEstimator(),
+    private readonly agreementAnalyzer = new EvidenceAgreementAnalyzer(),
+    private readonly contradictionDetector = new ContradictionDetector(),
+    private readonly sourceDiversityAnalyzer = new SourceDiversityAnalyzer(),
+    private readonly rerankStabilityAnalyzer = new RerankStabilityAnalyzer()
+  ) {}
+
+  collect(input: {
+    query?: string;
+    diagnostics: RetrievalDiagnostics;
+    chunks?: RetrievalEvidenceChunk[];
+    evals?: {
+      groundedness?: number;
+      answerOverlap?: number;
+      retrievalAccuracy?: number;
+      scorerResults?: {
+        faithfulness?: { score: number };
+        relevance?: { score: number };
+        recall?: { score: number };
+      };
+    };
+    rerankTrace?: Array<{ chunkId: string; beforeRank: number; afterRank: number; finalScore?: number }>;
+  }): ConfidenceSignalCollection {
+    const chunks = input.chunks ?? [];
+    const topChunkScore = normalizeScore(input.diagnostics.topScore);
+    const averageTopKScore = normalizeScore(input.diagnostics.avgScore);
+    const scoreGap = normalizeScore(input.diagnostics.scoreSpread);
+    const thresholdMargin = round(Math.max(0, topChunkScore - 0.2), 3);
+    const retrievalSaturation = round(
+      Math.min(1, input.diagnostics.relevantEvidenceCount / Math.max(1, input.diagnostics.returnedCount)),
+      3
+    );
+    const coverage =
+      input.query && chunks.length > 0
+        ? this.coverageEstimator.estimate({ query: input.query, chunks })
+        : {
+            facets: [],
+            facetScores: {},
+            coveredFacets: [],
+            missingFacets: [],
+            coverageBySource: {},
+            coverageScore: round(input.evals?.answerOverlap ?? input.diagnostics.evidenceCoverage, 3),
+          };
+    const agreement = this.agreementAnalyzer.analyze(chunks);
+    const contradictions = this.contradictionDetector.detect(chunks);
+    const source = this.sourceDiversityAnalyzer.analyze(chunks);
+    const rerank = this.rerankStabilityAnalyzer.analyze({
+      rerankTrace: input.rerankTrace,
+    });
+    const queryText = normalizeWhitespace((input.query ?? "").toLowerCase());
+    const tokenCount = queryText.match(/[a-z0-9]{2,}/g)?.length ?? 0;
+    const queryRisk: QueryRiskSignals = {
+      ambiguous: /\b(it|this|that|they)\b/.test(queryText) || tokenCount <= 4,
+      critical: /\b(security|compliance|financial|legal|medical)\b/.test(queryText),
+      multiHop: /\b(compare|difference|between|versus|vs|timeline|before|after)\b/.test(queryText),
+      normative: /\bshould|must|policy|required\b/.test(queryText),
+      precisionRequired: /\bexact|precise|strict|version|date\b/.test(queryText),
+    };
+
+    return {
+      retrieval: {
+        topChunkScore: round(topChunkScore, 3),
+        averageTopKScore: round(averageTopKScore, 3),
+        scoreDistribution: round(Math.max(0, 1 - scoreGap), 3),
+        scoreGap: round(scoreGap, 3),
+        thresholdMargin,
+        retrievalSaturation,
+      },
+      coverage,
+      agreement,
+      contradictions,
+      source,
+      rerank,
+      queryRisk,
+      groundedness: round(input.evals?.groundedness ?? input.diagnostics.groundedConsistency, 3),
+      answerConsistency: round(
+        input.evals?.scorerResults?.faithfulness?.score ??
+          input.evals?.groundedness ??
+          input.diagnostics.groundedConsistency,
+        3
+      ),
+      citationCoverage: round(input.diagnostics.citationCoverage, 3),
+    };
+  }
+}
+
+export class ConfidencePolicyEngine {
+  private readonly defaultPolicy: ConfidencePolicy = {
+    thresholds: {
+      veryLow: 0.3,
+      low: 0.45,
+      moderate: 0.65,
+      high: 0.82,
+    },
+    contradictionRiskThreshold: 0.35,
+    minimumEvidenceCoverage: 0.45,
+    minimumSourceDiversity: 0.35,
+  };
+
+  getPolicy(overrides?: Partial<ConfidencePolicy>): ConfidencePolicy {
+    return {
+      ...this.defaultPolicy,
+      ...overrides,
+      thresholds: {
+        ...this.defaultPolicy.thresholds,
+        ...(overrides?.thresholds ?? {}),
+      },
+    };
+  }
+
+  selectAction(input: {
+    score: number;
+    contradictionRisk: number;
+    evidenceCoverage: number;
+    sourceDiversity: number;
+    queryRisk: QueryRiskSignals;
+    policy?: Partial<ConfidencePolicy>;
+  }): ConfidenceAction {
+    const policy = this.getPolicy(input.policy);
+    if (input.evidenceCoverage < policy.minimumEvidenceCoverage * 0.6 || input.score < policy.thresholds.veryLow) {
+      return "refuse_due_to_insufficient_evidence";
+    }
+    if (input.contradictionRisk >= policy.contradictionRiskThreshold) {
+      return "run_contradiction_check";
+    }
+    if (input.queryRisk.ambiguous) {
+      return "request_clarification";
+    }
+    if (input.score < policy.thresholds.low || input.sourceDiversity < policy.minimumSourceDiversity * 0.8) {
+      return "run_additional_retrieval";
+    }
+    if (input.score < policy.thresholds.moderate) {
+      return "answer_with_uncertainty";
+    }
+    return "answer_normally";
+  }
+}
+
+export class ConfidenceCalibrationEngine {
+  constructor(
+    private readonly signalCollector = new ConfidenceSignalCollector(),
+    private readonly policyEngine = new ConfidencePolicyEngine()
+  ) {}
+
+  calibrate(input: {
+    query?: string;
+    diagnostics: RetrievalDiagnostics;
+    chunks?: RetrievalEvidenceChunk[];
+    evals?: {
+      groundedness?: number;
+      answerOverlap?: number;
+      retrievalAccuracy?: number;
+      scorerResults?: {
+        faithfulness?: { score: number };
+        relevance?: { score: number };
+        recall?: { score: number };
+      };
+    };
+    rerankTrace?: Array<{ chunkId: string; beforeRank: number; afterRank: number; finalScore?: number }>;
+    profile?: CalibrationProfile;
+  }): ConfidenceScore {
+    const signals = this.signalCollector.collect(input);
+    const retrievalConfidence = round(
+      signals.retrieval.topChunkScore * 0.45 +
+        signals.retrieval.averageTopKScore * 0.3 +
+        signals.retrieval.thresholdMargin * 0.1 +
+        signals.retrieval.retrievalSaturation * 0.15,
+      3
+    );
+    const evidenceConfidence = round(
+      signals.coverage.coverageScore * 0.45 +
+        signals.agreement.consensus.score * 0.3 +
+        signals.source.score * 0.25 -
+        Math.min(0.3, signals.contradictions.length * 0.08),
+      3
+    );
+    const answerConfidence = round(signals.groundedness * 0.55 + signals.answerConsistency * 0.45, 3);
+    const citationConfidence = round(signals.citationCoverage, 3);
+    const contradictionRisk = round(Math.min(1, signals.contradictions.length / 3), 3);
+    const rerankStability = round(signals.rerank.stability, 3);
+
+    const retrievalWeight = input.profile?.retrievalWeight ?? 0.28;
+    const evidenceWeight = input.profile?.evidenceWeight ?? 0.32;
+    const answerWeight = input.profile?.answerWeight ?? 0.22;
+    const citationWeight = input.profile?.citationWeight ?? 0.1;
+    const contradictionPenaltyWeight = input.profile?.contradictionPenaltyWeight ?? 0.2;
+    const overallConfidence = round(
+      Math.max(
+        0,
+        Math.min(
+          1,
+          retrievalConfidence * retrievalWeight +
+            evidenceConfidence * evidenceWeight +
+            answerConfidence * answerWeight +
+            citationConfidence * citationWeight +
+            rerankStability * 0.08 -
+            contradictionRisk * contradictionPenaltyWeight
+        )
+      ),
+      3
+    );
+
+    const label: ConfidenceLabel =
+      overallConfidence >= 0.85
+        ? "very_high"
+        : overallConfidence >= 0.68
+          ? "high"
+          : overallConfidence >= 0.5
+            ? "moderate"
+            : overallConfidence >= 0.32
+              ? "low"
+              : "very_low";
+    const uncertaintyLevel: UncertaintyLevel =
+      overallConfidence >= 0.75 ? "low" : overallConfidence >= 0.5 ? "medium" : "high";
+
+    const uncertaintyReasons = [
+      ...(signals.coverage.missingFacets.length > 0 ? ["Question coverage is partial."] : []),
+      ...(signals.source.score < 0.35 ? ["Evidence is concentrated in few sources."] : []),
+      ...(contradictionRisk > 0 ? ["Conflicting evidence was detected."] : []),
+      ...(rerankStability < 0.6 ? ["Answer appears sensitive to reranking changes."] : []),
+      ...(signals.queryRisk.ambiguous ? ["Query appears ambiguous or underspecified."] : []),
+    ];
+    const recommendedAction = this.policyEngine.selectAction({
+      score: overallConfidence,
+      contradictionRisk,
+      evidenceCoverage: signals.coverage.coverageScore,
+      sourceDiversity: signals.source.score,
+      queryRisk: signals.queryRisk,
+      policy: input.profile?.policy,
+    });
+
+    const breakdown: ConfidenceBreakdown = {
+      retrievalConfidence,
+      evidenceCoverage: round(signals.coverage.coverageScore, 3),
+      chunkAgreement: round(signals.agreement.consensus.score, 3),
+      sourceDiversity: round(signals.source.score, 3),
+      contradictionRisk,
+      groundedness: signals.groundedness,
+      rerankStability,
+      citationConfidence,
+      answerConfidence,
+    };
+    const trace: ConfidenceTrace = {
+      overallConfidence,
+      label,
+      uncertaintyLevel,
+      factors: [
+        { name: "retrievalConfidence", score: retrievalConfidence, weight: retrievalWeight, impact: "positive" },
+        { name: "evidenceCoverage", score: breakdown.evidenceCoverage, weight: evidenceWeight, impact: "positive" },
+        { name: "chunkAgreement", score: breakdown.chunkAgreement, weight: 0.2, impact: "positive" },
+        { name: "sourceDiversity", score: breakdown.sourceDiversity, weight: 0.15, impact: "positive" },
+        { name: "groundedness", score: breakdown.groundedness, weight: answerWeight, impact: "positive" },
+        {
+          name: "contradictionRisk",
+          score: contradictionRisk,
+          weight: contradictionPenaltyWeight,
+          impact: "negative",
+        },
+      ],
+      uncertaintyReasons,
+      policyAction: recommendedAction,
+    };
+
+    return {
+      overallConfidence,
+      label,
+      breakdown,
+      retrievalConfidence,
+      evidenceConfidence,
+      answerConfidence,
+      citationConfidence,
+      contradictionRisk,
+      uncertaintyLevel,
+      uncertaintyReasons,
+      recommendedAction,
+      trace,
+    };
+  }
 }
 
 export class RetrievalFailureClassifier {
@@ -1105,7 +1833,11 @@ export function classifyRetrievalFailure(input: {
 }
 
 export function calibrateConfidence(input: {
+  query?: string;
   diagnostics: RetrievalDiagnostics;
+  chunks?: RetrievalEvidenceChunk[];
+  rerankTrace?: Array<{ chunkId: string; beforeRank: number; afterRank: number; finalScore?: number }>;
+  profile?: CalibrationProfile;
   evals?: {
     groundedness?: number;
     answerOverlap?: number;
@@ -1122,7 +1854,11 @@ export function calibrateConfidence(input: {
 
 export class ConfidenceCalibrationService {
   calibrate(input: {
+    query?: string;
     diagnostics: RetrievalDiagnostics;
+    chunks?: RetrievalEvidenceChunk[];
+    rerankTrace?: Array<{ chunkId: string; beforeRank: number; afterRank: number; finalScore?: number }>;
+    profile?: CalibrationProfile;
     evals?: {
       groundedness?: number;
       answerOverlap?: number;
@@ -1134,6 +1870,14 @@ export class ConfidenceCalibrationService {
       };
     };
   }): ConfidenceCalibration {
+    const calibrated = defaultConfidenceCalibrationEngine.calibrate({
+      query: input.query,
+      diagnostics: input.diagnostics,
+      chunks: input.chunks,
+      evals: input.evals,
+      rerankTrace: input.rerankTrace,
+      profile: input.profile,
+    });
     const groundedness = input.evals?.groundedness ?? 0;
     const answerConsistency = input.evals?.scorerResults?.faithfulness?.score ?? groundedness;
     const questionCoverage =
@@ -1226,6 +1970,18 @@ export class ConfidenceCalibrationService {
         answerConsistency: evidenceSignals.answerConsistency,
         conflictPenalty: round(conflictPenalty, 3),
       },
+      overallConfidence: calibrated.overallConfidence,
+      label: calibrated.label,
+      breakdown: calibrated.breakdown,
+      retrievalConfidence: calibrated.retrievalConfidence,
+      evidenceConfidence: calibrated.evidenceConfidence,
+      answerConfidence: calibrated.answerConfidence,
+      citationConfidence: calibrated.citationConfidence,
+      contradictionRisk: calibrated.contradictionRisk,
+      uncertaintyLevel: calibrated.uncertaintyLevel,
+      uncertaintyReasons: calibrated.uncertaintyReasons,
+      recommendedAction: calibrated.recommendedAction,
+      confidenceTrace: calibrated.trace,
     };
   }
 }
@@ -1904,11 +2660,24 @@ function extractConflictKeywords(value: string): Set<string> {
   return new Set(tokens.filter((token) => !stopwords.has(token)));
 }
 
+function sameSet(left: Set<string>, right: Set<string>): boolean {
+  if (left.size !== right.size) {
+    return false;
+  }
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function round(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
 }
 
 const defaultConfidenceCalibrationService = new ConfidenceCalibrationService();
+const defaultConfidenceCalibrationEngine = new ConfidenceCalibrationEngine();
 
 async function tryReadJson<T>(path: string): Promise<T | undefined> {
   try {

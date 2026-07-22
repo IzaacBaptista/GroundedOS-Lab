@@ -1650,6 +1650,66 @@ describe("api server", () => {
     expect(body.recommendations.length).toBeGreaterThan(0);
   });
 
+  it("serves GET /confidence/policies", async () => {
+    const app = await createTestServer();
+    const response = await app.inject({
+      method: "GET",
+      url: "/confidence/policies",
+    });
+    const body = response.json() as {
+      thresholds: { veryLow: number; low: number; moderate: number; high: number };
+    };
+
+    expect(response.statusCode).toBe(200);
+    expect(body.thresholds.veryLow).toBeGreaterThan(0);
+    expect(body.thresholds.high).toBeGreaterThan(body.thresholds.low);
+  });
+
+  it("serves POST /confidence/calibrate", async () => {
+    const app = await createTestServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/confidence/calibrate",
+      payload: {
+        query: "Compare auth changes between phase 5 and phase 6",
+        retrievedChunks: [
+          {
+            chunkId: "doc:section-1:chunk-1",
+            documentId: "doc",
+            sectionId: "section-1",
+            score: 0.81,
+            text: "Phase 6 auth uses JWT tokens.",
+          },
+          {
+            chunkId: "doc:section-2:chunk-1",
+            documentId: "doc",
+            sectionId: "section-2",
+            score: 0.72,
+            text: "Phase 5 auth used session tokens.",
+          },
+        ],
+        citations: [{ chunkId: "doc:section-1:chunk-1" }, { chunkId: "doc:section-2:chunk-1" }],
+        evals: {
+          groundedness: 0.85,
+          answerOverlap: 0.8,
+          scorerResults: {
+            faithfulness: { score: 0.84 },
+          },
+        },
+      },
+    });
+    const body = response.json() as {
+      overallConfidence: number;
+      breakdown: { evidenceCoverage: number };
+      recommendedAction: string;
+    };
+
+    expect(response.statusCode).toBe(201);
+    expect(body.overallConfidence).toBeGreaterThanOrEqual(0);
+    expect(body.breakdown.evidenceCoverage).toBeGreaterThan(0);
+    expect(body.recommendedAction).toBeTruthy();
+  });
+
   it("serves GET /rag/memory/:sessionId", async () => {
     const app = await createTestServer();
     const sessionId = `session-http-${Date.now()}`;
