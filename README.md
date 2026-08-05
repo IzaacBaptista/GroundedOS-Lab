@@ -936,7 +936,7 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 - [x] `ReActRunner` and `PlanExecutor` provide single-agent ReAct loops and long-horizon plan-and-execute with replanning — `packages/agents/src/react-runner.ts`, `packages/agents/src/plan-executor.ts`
 - [x] API exposes `POST /agents/react`, `POST /agents/multi`, `POST /agents/plan` alongside `POST /agents/execute` — `apps/api/src/agents/agent.controller.ts`
 - [x] Architecture decision recorded in [ADR-015](./docs/adr/ADR-015-multi-agent-orchestration-strategy.md)
-- [ ] `@groundedos/safety` guardrails run on every agent handoff and on `POST /agents/execute`, not only on the `/safety/*` playground
+- [x] `@groundedos/safety` guardrails run on every agent handoff and on `POST /agents/execute`, not only on the `/safety/*` playground
 - [ ] `@groundedos/evals` scores are attached to multi-agent/plan traces
 - [ ] `packages/agents/README.md` and this README describe all four agent endpoints and four specialized roles accurately
 

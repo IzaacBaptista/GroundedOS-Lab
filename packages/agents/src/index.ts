@@ -25,3 +25,6 @@ export * from './specialized-agents.js';
 // Long-horizon planning (FASE E + F)
 export * from './planning-types.js';
 export * from './plan-executor.js';
+
+// Guardrail wiring (Phase 8 hardening)
+export * from './guardrail-setup.js';
