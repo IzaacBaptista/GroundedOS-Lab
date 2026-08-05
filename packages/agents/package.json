@@ -24,7 +24,8 @@
     "@groundedos/core": "*",
     "@groundedos/rag": "*",
     "@groundedos/observability": "*",
-    "@groundedos/safety": "*"
+    "@groundedos/safety": "*",
+    "@groundedos/evals": "*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

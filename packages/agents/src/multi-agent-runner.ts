@@ -14,6 +14,7 @@
 
 import { randomUUID } from 'crypto';
 import type { GuardrailChain, GuardrailChainResult } from '@groundedos/safety';
+import { FaithfulnessEvaluator, RelevanceEvaluator, RecallEvaluator } from '@groundedos/evals';
 import type { AgentExecutionContext, AgentResult } from './types.js';
 import {
   PlannerAgent,
@@ -32,6 +33,7 @@ import type {
   HandoffEnvelope,
   HandoffResult,
   MultiAgentDevModeTrace,
+  MultiAgentEvalScores,
   MultiAgentRunnerConfig,
   MultiAgentTrace,
 } from './multi-agent-types.js';
@@ -66,6 +68,9 @@ export class MultiAgentRunner {
   private readonly criticAgent: CriticAgent;
   private readonly synthesizerAgent: SynthesizerAgent;
   private readonly guardrailChain: GuardrailChain;
+  private readonly faithfulnessEvaluator = new FaithfulnessEvaluator();
+  private readonly relevanceEvaluator = new RelevanceEvaluator();
+  private readonly recallEvaluator = new RecallEvaluator(3);
 
   constructor(config: Partial<MultiAgentRunnerConfig> = {}) {
     this.config = { ...DEFAULT_MULTI_AGENT_CONFIG, ...config };
@@ -345,6 +350,9 @@ export class MultiAgentRunner {
 
     const completedAt = Date.now();
 
+    const evalScores: MultiAgentEvalScores | undefined =
+      success && finalAnswer ? await this._scoreFinalAnswer(query, finalAnswer, evidence) : undefined;
+
     const devModeTrace: MultiAgentDevModeTrace | undefined =
       context.devMode || this.config.devMode
         ? {
@@ -378,6 +386,39 @@ export class MultiAgentRunner {
       completedAt,
       totalDurationMs: completedAt - startedAt,
       devMode: devModeTrace,
+      evalScores,
+    };
+  }
+
+  /**
+   * Score the final answer with the same faithfulness/relevance/recall
+   * scorers already used for /rag/ask, using collected Evidence as the
+   * retrieved-chunks equivalent.
+   */
+  private async _scoreFinalAnswer(
+    question: string,
+    answer: string,
+    evidence: Evidence[],
+  ): Promise<MultiAgentEvalScores> {
+    const retrievedChunks = evidence.flatMap((e) =>
+      e.sources.length > 0
+        ? e.sources.map((chunkId) => ({ chunkId, text: e.content, score: e.confidence }))
+        : [{ chunkId: e.evidenceId, text: e.content, score: e.confidence }],
+    );
+    const evalInput = { question, answer, retrievedChunks };
+
+    const [faithResult, relevResult, recallResult] = await Promise.all([
+      this.faithfulnessEvaluator.evaluate(evalInput),
+      this.relevanceEvaluator.evaluate(evalInput),
+      this.recallEvaluator.evaluate(evalInput),
+    ]);
+
+    return {
+      faithfulness: { score: faithResult.score, passed: faithResult.passed, reason: faithResult.reason },
+      relevance: { score: relevResult.score, passed: relevResult.passed, reason: relevResult.reason },
+      recall: { score: recallResult.score, passed: recallResult.passed, reason: recallResult.reason },
+      averageScore: Number(((faithResult.score + relevResult.score + recallResult.score) / 3).toFixed(3)),
+      passedCount: [faithResult, relevResult, recallResult].filter((r) => r.passed).length,
     };
   }
 

@@ -937,7 +937,7 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 - [x] API exposes `POST /agents/react`, `POST /agents/multi`, `POST /agents/plan` alongside `POST /agents/execute` — `apps/api/src/agents/agent.controller.ts`
 - [x] Architecture decision recorded in [ADR-015](./docs/adr/ADR-015-multi-agent-orchestration-strategy.md)
 - [x] `@groundedos/safety` guardrails run on every agent handoff and on `POST /agents/execute`, not only on the `/safety/*` playground
-- [ ] `@groundedos/evals` scores are attached to multi-agent/plan traces
+- [x] `@groundedos/evals` scores are attached to multi-agent traces (`/agents/plan` deferred — see SDD "Deviation" note, its node-executor contract doesn't carry evidence)
 - [ ] `packages/agents/README.md` and this README describe all four agent endpoints and four specialized roles accurately
 
 ---

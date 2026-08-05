@@ -200,6 +200,8 @@ export interface MultiAgentTrace {
   totalDurationMs: number;
   /** Dev mode trace (sanitized). */
   devMode?: MultiAgentDevModeTrace;
+  /** Eval scores for the final answer, when one was produced. */
+  evalScores?: MultiAgentEvalScores;
 }
 
 export interface AgentParticipant {
@@ -218,6 +220,21 @@ export interface AgentDecision {
   rationale: string;
   timestamp: number;
   outcome?: string;
+}
+
+export interface EvalScoreDetail {
+  score: number;
+  passed: boolean;
+  reason?: string;
+}
+
+/** Mirrors the scorer summary shape @groundedos/evals already produces for /rag/ask. */
+export interface MultiAgentEvalScores {
+  faithfulness: EvalScoreDetail;
+  relevance: EvalScoreDetail;
+  recall: EvalScoreDetail;
+  averageScore: number;
+  passedCount: number;
 }
 
 export interface MultiAgentDevModeTrace {

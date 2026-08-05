@@ -24,25 +24,31 @@ give it a real Roadmap entry.
       (Planner/Researcher/Critic/Synthesizer)
 - [x] Numbered as a new Phase 8 (decided — Phase 3's already-shipped
       checklist is not rewritten)
-- [ ] `packages/agents` depends on `@groundedos/safety` and instantiates a
+- [x] `packages/agents` depends on `@groundedos/safety` and instantiates a
       `GuardrailChain` with the six registered guardrails
-- [ ] `MultiAgentRunnerConfig.enableSafetyChecks` is read and enforced:
+      (`packages/agents/src/guardrail-setup.ts`)
+- [x] `MultiAgentRunnerConfig.enableSafetyChecks` is read and enforced:
       each handoff in `MultiAgentRunner.run()` passes through
       `GuardrailChain.check()` before the receiving agent executes
-- [ ] `PlanExecutor.execute()` node results pass through the same guardrail
-      chain before being marked `completed`
-- [ ] `POST /agents/execute` (`DocumentQAAgent`) also passes through the
-      guardrail chain — it has **no** existing safety coverage (see ADR-015
+- [x] `PlanExecutor.execute()` node results pass through the same guardrail
+      chain before being marked `completed`. Found and fixed a related bug
+      while implementing this: the default planning strategy
+      (`enableReplanning: true, maxReplans: 3`) silently converted *any*
+      node failure — including a guardrail block — into `status: 'skipped'`
+      and let the plan report `success: true`. A guardrail block now
+      hard-fails the plan instead of being replanned past.
+- [x] `POST /agents/execute` (`DocumentQAAgent`) also passes through the
+      guardrail chain — it had **no** existing safety coverage (see ADR-015
       Consequences: it doesn't delegate to a real RAG service at all, so
       there was nothing to inherit from)
-- [ ] `/agents/multi` and `/agents/plan` responses include eval scores
+- [x] `/agents/multi` responses include eval scores
       (faithfulness/relevance/recall) from `@groundedos/evals` — this is
       **new** wiring, not a copy of an existing pattern: `/rag/ask` itself
       does not call `GuardrailChain` today either (see ADR-015
       "Second correction")
-- [ ] At least one new test asserts a guardrail-triggering handoff is
+- [x] At least one new test asserts a guardrail-triggering handoff is
       blocked/flagged in `multi-agent.test.ts` and `planning.test.ts`
-- [ ] `packages/agents/README.md` "Current implementation" / "Current
+- [x] `packages/agents/README.md` "Current implementation" / "Current
       limits" sections describe all four endpoints (`execute`, `react`,
       `multi`, `plan`) and name the four specialized agent roles
       (Planner/Researcher/Critic/Synthesizer); the heuristic/no-LLM
@@ -125,11 +131,28 @@ piece worth preserving, not replacing.
 ### `GuardrailChain` setup
 
 `packages/agents` gains a new dependency on `@groundedos/safety`. A shared
-helper (e.g. `packages/agents/src/guardrail-setup.ts`) builds one
+helper (`packages/agents/src/guardrail-setup.ts`) builds one
 `GuardrailChain` with `PromptInjectionGuardrail`, `PIILeakageGuardrail`,
 `JailbreakGuardrail`, `HallucinationGuardrail`, `PromptLeakageGuardrail`,
 `IndirectInjectionGuardrail` registered, reused by `MultiAgentRunner`,
 `PlanExecutor`, and `AgentService`.
+
+### Deviation: `/agents/plan` does not get eval scores
+
+The original plan assumed `/agents/plan` would get the same `evalScores`
+treatment as `/agents/multi`. Reading `PlanExecutor.execute()`'s actual
+signature before implementing surfaced why that doesn't fit cleanly: its
+`nodeExecutorFn` callback returns `{ success, result, error, costUsd }` —
+no evidence/retrieved-chunks field. In `agent.service.ts`'s
+`executePlan()`, each node's executor is itself a `MultiAgentRunner.run()`
+call (which *does* now produce `evalScores` internally, per-node), but the
+per-node `Evidence[]` is discarded — only `nodeResult.finalAnswer` and
+`success` survive into the node result. Plumbing evidence through to the
+plan level would mean widening `PlanExecutor`'s generic node-executor
+contract, which is a `PlanExecutor` API change, not "wire in eval
+scoring." Decided: leave `/agents/plan` without `evalScores` for now;
+revisit only if plan-level eval scoring is actually requested, since it
+needs its own design (aggregate across nodes? score only the final node?).
 
 ## Integration with `@groundedos/evals` and `@groundedos/safety`
 

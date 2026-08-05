@@ -267,6 +267,7 @@ export class AgentService {
       ...(request.devMode && multiTrace.devMode
         ? { devMode: multiTrace.devMode }
         : {}),
+      ...(multiTrace.evalScores ? { evalScores: multiTrace.evalScores } : {}),
     };
 
     return response;
