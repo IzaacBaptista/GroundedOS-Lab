@@ -121,3 +121,13 @@ not yet wired across every API request path." Phase 8's guardrail wiring
 (SDD, "What changes in this phase") is therefore the **first** automatic
 wiring of `GuardrailChain` into a live request path in this codebase, not
 a copy of an existing pattern.
+
+This correction was made while drafting this ADR, before any Phase 8 code
+was written — the original audit findings doc (written earlier in the same
+initial session) still carried the unverified "`/rag/ask` already has this"
+assumption in its §4 until a follow-up pass caught and fixed it there too.
+The underlying gap — `/rag/ask` itself shipping with no automatic guardrail
+coverage — is real, independent of Phase 8, and is now tracked separately
+in [phase-8-audit-findings.md §7](../planning/phase-8-audit-findings.md#7-new-finding-ragask-guardrail-gap-out-of-scope-for-phase-8)
+as its own backlog item. Phase 8 does not fix it — only the agent endpoints
+this ADR covers.

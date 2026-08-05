@@ -112,9 +112,23 @@ brief's assumption:
   `MultiAgentRunnerConfig.enableSafetyChecks` (`multi-agent-types.ts:249`)
   is declared but never read anywhere in `multi-agent-runner.ts`. `grep -n
   "safety\|Guardrail\|Evaluator" apps/api/src/agents/agent.service.ts` → no
-  matches either. `@groundedos/safety`'s guardrail chain wraps `POST
-  /rag/ask` (per README Phase 3 claims) but not `/agents/multi`, `/agents/
-  react`, or `/agents/plan`.
+  matches either.
+
+  **Correction (not verified at audit time, confirmed during
+  implementation):** this section originally claimed "`@groundedos/
+  safety`'s guardrail chain wraps `POST /rag/ask` (per README Phase 3
+  claims) but not `/agents/multi`, `/agents/react`, or `/agents/plan`." That
+  was an inference from the README, never checked against the actual
+  endpoint code. It was wrong. `grep -rln "GuardrailChain" apps/api/src` →
+  only `apps/api/src/lab/lab.service.ts` matches.
+  `apps/api/src/rag-service.ts` — the file implementing `POST /rag/ask` —
+  has **zero** references to `GuardrailChain` or `@groundedos/safety`. The
+  only place `@groundedos/safety` is wired into a live API path is
+  `apps/api/src/safety/safety.service.ts`, which backs the standalone
+  `/safety/*` playground (`POST /safety/analyze`, `/critique`,
+  `/constitutional`) that a caller invokes manually — it is not applied
+  automatically to `/rag/ask` or any other request path. See also §7 below,
+  since this is a gap in its own right, independent of Phase 8.
 - **No evals integration**: no `@groundedos/evals` import in
   `agent.service.ts`. Multi-agent/plan/react runs are not scored by
   `FaithfulnessEvaluator`/`RelevanceEvaluator`/`RecallEvaluator`.
@@ -142,3 +156,35 @@ orchestration" (already decided and shipped) but:
   wiring guardrails/evals into the three new endpoints, and replacing
   heuristic reasoning with LLM-backed reasoning — not "designing"
   orchestration from scratch.
+
+## 7. New finding: `/rag/ask` guardrail gap (out of scope for Phase 8)
+
+Discovered during Phase 8 implementation (guardrail-wiring step), not
+during this audit — the original audit text in §4 assumed `/rag/ask`
+already had `GuardrailChain` wired in and that Phase 8's job was to extend
+an existing pattern to the agent endpoints. That assumption was never
+checked against `apps/api/src/rag-service.ts` at audit time. It's false.
+
+- `grep -rln "GuardrailChain" apps/api/src` → only
+  `apps/api/src/lab/lab.service.ts`. Nothing in `rag-service.ts`.
+- `grep -rln "@groundedos/safety" apps/api/src` → only
+  `apps/api/src/lab/lab.service.ts` and `apps/api/src/safety/safety.service.ts`.
+- `apps/api/src/safety/safety.service.ts` backs a standalone `/safety/*`
+  playground (`POST /safety/analyze`, `/critique`, `/constitutional`,
+  `GET /safety/runs`, `/fixtures`) that a caller must invoke manually. It is
+  not applied automatically to any request in the actual RAG or agent
+  request paths.
+- By contrast, `@groundedos/evals` **is** wired into `/rag/ask` —
+  `apps/api/src/rag-service.ts:52-109` instantiates the three evaluators and
+  calls `.evaluate()` at `rag-service.ts:2024-2037` and `2705-2718`. So the
+  gap is specific to `@groundedos/safety`, not a general "nothing is wired
+  into `/rag/ask`" problem.
+
+**This is the project's most-used endpoint shipping with zero automatic
+prompt-injection/PII/jailbreak/hallucination/prompt-leakage/indirect-
+injection protection.** It deserves its own backlog item and likely its own
+ADR (should guardrails wrap the whole `/rag/ask` pipeline the way they now
+wrap agent handoffs, or does the semantic-cache/cost-tracking pipeline
+already decided in ADR-009/ADR-013 change where the insertion point should
+be?) — not a quick add bundled into Phase 8's agents-only scope. No
+implementation proposed here.
