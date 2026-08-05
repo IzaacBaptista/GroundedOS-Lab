@@ -909,6 +909,37 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 - [x] Authentication strategy is documented (see [ADR-014](./docs/adr/ADR-014-authentication-strategy.md))
 - [x] Security hardening audit complete: auth middleware, rate limiting, audit logging, CORS (see [PHASE-6-OBSERVABILITY-VALIDATION.md](./docs/PHASE-6-OBSERVABILITY-VALIDATION.md))
 
+### Phase 7 — Conceitos Lab UX
+
+* Concept discovery (search, filters, persistence)
+* Concept detail flow (modal, tabbed navigation)
+* Dependency graph with multi-level expansion
+* Portuguese-language didactic summaries
+* Learning path tracking
+
+**✅ Success Criteria:**
+- [x] Sidebar supports full-text concept search with category/status filters, persisted locally — `apps/web/src/components/ConceptsSidebar.tsx`, `apps/web/src/hooks/useConceptsFilter.ts`
+- [x] Concept detail flow is a single modal with Details/Dependencies/Paths tabs — `apps/web/src/components/ConceptModal.tsx`, `apps/web/src/components/ConceptDetailTabs.tsx`
+- [x] Dependency graph supports multi-level expansion with directed edges, primary-path highlighting and a direct-relations focus mode — `apps/web/src/components/DependencyGraph.tsx`
+- [x] Educational summary panel is structured in Portuguese (definition, when to use, common pitfalls, computational cost, popular libs, why it matters for RAG)
+- [x] Learning Path panel tracks viewed/learned progress and recommends next concepts — `apps/web/src/components/LearningPathPanel.tsx`, `apps/web/src/hooks/useLearningProgress.ts`
+- [x] Frontend build and test suite pass (32 tests passed, 4 skipped) — see [docs/PHASE-7-SUMMARY.md](./docs/PHASE-7-SUMMARY.md)
+
+### Phase 8 — Multi-Agent Orchestration Hardening
+
+* Guardrails and evals applied to every agent handoff, not just `/rag/ask`
+* Documentation sync between `packages/agents` and the shipped API surface
+* Architecture decision recorded in ADR-015
+
+**✅ Success Criteria:**
+- [x] `MultiAgentRunner` implements an explicit Planner→Researcher→Critic→Synthesizer handoff protocol with `AgentHandoff`/`HandoffEnvelope` — `packages/agents/src/multi-agent-runner.ts`
+- [x] `ReActRunner` and `PlanExecutor` provide single-agent ReAct loops and long-horizon plan-and-execute with replanning — `packages/agents/src/react-runner.ts`, `packages/agents/src/plan-executor.ts`
+- [x] API exposes `POST /agents/react`, `POST /agents/multi`, `POST /agents/plan` alongside `POST /agents/execute` — `apps/api/src/agents/agent.controller.ts`
+- [x] Architecture decision recorded in [ADR-015](./docs/adr/ADR-015-multi-agent-orchestration-strategy.md)
+- [ ] `@groundedos/safety` guardrails run on every agent handoff and on `POST /agents/execute`, not only on the `/safety/*` playground
+- [ ] `@groundedos/evals` scores are attached to multi-agent/plan traces
+- [ ] `packages/agents/README.md` and this README describe all four agent endpoints and four specialized roles accurately
+
 ---
 
 ## 🧭 Execution Plan (Current)
