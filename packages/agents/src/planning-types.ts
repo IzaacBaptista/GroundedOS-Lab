@@ -222,6 +222,7 @@ export type PlanExecutionEventType =
   | 'node-started'
   | 'node-completed'
   | 'node-failed'
+  | 'node-blocked'
   | 'node-skipped'
   | 'replan-triggered'
   | 'plan-completed'

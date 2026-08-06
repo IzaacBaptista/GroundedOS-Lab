@@ -12,7 +12,9 @@
  */
 
 import { randomUUID } from 'crypto';
+import type { GuardrailChain } from '@groundedos/safety';
 import type { AgentExecutionContext } from './types.js';
+import { createAgentGuardrailChain } from './guardrail-setup.js';
 import type {
   PlanEvaluation,
   PlanExecutionEvent,
@@ -134,21 +136,26 @@ export interface PlanExecutorConfig {
   maxRiskScore?: number;
   /** Stop execution early if objective is clearly achieved. */
   enableEarlyTermination: boolean;
+  /** Run node results through the guardrail chain before marking them completed. */
+  enableSafetyChecks: boolean;
 }
 
 const DEFAULT_EXECUTOR_CONFIG: PlanExecutorConfig = {
   maxCostUsd: undefined,
   maxRiskScore: 0.9,
   enableEarlyTermination: true,
+  enableSafetyChecks: true,
 };
 
 export class PlanExecutor {
   private readonly config: PlanExecutorConfig;
   private readonly critic: PlanCritic;
+  private readonly guardrailChain: GuardrailChain;
 
   constructor(config: Partial<PlanExecutorConfig> = {}) {
     this.config = { ...DEFAULT_EXECUTOR_CONFIG, ...config };
     this.critic = new PlanCritic();
+    this.guardrailChain = createAgentGuardrailChain();
   }
 
   /**
@@ -222,9 +229,29 @@ export class PlanExecutor {
 
       try {
         const result = await nodeExecutorFn(node, context);
-        node.status = result.success ? 'completed' : 'failed';
+        let nodeSuccess = result.success;
+        let nodeError = result.error;
+        let blockedByGuardrail = false;
+
+        if (nodeSuccess && this.config.enableSafetyChecks) {
+          const resultText = this._resultToText(result.result);
+          if (resultText) {
+            const guardrailResult = await this.guardrailChain.check({
+              text: resultText,
+              role: 'assistant',
+            });
+            if (!guardrailResult.passed) {
+              nodeSuccess = false;
+              blockedByGuardrail = true;
+              nodeError = `Blocked by guardrail: ${guardrailResult.reason ?? guardrailResult.blockedBy}`;
+              this._addEvent(events, 'node-blocked', nodeId, `Blocked: ${node.label} — ${nodeError}`);
+            }
+          }
+        }
+
+        node.status = nodeSuccess ? 'completed' : 'failed';
         node.result = result.result;
-        node.error = result.error;
+        node.error = nodeError;
         node.actualDurationMs = Date.now() - node.startedAt;
         node.completedAt = Date.now();
 
@@ -233,7 +260,7 @@ export class PlanExecutor {
           node.estimatedCostUsd = result.costUsd;
         }
 
-        if (result.success) {
+        if (nodeSuccess) {
           this._addEvent(events, 'node-completed', nodeId, `Completed: ${node.label}`);
 
           // Early termination check
@@ -244,7 +271,16 @@ export class PlanExecutor {
             break;
           }
         } else {
-          this._addEvent(events, 'node-failed', nodeId, `Failed: ${node.label} — ${result.error}`);
+          this._addEvent(events, 'node-failed', nodeId, `Failed: ${node.label} — ${nodeError}`);
+
+          if (blockedByGuardrail) {
+            // A guardrail block must hard-fail the plan, not be replanned
+            // away as skippable — replanning would silently mark this node
+            // 'skipped' and let the overall plan report success.
+            plan.status = 'failed';
+            this._addEvent(events, 'plan-failed', nodeId, 'Plan failed — node blocked by safety guardrail');
+            break;
+          }
 
           // Attempt replan
           if (replanCount < plan.strategy.maxReplans && plan.strategy.enableReplanning) {
@@ -328,6 +364,22 @@ export class PlanExecutor {
     }
 
     return result;
+  }
+
+  private _resultToText(result: unknown): string | undefined {
+    if (result === null || result === undefined) return undefined;
+    if (typeof result === 'string') return result;
+    if (typeof result === 'object') {
+      const obj = result as Record<string, unknown>;
+      if (typeof obj['answer'] === 'string') return obj['answer'];
+      if (typeof obj['summary'] === 'string') return obj['summary'];
+      try {
+        return JSON.stringify(result);
+      } catch {
+        return undefined;
+      }
+    }
+    return String(result);
   }
 
   private _isGoalAchieved(plan: TaskPlan): boolean {

@@ -13,6 +13,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import type { GuardrailChain, GuardrailChainResult } from '@groundedos/safety';
 import type { AgentExecutionContext, AgentResult } from './types.js';
 import {
   PlannerAgent,
@@ -20,6 +21,7 @@ import {
   CriticAgent,
   SynthesizerAgent,
 } from './specialized-agents.js';
+import { createAgentGuardrailChain } from './guardrail-setup.js';
 import type {
   AgentDecision,
   AgentHandoff,
@@ -36,6 +38,24 @@ import type {
 import { DEFAULT_MULTI_AGENT_CONFIG } from './multi-agent-types.js';
 
 // ---------------------------------------------------------------------------
+// Safety
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a handoff's task/evidence is blocked by the guardrail chain.
+ * Caught by MultiAgentRunner.run() to short-circuit with a safe fallback.
+ */
+export class HandoffBlockedError extends Error {
+  constructor(
+    public readonly handoff: AgentHandoff,
+    public readonly guardrailReason: string,
+  ) {
+    super(`Handoff ${handoff.handoffId} blocked by guardrail: ${guardrailReason}`);
+    this.name = 'HandoffBlockedError';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // MultiAgentRunner
 // ---------------------------------------------------------------------------
 
@@ -45,6 +65,7 @@ export class MultiAgentRunner {
   private readonly researcherAgent: ResearcherAgent;
   private readonly criticAgent: CriticAgent;
   private readonly synthesizerAgent: SynthesizerAgent;
+  private readonly guardrailChain: GuardrailChain;
 
   constructor(config: Partial<MultiAgentRunnerConfig> = {}) {
     this.config = { ...DEFAULT_MULTI_AGENT_CONFIG, ...config };
@@ -52,6 +73,7 @@ export class MultiAgentRunner {
     this.researcherAgent = new ResearcherAgent();
     this.criticAgent = new CriticAgent();
     this.synthesizerAgent = new SynthesizerAgent();
+    this.guardrailChain = createAgentGuardrailChain();
   }
 
   /**
@@ -130,6 +152,7 @@ export class MultiAgentRunner {
         'Structured evidence with source citations',
       );
       handoffs.push(plannerHandoff);
+      await this._enforceHandoffSafety(plannerHandoff);
 
       const researcherCtx = this._makeAgentContext(context, 'researcher');
       const researcherStart = Date.now();
@@ -186,6 +209,7 @@ export class MultiAgentRunner {
         'Critique report with quality scores and gap analysis',
       );
       handoffs.push(researchHandoff);
+      await this._enforceHandoffSafety(researchHandoff);
 
       const criticCtx = this._makeAgentContext(context, 'critic');
       const criticStart = Date.now();
@@ -262,6 +286,7 @@ export class MultiAgentRunner {
         'Final grounded answer with source citations',
       );
       handoffs.push(criticHandoff);
+      await this._enforceHandoffSafety(criticHandoff);
 
       const synthesizerCtx = this._makeAgentContext(context, 'synthesizer');
       const synthesizerStart = Date.now();
@@ -300,8 +325,22 @@ export class MultiAgentRunner {
         outcome: 'answer-ready',
       });
     } catch (err) {
-      finalAnswer = undefined;
-      success = false;
+      if (err instanceof HandoffBlockedError) {
+        finalAnswer = 'This response was blocked by a safety guardrail and could not be completed.';
+        success = false;
+        criticalGaps.push(`safety-blocked: ${err.guardrailReason}`);
+        decisions.push({
+          decisionId: randomUUID(),
+          agentId: err.handoff.fromAgentId,
+          description: `Handoff to ${err.handoff.toAgentName} blocked by guardrail`,
+          rationale: err.guardrailReason,
+          timestamp: Date.now(),
+          outcome: 'safety-blocked',
+        });
+      } else {
+        finalAnswer = undefined;
+        success = false;
+      }
     }
 
     const completedAt = Date.now();
@@ -388,6 +427,30 @@ export class MultiAgentRunner {
   private _completeHandoff(handoff: AgentHandoff, result: HandoffResult): void {
     handoff.status = result.success ? 'completed' : 'failed';
     handoff.completedAt = Date.now();
+  }
+
+  /**
+   * Run the handoff's task + carried evidence through the guardrail chain
+   * before the receiving agent executes. Throws HandoffBlockedError on
+   * block so the caller can short-circuit with a safe fallback answer.
+   */
+  private async _enforceHandoffSafety(handoff: AgentHandoff): Promise<void> {
+    if (!this.config.enableSafetyChecks) return;
+
+    const evidenceText = handoff.context.evidence.map((e) => e.content).join('\n');
+    const combinedText = [handoff.task, evidenceText].filter(Boolean).join('\n');
+    if (!combinedText) return;
+
+    const result: GuardrailChainResult = await this.guardrailChain.check({
+      text: combinedText,
+      role: 'assistant',
+    });
+
+    if (!result.passed) {
+      handoff.status = 'rejected';
+      handoff.completedAt = Date.now();
+      throw new HandoffBlockedError(handoff, result.reason ?? `blocked by ${result.blockedBy}`);
+    }
   }
 
   private _extractEvidence(result: AgentResult, agentId: string): Evidence[] {

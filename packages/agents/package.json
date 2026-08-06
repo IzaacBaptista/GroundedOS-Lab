@@ -23,7 +23,8 @@
   "dependencies": {
     "@groundedos/core": "*",
     "@groundedos/rag": "*",
-    "@groundedos/observability": "*"
+    "@groundedos/observability": "*",
+    "@groundedos/safety": "*"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

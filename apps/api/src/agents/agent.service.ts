@@ -19,6 +19,7 @@ import {
   PlannerAgent,
   PlanExecutor,
   PlanCritic,
+  createAgentGuardrailChain,
   type AgentResult,
   type AgentExecutionContext,
   type AgentObservation,
@@ -52,6 +53,7 @@ export type {
 @Injectable()
 export class AgentService {
   private readonly traceStore = new TraceStore();
+  private readonly guardrailChain = createAgentGuardrailChain();
 
   // ---------------------------------------------------------------------------
   // POST /agents/execute — DocumentQA (existing, unchanged)
@@ -80,9 +82,25 @@ export class AgentService {
 
     const result: AgentResult = await agent.execute(context, request.query);
 
+    let responseSuccess = result.success;
+    let responseAnswer = result.answer;
+    let responseError = result.error;
+
+    if (responseSuccess && responseAnswer) {
+      const guardrailResult = await this.guardrailChain.check({
+        text: responseAnswer,
+        role: 'assistant',
+      });
+      if (!guardrailResult.passed) {
+        responseSuccess = false;
+        responseAnswer = undefined;
+        responseError = `Blocked by guardrail: ${guardrailResult.reason ?? guardrailResult.blockedBy}`;
+      }
+    }
+
     const response: AgentExecuteResponse = {
-      success: result.success,
-      answer: result.answer,
+      success: responseSuccess,
+      answer: responseAnswer,
       sources: result.sources,
       reasoning: result.reasoning,
       ...(request.devMode
@@ -113,7 +131,7 @@ export class AgentService {
             },
           }
         : {}),
-      error: result.error,
+      error: responseError,
     };
 
     await this.traceStore.append(
