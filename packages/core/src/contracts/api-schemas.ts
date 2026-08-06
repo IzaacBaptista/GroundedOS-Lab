@@ -16,6 +16,17 @@ import { z } from "zod";
 // Shared primitives
 // ---------------------------------------------------------------------------
 
+/** Eval scorer summary shared by /agents/multi and /agents/plan (Phase 8). */
+export const AgentEvalScoresSchema = z.object({
+  faithfulness: z.object({ score: z.number(), passed: z.boolean(), reason: z.string().optional() }),
+  relevance: z.object({ score: z.number(), passed: z.boolean(), reason: z.string().optional() }),
+  recall: z.object({ score: z.number(), passed: z.boolean(), reason: z.string().optional() }),
+  averageScore: z.number(),
+  passedCount: z.number(),
+});
+
+export type AgentEvalScores = z.infer<typeof AgentEvalScoresSchema>;
+
 export const ApiEmbeddingProviderIdSchema = z.enum([
   "api-lexical",
   "local-hash",
@@ -199,6 +210,7 @@ export const AgentMultiResponseSchema = z.object({
       evidenceSummary: z.array(z.string()),
     })
     .optional(),
+  evalScores: AgentEvalScoresSchema.optional(),
   error: z.string().optional(),
 });
 
