@@ -1,5 +1,16 @@
 node_modules/
 dist/
+# tsc build output must never land inside src/ (it shadows the .ts source
+# when anything imports the compiled sibling by its .js path) — see ADR-016.
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+apps/*/src/**/*.js
+apps/*/src/**/*.js.map
+apps/*/src/**/*.d.ts
+scripts/*.js
+scripts/*.js.map
+scripts/*.d.ts
 coverage/
 .turbo/
 .groundedos/

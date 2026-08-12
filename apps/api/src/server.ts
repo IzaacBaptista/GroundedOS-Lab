@@ -44,6 +44,14 @@ export async function createApiServer(
     {
       logger: false,
       bufferLogs: true,
+      // Nest's default (abortOnError: true) calls process.abort() on any
+      // bootstrap failure — a native SIGABRT that kills the whole process.
+      // Under Vitest that takes the entire worker down with a bare native
+      // stack trace instead of a catchable error, so every test in the
+      // worker's batch is reported as "Worker exited unexpectedly" with no
+      // indication of what actually failed. Rejecting instead lets the real
+      // init error surface normally in both tests and production logs.
+      abortOnError: false,
     }
   );
 
