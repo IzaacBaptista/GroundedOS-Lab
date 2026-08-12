@@ -71,6 +71,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -82,7 +84,12 @@ jobs:
         run: npm ci
 
       - name: Run tests (unit, integration)
-        run: npm test
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npx vitest run --changed origin/${{ github.base_ref }}
+          else
+            npm test
+          fi
 
   harness:
     name: Harness CI Integration
