@@ -7,8 +7,13 @@
 
 export {
   chunkDocument,
+  chunkDocumentWithParents,
   type ChunkDocumentOptions,
+  type ChunkDocumentWithParentsResult,
   type ChunkOffsetBasis,
+  type ChunkStrategy,
+  type HierarchicalChunk,
+  type ParentChunk,
   type RetrievalChunk,
   type RetrievalChunkMetadata,
 } from "./chunking";

@@ -25,9 +25,19 @@ const CODE_FILE_EXTENSIONS = new Set([
   "swift",
 ]);
 
+export type ChunkStrategy = "fixed" | "recursive" | "sentence";
+
 export interface ChunkDocumentOptions {
   maxChunkChars?: number;
   overlapChars?: number;
+  /**
+   * Book cap. 8: `"fixed"` (default) is a raw character window with
+   * word-boundary snapping. `"recursive"` prefers paragraph, then sentence
+   * boundaries before falling back to a fixed-size cut. `"sentence"` packs
+   * whole sentences and never splits one across chunks, even if that means
+   * emitting an oversized chunk for a single very long sentence.
+   */
+  strategy?: ChunkStrategy;
 }
 
 export type ChunkOffsetBasis = "document" | "section";
@@ -77,7 +87,7 @@ export function chunkDocument(
 
     const slices = isCode
       ? sliceCodeSectionText(section.text, resolvedOptions)
-      : sliceSectionText(section.text, resolvedOptions);
+      : sliceByStrategy(section.text, resolvedOptions);
 
     for (const slice of slices) {
       sectionChunkIndex += 1;
@@ -108,9 +118,57 @@ export function chunkDocument(
   return chunks;
 }
 
+export interface HierarchicalChunk extends RetrievalChunk {
+  /** Id of the `ParentChunk` (the full section text) this chunk was cut from. */
+  parentChunkId: string;
+}
+
+export interface ParentChunk {
+  id: string;
+  documentId: string;
+  sectionId: string;
+  text: string;
+}
+
+export interface ChunkDocumentWithParentsResult {
+  chunks: HierarchicalChunk[];
+  parents: ParentChunk[];
+}
+
+/**
+ * Parent-child chunking (book cap. 8): retrieval matches against the small,
+ * precise `chunks` (same output as `chunkDocument`), but each carries a
+ * `parentChunkId` pointing to the full section text in `parents` — the
+ * broader context a caller can inject into the prompt once a child chunk
+ * scores well. The section itself is the parent unit, matching the book's
+ * Figure 8.2 example ("parent chunk — contexto amplo — ex: seção inteira").
+ */
+export function chunkDocumentWithParents(
+  document: NormalizedDocument,
+  options: ChunkDocumentOptions = {}
+): ChunkDocumentWithParentsResult {
+  const childChunks = chunkDocument(document, options);
+  const parents: ParentChunk[] = document.content.sections
+    .filter((section) => section.text.trim().length > 0)
+    .map((section) => ({
+      id: `${document.documentId}:${section.id}:parent`,
+      documentId: document.documentId,
+      sectionId: section.id,
+      text: section.text.trim(),
+    }));
+
+  const chunks: HierarchicalChunk[] = childChunks.map((chunk) => ({
+    ...chunk,
+    parentChunkId: `${document.documentId}:${chunk.sectionId}:parent`,
+  }));
+
+  return { chunks, parents };
+}
+
 function resolveOptions(options: ChunkDocumentOptions): ResolvedChunkOptions {
   const maxChunkChars = options.maxChunkChars ?? DEFAULT_MAX_CHUNK_CHARS;
   const overlapChars = options.overlapChars ?? DEFAULT_OVERLAP_CHARS;
+  const strategy = options.strategy ?? "fixed";
 
   if (!Number.isInteger(maxChunkChars) || maxChunkChars <= 0) {
     throw new Error(`${ERROR_PREFIX} maxChunkChars must be a positive integer.`);
@@ -124,7 +182,7 @@ function resolveOptions(options: ChunkDocumentOptions): ResolvedChunkOptions {
     throw new Error(`${ERROR_PREFIX} overlapChars must be smaller than maxChunkChars.`);
   }
 
-  return { maxChunkChars, overlapChars };
+  return { maxChunkChars, overlapChars, strategy };
 }
 
 function isCodeFile(filename: string | undefined): boolean {
@@ -234,16 +292,42 @@ function splitIntoCodeUnits(
   return units;
 }
 
+function sliceByStrategy(
+  text: string,
+  options: ResolvedChunkOptions
+): Array<{ text: string; startOffset: number; endOffset: number }> {
+  switch (options.strategy) {
+    case "recursive":
+      return sliceRecursiveSectionText(text, options);
+    case "sentence":
+      return sliceSentenceSectionText(text, options);
+    default:
+      return sliceSectionText(text, options);
+  }
+}
+
+/**
+ * Fixed-size sliding window (book cap. 8, "Fixed-size chunking"). The raw
+ * character window is snapped back to the nearest whitespace when it would
+ * otherwise land mid-word — "a prática recomendada... é sempre ajustar o
+ * corte final para o limite estrutural mais próximo" — falling back to a
+ * hard cut only when no whitespace exists in the window (e.g. one long
+ * unbroken token).
+ */
 function sliceSectionText(
   text: string,
   options: ResolvedChunkOptions
 ): Array<{ text: string; startOffset: number; endOffset: number }> {
   const slices: Array<{ text: string; startOffset: number; endOffset: number }> = [];
-  const step = options.maxChunkChars - options.overlapChars;
   let rawStartOffset = 0;
 
   while (rawStartOffset < text.length) {
-    const rawEndOffset = Math.min(rawStartOffset + options.maxChunkChars, text.length);
+    let rawEndOffset = Math.min(rawStartOffset + options.maxChunkChars, text.length);
+
+    if (rawEndOffset < text.length) {
+      rawEndOffset = snapToWordBoundary(text, rawStartOffset, rawEndOffset);
+    }
+
     const rawText = text.slice(rawStartOffset, rawEndOffset);
     const trimmedText = rawText.trim();
 
@@ -262,8 +346,149 @@ function sliceSectionText(
       break;
     }
 
-    rawStartOffset += step;
+    rawStartOffset = Math.max(rawEndOffset - options.overlapChars, rawStartOffset + 1);
   }
+
+  return slices;
+}
+
+function snapToWordBoundary(text: string, windowStart: number, windowEnd: number): number {
+  if (/\s/.test(text[windowEnd] ?? "") || /\s/.test(text[windowEnd - 1] ?? "")) {
+    return windowEnd;
+  }
+
+  let cursor = windowEnd - 1;
+  while (cursor > windowStart && !/\s/.test(text[cursor]!)) {
+    cursor -= 1;
+  }
+
+  return cursor > windowStart ? cursor : windowEnd;
+}
+
+/**
+ * Recursive chunking (book cap. 8): prefers paragraph boundaries, then
+ * sentence boundaries, falling back to the fixed-size word-snapped window
+ * only when a single sentence alone exceeds `maxChunkChars`.
+ */
+function sliceRecursiveSectionText(
+  text: string,
+  options: ResolvedChunkOptions
+): Array<{ text: string; startOffset: number; endOffset: number }> {
+  const paragraphs = splitWithOffsets(text, /\n{2,}/g);
+  return packUnits(paragraphs, options, (paragraph) => {
+    const sentences = splitIntoSentences(paragraph.text);
+    if (sentences.length <= 1) {
+      return sliceSectionText(paragraph.text, options).map((slice) => offsetSlice(slice, paragraph.startOffset));
+    }
+    return packUnits(
+      sentences.map((s) => ({ ...s, startOffset: s.startOffset + paragraph.startOffset })),
+      options,
+      (sentence) =>
+        sliceSectionText(sentence.text, options).map((slice) => offsetSlice(slice, sentence.startOffset))
+    );
+  });
+}
+
+/**
+ * Sentence-based chunking (book cap. 8): packs whole sentences up to
+ * `maxChunkChars`, never splitting one — a single sentence longer than the
+ * budget is emitted as its own oversized chunk rather than being cut.
+ */
+function sliceSentenceSectionText(
+  text: string,
+  options: ResolvedChunkOptions
+): Array<{ text: string; startOffset: number; endOffset: number }> {
+  const sentences = splitIntoSentences(text);
+  return packUnits(sentences, options, (sentence) => [
+    { text: sentence.text, startOffset: sentence.startOffset, endOffset: sentence.endOffset },
+  ]);
+}
+
+interface TextUnit {
+  text: string;
+  startOffset: number;
+  endOffset: number;
+}
+
+/** Splits `text` on `separator`, keeping each piece's offset into `text`. */
+function splitWithOffsets(text: string, separator: RegExp): TextUnit[] {
+  const units: TextUnit[] = [];
+  let lastEnd = 0;
+  let match: RegExpExecArray | null;
+  const pattern = new RegExp(separator);
+
+  while ((match = pattern.exec(text)) !== null) {
+    pushUnit(units, text, lastEnd, match.index);
+    lastEnd = match.index + match[0].length;
+  }
+  pushUnit(units, text, lastEnd, text.length);
+
+  return units;
+}
+
+function pushUnit(units: TextUnit[], text: string, start: number, end: number): void {
+  const raw = text.slice(start, end);
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+  const leadingTrim = raw.length - raw.trimStart().length;
+  const trailingTrim = raw.length - raw.trimEnd().length;
+  units.push({ text: trimmed, startOffset: start + leadingTrim, endOffset: end - trailingTrim });
+}
+
+/** Splits on sentence-ending punctuation (`.`/`!`/`?`) followed by whitespace or end of text. */
+function splitIntoSentences(text: string): TextUnit[] {
+  return splitWithOffsets(text, /(?<=[.!?])\s+/g);
+}
+
+function offsetSlice(
+  slice: { text: string; startOffset: number; endOffset: number },
+  base: number
+): { text: string; startOffset: number; endOffset: number } {
+  return { text: slice.text, startOffset: slice.startOffset + base, endOffset: slice.endOffset + base };
+}
+
+/**
+ * Greedily packs `units` (paragraphs or sentences) into chunks up to
+ * `maxChunkChars`, joining consecutive units with a blank line. A unit that
+ * alone exceeds the budget is expanded via `splitOversizedUnit` instead of
+ * being packed.
+ */
+function packUnits(
+  units: TextUnit[],
+  options: ResolvedChunkOptions,
+  splitOversizedUnit: (unit: TextUnit) => Array<{ text: string; startOffset: number; endOffset: number }>
+): Array<{ text: string; startOffset: number; endOffset: number }> {
+  const slices: Array<{ text: string; startOffset: number; endOffset: number }> = [];
+  let buffer: { text: string; startOffset: number; endOffset: number } | null = null;
+
+  const flush = () => {
+    if (buffer) {
+      slices.push(buffer);
+      buffer = null;
+    }
+  };
+
+  for (const unit of units) {
+    if (unit.text.length > options.maxChunkChars) {
+      flush();
+      slices.push(...splitOversizedUnit(unit));
+      continue;
+    }
+
+    if (buffer && buffer.text.length + 1 + unit.text.length > options.maxChunkChars) {
+      flush();
+    }
+
+    if (!buffer) {
+      buffer = { text: unit.text, startOffset: unit.startOffset, endOffset: unit.endOffset };
+    } else {
+      buffer.text += ` ${unit.text}`;
+      buffer.endOffset = unit.endOffset;
+    }
+  }
+  flush();
 
   return slices;
 }

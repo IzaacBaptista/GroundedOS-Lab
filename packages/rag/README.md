@@ -54,6 +54,29 @@ When `document.lineage.originalFilename` has a recognized code extension
 that avoids splitting a function/class body mid-way (book cap. 8,
 "Chunking para código") instead of the default fixed-size sliding window.
 
+### Chunking strategies (book cap. 8)
+
+`chunkDocument(document, { strategy })` supports three strategies:
+
+| `strategy` | Behavior |
+|---|---|
+| `"fixed"` (default) | Character sliding window; the cut is snapped back to the nearest whitespace instead of splitting a word, falling back to a hard cut only when no whitespace exists in the window. |
+| `"recursive"` | Prefers paragraph boundaries, then sentence boundaries, before falling back to `"fixed"` — the "default choice of most RAG libraries" per the book. |
+| `"sentence"` | Packs whole sentences up to `maxChunkChars`; never splits a sentence, even if a single one alone exceeds the budget (emitted as an oversized chunk instead). |
+
+`chunkDocumentWithParents(document, options)` adds parent-child chunking:
+returns the same fine-grained `chunks` as `chunkDocument()` (for precise
+retrieval matching) plus a `parents` array — one entry per section, the
+"contexto amplo" a caller can inject into the prompt once a child chunk
+scores well. Each child carries `parentChunkId` pointing to its parent.
+`structure-aware` chunking already happens implicitly: chunking runs
+per-section, and sections already come from heading/page boundaries set by
+the extractors (Part 2).
+
+Semantic chunking (embedding-based topic-shift detection) is not implemented — it needs
+a real embedding call per candidate boundary, which is a meaningfully different
+cost/complexity trade-off from the three strategies above.
+
 Defaults:
 
 | Option | Default | Description |

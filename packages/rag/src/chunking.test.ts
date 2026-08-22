@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedDocument } from "@groundedos/core";
 
-import { chunkDocument } from "./chunking";
+import { chunkDocument, chunkDocumentWithParents } from "./chunking";
 
 function createDocument(
   overrides: Partial<NormalizedDocument> = {}
@@ -313,5 +313,110 @@ describe("chunkDocument", () => {
     const chunks = chunkDocument(doc, { maxChunkChars: 20, overlapChars: 0 });
 
     expect(chunks.length).toBeGreaterThan(1);
+  });
+
+  it("adjusts the chunk boundary to the nearest whitespace instead of cutting a word in half", () => {
+    const text = "aaaaaaaaaa bbbbbbbbbb cccccccccc";
+    const doc = createDocument({
+      content: {
+        fullText: text,
+        sections: [{ id: "section-1", text, startOffset: 0, endOffset: text.length }],
+      },
+    });
+
+    const chunks = chunkDocument(doc, { maxChunkChars: 15, overlapChars: 0 });
+
+    expect(chunks.map((c) => c.text)).toEqual(["aaaaaaaaaa", "bbbbbbbbbb", "cccccccccc"]);
+  });
+
+  describe("strategy: recursive", () => {
+    it("packs whole paragraphs together instead of cutting mid-paragraph", () => {
+      const text = "Alpha paragraph is short.\n\nBeta paragraph is short too.\n\nGamma paragraph also short.";
+      const doc = createDocument({
+        content: {
+          fullText: text,
+          sections: [{ id: "section-1", text, startOffset: 0, endOffset: text.length }],
+        },
+      });
+
+      const chunks = chunkDocument(doc, {
+        maxChunkChars: 60,
+        overlapChars: 0,
+        strategy: "recursive",
+      });
+
+      for (const chunk of chunks) {
+        expect(chunk.text.endsWith(".")).toBe(true);
+        expect(chunk.text.startsWith("Alpha") || chunk.text.startsWith("Beta") || chunk.text.startsWith("Gamma")).toBe(
+          true
+        );
+      }
+      expect(chunks.some((c) => c.text.includes("Alpha") && c.text.includes("Beta"))).toBe(true);
+    });
+
+    it("recurses into sentence splitting when a single paragraph exceeds maxChunkChars", () => {
+      const text = "First sentence here. Second sentence here. Third sentence here.";
+      const doc = createDocument({
+        content: {
+          fullText: text,
+          sections: [{ id: "section-1", text, startOffset: 0, endOffset: text.length }],
+        },
+      });
+
+      const chunks = chunkDocument(doc, {
+        maxChunkChars: 30,
+        overlapChars: 0,
+        strategy: "recursive",
+      });
+
+      for (const chunk of chunks) {
+        expect(chunk.text.trim().endsWith(".")).toBe(true);
+      }
+    });
+  });
+
+  describe("strategy: sentence", () => {
+    it("never splits a sentence across chunks", () => {
+      const text = "Sentence one is short. Sentence two is also short. Sentence three too.";
+      const doc = createDocument({
+        content: {
+          fullText: text,
+          sections: [{ id: "section-1", text, startOffset: 0, endOffset: text.length }],
+        },
+      });
+
+      const chunks = chunkDocument(doc, {
+        maxChunkChars: 35,
+        overlapChars: 0,
+        strategy: "sentence",
+      });
+
+      for (const chunk of chunks) {
+        expect(chunk.text.trim().endsWith(".")).toBe(true);
+      }
+      expect(chunks.join(" ")).not.toBe("");
+    });
+  });
+
+  describe("chunkDocumentWithParents", () => {
+    it("returns child chunks carrying a parentChunkId that resolves to the full section text", () => {
+      const doc = createDocument();
+
+      const { chunks, parents } = chunkDocumentWithParents(doc, {
+        maxChunkChars: 5,
+        overlapChars: 0,
+      });
+
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(parents).toHaveLength(2);
+
+      const parentIds = new Set(parents.map((p) => p.id));
+      for (const chunk of chunks) {
+        expect(parentIds.has(chunk.parentChunkId)).toBe(true);
+      }
+
+      const parentForFirstSection = parents.find((p) => p.sectionId === "section-1");
+      expect(parentForFirstSection?.text).toBe("First section.");
+    });
   });
 });

@@ -68,3 +68,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-018](./ADR-018-real-generation-in-judge-and-synthesizer.md) | Real LLM generation in SynthesizerAgent and a real OllamaJudgeProvider | Accepted |
 | [ADR-019](./ADR-019-real-multimodal-providers.md) | Real OCR, vision and transcription providers (opt-in) | Accepted |
 | [ADR-020](./ADR-020-normalization-table-code-chunking-structured-docs.md) | Cap. 7 normalization pass, real table extraction, code-aware chunking, JSON/XML modalities | Accepted |
+| [ADR-021](./ADR-021-chunking-boundary-fix-and-strategies.md) | Chunk boundary word-snap fix, recursive/sentence strategies, parent-child chunking | Accepted |
