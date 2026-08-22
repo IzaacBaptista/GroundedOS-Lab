@@ -15,11 +15,42 @@
  */
 
 import { randomUUID } from 'crypto';
+import { OllamaChatProvider, type GenerationProvider } from '@groundedos/rag';
 import { BaseAgent } from './agent.js';
 import type { AgentExecutionContext, AgentResult, Tool } from './types.js';
 import type { AgentRole, Evidence } from './multi-agent-types.js';
 import type { TaskPlan, PlanNode, PlanEdge } from './planning-types.js';
 import { DEFAULT_PLANNING_STRATEGY } from './planning-types.js';
+
+const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
+const DEFAULT_OLLAMA_CHAT_MODEL = 'llama3.2';
+
+/**
+ * Resolves the LLM generation provider used by SynthesizerAgent. Real
+ * generation is opt-in (`GROUNDEDOS_ENABLE_LLM_GENERATION=true`, the same
+ * flag used by the /rag/ask path) so the default heuristic synthesis stays
+ * unchanged unless a caller explicitly enables it.
+ */
+function resolveGenerationProvider(): GenerationProvider | undefined {
+  if (process.env.GROUNDEDOS_ENABLE_LLM_GENERATION !== 'true') {
+    return undefined;
+  }
+
+  return new OllamaChatProvider({
+    baseUrl: process.env.GROUNDEDOS_OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL,
+    model: process.env.GROUNDEDOS_OLLAMA_CHAT_MODEL ?? DEFAULT_OLLAMA_CHAT_MODEL,
+    temperature: parseOptionalFloat(process.env.GROUNDEDOS_LLM_TEMPERATURE),
+    topP: parseOptionalFloat(process.env.GROUNDEDOS_LLM_TOP_P),
+  });
+}
+
+function parseOptionalFloat(rawValue: string | undefined): number | undefined {
+  if (!rawValue) {
+    return undefined;
+  }
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 // ---------------------------------------------------------------------------
 // PlannerAgent
@@ -490,7 +521,7 @@ export class SynthesizerAgent extends BaseAgent {
       return {
         reasoning: `Synthesizer: Consolidating evidence to answer query.`,
         toolName: 'synthesize-answer',
-        toolInput: { evidenceJson: input, query: input },
+        toolInput: { evidenceJson: input },
         directAnswer: null,
       };
     }
@@ -528,15 +559,18 @@ function createSynthesisTool(): Tool {
       required: ['query'],
     },
     call: async (input: Record<string, unknown>) => {
-      const query = String(input['query'] ?? '');
       const evidenceJson = String(input['evidenceJson'] ?? '[]');
 
       let evidence: Evidence[] = [];
       let critiqueOutput: Record<string, unknown> = {};
+      let query = String(input['query'] ?? '');
 
       try {
         const parsed = JSON.parse(evidenceJson);
         if (parsed && typeof parsed === 'object') {
+          if (typeof parsed.query === 'string' && query.length === 0) {
+            query = parsed.query;
+          }
           if ('approvedEvidence' in parsed) {
             critiqueOutput = parsed as Record<string, unknown>;
             evidence = (parsed.approvedEvidence as Evidence[]) ?? [];
@@ -552,6 +586,31 @@ function createSynthesisTool(): Tool {
 
       const sources = evidence.flatMap((e) => e.sources);
       const evidenceText = evidence.map((e) => e.content).join(' ');
+      const groundingScore = evidence.length > 0 ? 0.85 : 0.2;
+
+      const provider = resolveGenerationProvider();
+      if (provider && evidence.length > 0 && query.length > 0) {
+        try {
+          const generated = await provider.generate({
+            query,
+            chunks: evidence.map((e) => ({
+              chunkId: e.sources[0] ?? e.evidenceId,
+              text: e.content,
+            })),
+          });
+
+          return {
+            answer: generated.text,
+            sources: [...new Set(sources)],
+            groundingScore,
+            evidenceCount: evidence.length,
+            qualityScore: (critiqueOutput['qualityScore'] as number | undefined) ?? 0.7,
+          };
+        } catch {
+          // Generation failed (provider unavailable, timeout, bad response) —
+          // fall through to the heuristic answer below.
+        }
+      }
 
       const answer =
         evidence.length > 0
@@ -561,7 +620,7 @@ function createSynthesisTool(): Tool {
       return {
         answer,
         sources: [...new Set(sources)],
-        groundingScore: evidence.length > 0 ? 0.85 : 0.2,
+        groundingScore,
         evidenceCount: evidence.length,
         qualityScore: (critiqueOutput['qualityScore'] as number | undefined) ?? 0.7,
       };

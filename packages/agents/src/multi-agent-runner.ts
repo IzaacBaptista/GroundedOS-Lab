@@ -304,7 +304,7 @@ export class MultiAgentRunner {
       });
 
       // Pass critique output + evidence to synthesizer
-      const synthInput = JSON.stringify({ approvedEvidence: evidence, ...criticOutput });
+      const synthInput = JSON.stringify({ query, approvedEvidence: evidence, ...criticOutput });
       const synthesizerResult = await this.synthesizerAgent.execute(synthesizerCtx, synthInput);
       const synthesizerParticipant = participants[participants.length - 1];
       synthesizerParticipant.completedAt = Date.now();

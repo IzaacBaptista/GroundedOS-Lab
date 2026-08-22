@@ -943,6 +943,7 @@ Implemented via `@groundedos/memory` and integrated into `POST /rag/ask` with op
 - [x] `@groundedos/safety` guardrails run on every agent handoff and on `POST /agents/execute`, not only on the `/safety/*` playground
 - [x] `@groundedos/evals` scores are attached to multi-agent traces (`/agents/plan` deferred — see SDD "Deviation" note, its node-executor contract doesn't carry evidence)
 - [ ] `packages/agents/README.md` and this README describe all four agent endpoints and four specialized roles accurately
+- [x] `SynthesizerAgent` calls a real LLM (opt-in, `GROUNDEDOS_ENABLE_LLM_GENERATION=true`) instead of a string-template answer — see [ADR-018](./docs/adr/ADR-018-real-generation-in-judge-and-synthesizer.md). Planner/Researcher/Critic remain heuristic.
 
 ---
 

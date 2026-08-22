@@ -25,12 +25,23 @@ In progress (Advanced Evals phase)
   aggregate summary data.
 - `advanced.ts` adds typed building blocks for LLM-as-judge, RAGAS mapping,
   synthetic dataset generation, artifact writing and eval orchestration.
+- `OllamaJudgeProvider` (`ollama-judge-provider.ts`) is the first real
+  `JudgeProvider`: sends the rendered judge prompt to a local Ollama chat
+  model and returns its raw JSON response for `parseJudgeOutput`. Use
+  `StaticJudgeProvider` for tests or for wiring a custom/mocked judge
+  resolver instead.
 
 ## Current limits
 
-- Current evaluators are deterministic lexical/heuristic scorers.
-- Judge providers and the Python RAGAS runner are integrated through adapters so
-  the core remains TypeScript-first.
+- Current evaluators (`FaithfulnessEvaluator`, `RelevanceEvaluator`,
+  `RecallEvaluator`) are deterministic lexical/heuristic scorers, not LLM
+  calls.
+- `createJudgeRun`/`JudgeProvider` (the LLM-as-judge harness) has no
+  production caller yet — it's invoked only from this package's own tests
+  plus `OllamaJudgeProvider`/`StaticJudgeProvider`. Wiring it into an eval
+  pipeline or API endpoint is separate future work.
+- The Python RAGAS runner is integrated through adapters so the core remains
+  TypeScript-first.
 - Automated A/B prompt testing and statistical winner reporting are available
   via `@groundedos/experiment-toolkit`; this package keeps the evaluator
   primitives used by that workflow.

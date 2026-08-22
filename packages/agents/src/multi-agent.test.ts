@@ -8,7 +8,7 @@
  * - Specialized agent creation and execution
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { MultiAgentRunner, createHandoffEnvelope } from './multi-agent-runner';
 import {
   PlannerAgent,
@@ -183,6 +183,79 @@ describe('SynthesizerAgent', () => {
     expect(typeof output['answer']).toBe('string');
     expect(Array.isArray(output['sources'])).toBe(true);
     expect(typeof output['groundingScore']).toBe('number');
+  });
+
+  describe('LLM generation (GROUNDEDOS_ENABLE_LLM_GENERATION)', () => {
+    const originalFetch = globalThis.fetch;
+    const originalFlag = process.env.GROUNDEDOS_ENABLE_LLM_GENERATION;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+      if (originalFlag === undefined) {
+        delete process.env.GROUNDEDOS_ENABLE_LLM_GENERATION;
+      } else {
+        process.env.GROUNDEDOS_ENABLE_LLM_GENERATION = originalFlag;
+      }
+    });
+
+    it('uses the real LLM answer when generation is enabled and Ollama responds', async () => {
+      process.env.GROUNDEDOS_ENABLE_LLM_GENERATION = 'true';
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { content: 'Neural networks underlie deep learning [chunk-1].' },
+        }),
+      }) as unknown as typeof fetch;
+
+      const agent = new SynthesizerAgent();
+      const input = JSON.stringify({
+        query: 'What are neural networks?',
+        approvedEvidence: [
+          {
+            evidenceId: 'e-1',
+            sourceAgentId: 'researcher-agent',
+            content: 'Neural networks are the foundation of deep learning.',
+            sources: ['chunk-1'],
+            confidence: 0.92,
+            collectedAt: Date.now(),
+          },
+        ],
+        qualityScore: 0.85,
+      });
+
+      const result = await agent.execute(makeContext(), input);
+      const synthCall = result.toolCalls.find((tc) => tc.toolName === 'synthesize-answer');
+      const output = synthCall!.output as Record<string, unknown>;
+
+      expect(output['answer']).toBe('Neural networks underlie deep learning [chunk-1].');
+    });
+
+    it('falls back to the heuristic answer when generation is enabled but Ollama is unreachable', async () => {
+      process.env.GROUNDEDOS_ENABLE_LLM_GENERATION = 'true';
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('connect ECONNREFUSED')) as unknown as typeof fetch;
+
+      const agent = new SynthesizerAgent();
+      const input = JSON.stringify({
+        query: 'What are neural networks?',
+        approvedEvidence: [
+          {
+            evidenceId: 'e-1',
+            sourceAgentId: 'researcher-agent',
+            content: 'Neural networks are the foundation of deep learning.',
+            sources: ['chunk-1'],
+            confidence: 0.92,
+            collectedAt: Date.now(),
+          },
+        ],
+        qualityScore: 0.85,
+      });
+
+      const result = await agent.execute(makeContext(), input);
+      const synthCall = result.toolCalls.find((tc) => tc.toolName === 'synthesize-answer');
+      const output = synthCall!.output as Record<string, unknown>;
+
+      expect(output['answer']).toContain('Based on 1 evidence items');
+    });
   });
 });
 

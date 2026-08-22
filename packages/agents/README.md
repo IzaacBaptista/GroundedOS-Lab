@@ -28,10 +28,19 @@ Complete (Phase 3 baseline); hardening in progress (Phase 8 — see
 
 ## Current limits
 
-- Reasoning is deterministic and heuristic-driven across all four agent
-  paths (Planner/Researcher/Critic/Synthesizer included); no agent calls an
-  LLM yet. Replacing this with LLM-backed reasoning is deliberately out of
-  scope for Phase 8 (see ADR-015) and tracked as separate future work.
+- `SynthesizerAgent`'s `synthesize-answer` tool now calls a real LLM (Ollama
+  chat via `@groundedos/rag`'s `OllamaChatProvider`) when
+  `GROUNDEDOS_ENABLE_LLM_GENERATION=true` (same flag as `/rag/ask` —
+  see [ADR-018](../../docs/adr/ADR-018-real-generation-in-judge-and-synthesizer.md)).
+  Falls back to the previous heuristic template (`Based on N evidence
+  items: ...`) when the flag is off, generation fails, or evidence/query is
+  missing.
+- Planner (`decomposeObjective`), Researcher (`research-retrieve`) and
+  Critic (`critique-evidence`) remain deterministic/heuristic — not yet
+  wired to an LLM. `research-retrieve` is still a fully mocked simulation,
+  not a real call into `@groundedos/rag` (`setRagService` exists but is
+  never invoked by `MultiAgentRunner`); wiring a real index through the
+  multi-agent pipeline is separate future work.
 - Tool execution is in-process; queue-backed worker execution is still planned.
 - No guardrail (`@groundedos/safety`) or eval (`@groundedos/evals`)
   integration on any of the four endpoints yet — Phase 8 hardening work.
