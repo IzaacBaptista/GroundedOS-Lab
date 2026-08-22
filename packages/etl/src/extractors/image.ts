@@ -17,18 +17,16 @@ import type {
   NormalizedDocument,
 } from "@groundedos/core";
 import { buildMultimodalChunks } from "../multimodal/chunking";
-import { MockOCRProvider, type OCRProvider } from "../multimodal/providers/ocr";
-import {
-  MockVisionProvider,
-  type ImageDescriptionProvider,
-} from "../multimodal/providers/vision";
+import type { OCRProvider } from "../multimodal/providers/ocr";
+import type { ImageDescriptionProvider } from "../multimodal/providers/vision";
+import { resolveOcrProvider, resolveVisionProvider } from "../multimodal/providers/resolve";
 
 export class ImageExtractor implements Extractor {
   readonly supportedModalities: DocumentModality[] = ["image"];
 
   constructor(
-    private readonly ocrProvider: OCRProvider = new MockOCRProvider(),
-    private readonly visionProvider: ImageDescriptionProvider = new MockVisionProvider()
+    private readonly ocrProvider: OCRProvider = resolveOcrProvider(),
+    private readonly visionProvider: ImageDescriptionProvider = resolveVisionProvider()
   ) {}
 
   async extract(input: IngestionInput): Promise<NormalizedDocument> {

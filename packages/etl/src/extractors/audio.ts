@@ -15,16 +15,14 @@ import type {
   NormalizedDocument,
 } from "@groundedos/core";
 import { buildMultimodalChunks } from "../multimodal/chunking";
-import {
-  MockTranscriptionProvider,
-  type AudioTranscriptionProvider,
-} from "../multimodal/providers/transcription";
+import type { AudioTranscriptionProvider } from "../multimodal/providers/transcription";
+import { resolveTranscriptionProvider } from "../multimodal/providers/resolve";
 
 export class AudioExtractor implements Extractor {
   readonly supportedModalities: DocumentModality[] = ["audio"];
 
   constructor(
-    private readonly transcriptionProvider: AudioTranscriptionProvider = new MockTranscriptionProvider()
+    private readonly transcriptionProvider: AudioTranscriptionProvider = resolveTranscriptionProvider()
   ) {}
 
   async extract(input: IngestionInput): Promise<NormalizedDocument> {

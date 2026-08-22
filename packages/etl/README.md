@@ -111,11 +111,28 @@ from `packages/etl/src/index.ts` for convenience.
 |---|---|---|---|
 | `text` | `TextExtractor` | ✅ Complete | Inline `content` or `filePath`; paragraph-based section splitting |
 | `pdf` | `PdfExtractor` | ✅ Complete | Local `filePath` or remote `url`; page-based text extraction |
-| `image` | `ImageExtractor` | ✅ Baseline | OCR + image description via provider abstraction (mock/local/cloud adapters) |
-| `audio` | `AudioExtractor` | ✅ Baseline | Transcription via provider abstraction (mock/local/cloud adapters) |
+| `image` | `ImageExtractor` | ✅ Baseline | OCR + image description via provider abstraction. Real providers exist (`TesseractOcrProvider`, `OllamaVisionProvider`) but default to `Mock*Provider` unless opted in — see "Real multimodal providers (opt-in)" below |
+| `audio` | `AudioExtractor` | ✅ Baseline | Transcription via provider abstraction. Real provider exists (`OpenAIWhisperProvider`) but defaults to `MockTranscriptionProvider` unless `OPENAI_API_KEY` is set |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
 | `markdown` | `MarkdownExtractor` | ✅ Complete | Heading-aware section splitting (ATX `#`..`######`) |
 | `html` | `HtmlExtractor` | ✅ Baseline | Regex-based tag stripping; drops `<script>`/`<style>`; no table/structure extraction yet |
+
+### Real multimodal providers (opt-in)
+
+`MockOCRProvider`/`MockVisionProvider`/`MockTranscriptionProvider` are the
+defaults — they return fabricated text (e.g. `"OCR extracted text from
+${filename}"`) with no real model/OCR/API call. Real implementations:
+
+| Capability | Real provider | Enabled by |
+|---|---|---|
+| Image description | `OllamaVisionProvider` (`/api/chat` with a vision model, e.g. `llava`) | `GROUNDEDOS_ENABLE_LLM_GENERATION=true` |
+| OCR | `TesseractOcrProvider` (local, `tesseract.js`, no API key) | `GROUNDEDOS_ENABLE_REAL_OCR=true` |
+| Audio transcription | `OpenAIWhisperProvider` (`/v1/audio/transcriptions`) | `OPENAI_API_KEY` set |
+
+`resolveOcrProvider()` / `resolveVisionProvider()` / `resolveTranscriptionProvider()`
+(`src/multimodal/providers/resolve.ts`) pick the real or mock provider based
+on these env vars and are the constructor defaults for `ImageExtractor`,
+`PdfExtractor` and `AudioExtractor`.
 
 ### Adding a new extractor
 

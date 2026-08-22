@@ -33,24 +33,25 @@ export {
 } from "./multimodal/pdf-assets";
 export {
   MockOCRProvider,
-  LocalOCRProvider,
-  CloudOCRProvider,
+  TesseractOcrProvider,
   type OCRProvider,
 } from "./multimodal/providers/ocr";
 export {
   MockVisionProvider,
-  LocalVisionProvider,
-  CloudVisionProvider,
+  OllamaVisionProvider,
   type ImageDescriptionProvider,
   type VisionModelProvider,
 } from "./multimodal/providers/vision";
 export {
   MockTranscriptionProvider,
-  LocalWhisperProvider,
-  OllamaWhisperProvider,
-  CloudTranscriptionProvider,
+  OpenAIWhisperProvider,
   type AudioTranscriptionProvider,
 } from "./multimodal/providers/transcription";
+export {
+  resolveOcrProvider,
+  resolveVisionProvider,
+  resolveTranscriptionProvider,
+} from "./multimodal/providers/resolve";
 
 // Re-exported core types (convenience)
 export type {

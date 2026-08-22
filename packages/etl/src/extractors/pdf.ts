@@ -27,11 +27,9 @@ import {
   PdfImageExtractor,
   PdfPageRenderer,
 } from "../multimodal/pdf-assets";
-import { MockOCRProvider, type OCRProvider } from "../multimodal/providers/ocr";
-import {
-  MockVisionProvider,
-  type ImageDescriptionProvider,
-} from "../multimodal/providers/vision";
+import type { OCRProvider } from "../multimodal/providers/ocr";
+import type { ImageDescriptionProvider } from "../multimodal/providers/vision";
+import { resolveOcrProvider, resolveVisionProvider } from "../multimodal/providers/resolve";
 
 const EXTRACTOR_NAME = "pdf-extractor";
 const EXTRACTOR_VERSION = "0.1.0";
@@ -44,8 +42,8 @@ export class PdfExtractor implements Extractor {
     private readonly pageRenderer: PdfPageRenderer = new PdfPageRenderer(),
     private readonly imageStore: ExtractedImageStore = new ExtractedImageStore(),
     private readonly assetRegistry: ImageAssetRegistry = new ImageAssetRegistry(),
-    private readonly ocrProvider: OCRProvider = new MockOCRProvider(),
-    private readonly visionProvider: ImageDescriptionProvider = new MockVisionProvider()
+    private readonly ocrProvider: OCRProvider = resolveOcrProvider(),
+    private readonly visionProvider: ImageDescriptionProvider = resolveVisionProvider()
   ) {}
 
   async extract(input: IngestionInput): Promise<NormalizedDocument> {

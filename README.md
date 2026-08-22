@@ -171,7 +171,7 @@ Reference docs:
 | Multi-worker distributed coordination | Phase 6+ |
 | Long-term trace storage and retention | Phase 7+ |
 | Streaming responses and WebSockets | Phase 7+ |
-| Multimodal (complete image + audio extraction) | Phase 7+ |
+| Multimodal as a *default* (non-opt-in) path; table/chart-aware extraction | Phase 7+ |
 
 ---
 
@@ -629,11 +629,18 @@ The Jailbreak Playground (`experiments/jailbreak-defense/`) is a red-teaming sur
 
 ### Multimodality (image & audio)
 
-Image and audio extractors are registered stubs. They will re-enter the roadmap when:
+Image and audio extractors default to mock providers (fabricated text, no
+real OCR/vision/transcription call). Real providers now exist, opt-in:
+`OllamaVisionProvider` (image description via a local Ollama vision model,
+`GROUNDEDOS_ENABLE_LLM_GENERATION=true`), `TesseractOcrProvider` (local OCR,
+`GROUNDEDOS_ENABLE_REAL_OCR=true`), and `OpenAIWhisperProvider` (audio
+transcription, requires `OPENAI_API_KEY`) — see
+[`packages/etl/README.md`](./packages/etl/README.md#real-multimodal-providers-opt-in).
+Still open before this becomes the default (not opt-in) experience:
 
-1. A concrete use case is identified (e.g. PDF-with-images ingestion, audio transcription for meeting notes).
-2. The relevant privacy and content-moderation implications for user-uploaded media are documented.
-3. A Phase milestone explicitly includes multimodal success criteria.
+1. Privacy and content-moderation implications for user-uploaded media sent to a vision/transcription model.
+2. Table/chart-aware extraction (book cap. 75) — not covered by any current provider.
+3. A Phase milestone explicitly promoting multimodal to a default, non-opt-in path.
 
 ---
 
