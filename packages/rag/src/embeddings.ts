@@ -46,10 +46,20 @@ export interface EmbeddingModelInfo {
   similarityMetric?: SimilarityMetric;
 }
 
+/**
+ * Book cap. 12: some models are trained asymmetrically and expect a
+ * different prefix/instruction depending on whether the text being
+ * embedded is a document to index or a query to search with. Ignoring
+ * this for a model that expects it is a silent quality regression — the
+ * call succeeds, but retrieval degrades with no visible error.
+ */
+export type EmbeddingInputType = "document" | "query";
+
 export interface EmbedTextInput {
   id?: string;
   text: string;
   metadata?: Record<string, unknown>;
+  inputType?: EmbeddingInputType;
 }
 
 export interface EmbedTextResult {
@@ -72,7 +82,7 @@ export interface EmbeddingProvider {
   readonly name: string;
   readonly dimensions: number;
   readonly modelInfo?: EmbeddingModelInfo;
-  embedTexts(texts: string[]): Promise<EmbeddingVector[]>;
+  embedTexts(texts: string[], inputType?: EmbeddingInputType): Promise<EmbeddingVector[]>;
 }
 
 export interface EmbeddedChunk extends RetrievalChunk {
@@ -106,6 +116,16 @@ export interface OllamaEmbeddingsProviderOptions {
   keepAlive?: string;
   requestTimeoutMs?: number;
   fetchFn?: typeof fetch;
+  /**
+   * Book cap. 12: prepended to text embedded with `inputType: "document"`.
+   * e.g. embeddinggemma expects `"title: none | text: "` for documents.
+   */
+  documentPrefix?: string;
+  /**
+   * Prepended to text embedded with `inputType: "query"`.
+   * e.g. embeddinggemma expects `"task: search result | query: "` for queries.
+   */
+  queryPrefix?: string;
 }
 
 export interface OpenAIEmbeddingsProviderOptions {
@@ -118,6 +138,10 @@ export interface OpenAIEmbeddingsProviderOptions {
   organization?: string;
   project?: string;
   fetchFn?: typeof fetch;
+  /** Book cap. 12: see `OllamaEmbeddingsProviderOptions.documentPrefix`. */
+  documentPrefix?: string;
+  /** Book cap. 12: see `OllamaEmbeddingsProviderOptions.queryPrefix`. */
+  queryPrefix?: string;
 }
 
 export interface EmbeddingProviderRegistry {
@@ -136,7 +160,10 @@ export async function embedChunks(
     return [];
   }
 
-  const embeddings = await provider.embedTexts(chunks.map((chunk) => chunk.text));
+  const embeddings = await provider.embedTexts(
+    chunks.map((chunk) => chunk.text),
+    "document"
+  );
   validateEmbeddings(embeddings, chunks.length, provider);
 
   const embedded = chunks.map((chunk, index) => ({
@@ -152,6 +179,56 @@ export async function embedChunks(
   }));
 
   return validateEmbeddedChunks(embedded) as EmbeddedChunk[];
+}
+
+/**
+ * Book cap. 12 (Matryoshka embeddings): a Matryoshka-trained model's first
+ * N dimensions already concentrate most of the semantic signal, so a full
+ * vector can be truncated to a smaller size on demand — trading quality for
+ * storage/compute cost — without re-embedding or reindexing from scratch.
+ * This is a plain slice: no re-normalization, since cosine similarity is
+ * magnitude-insensitive and dot product/Euclidean intentionally reflect the
+ * shorter vector's own magnitude after truncation.
+ */
+export function truncateEmbedding(
+  vector: EmbeddingVector,
+  targetDimensions: number
+): EmbeddingVector {
+  if (!Array.isArray(vector) || vector.length === 0) {
+    throw new Error(`${ERROR_PREFIX} truncateEmbedding vector must be a non-empty array.`);
+  }
+
+  if (!Number.isInteger(targetDimensions) || targetDimensions <= 0) {
+    throw new Error(`${ERROR_PREFIX} truncateEmbedding targetDimensions must be a positive integer.`);
+  }
+
+  if (targetDimensions > vector.length) {
+    throw new Error(
+      `${ERROR_PREFIX} truncateEmbedding targetDimensions (${targetDimensions}) exceeds the ` +
+        `vector's ${vector.length} dimensions — Matryoshka truncation only shrinks a vector.`
+    );
+  }
+
+  return vector.slice(0, targetDimensions);
+}
+
+/**
+ * Truncates an already-embedded chunk's vector and updates its metadata's
+ * `dimensions` to match, so the result stays valid for `InMemoryVectorStore`
+ * (which requires `embedding.length === embeddingMetadata.dimensions`).
+ */
+export function truncateEmbeddedChunk(
+  chunk: EmbeddedChunk,
+  targetDimensions: number
+): EmbeddedChunk {
+  return {
+    ...chunk,
+    embedding: truncateEmbedding(chunk.embedding, targetDimensions),
+    embeddingMetadata: {
+      ...chunk.embeddingMetadata,
+      dimensions: targetDimensions,
+    },
+  };
 }
 
 export class LocalHashEmbeddingsProvider implements SemanticEmbeddingsProvider {
@@ -224,6 +301,8 @@ export class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvider {
   private readonly keepAlive: string | undefined;
   private readonly requestTimeoutMs: number;
   private readonly fetchFn: typeof fetch;
+  private readonly documentPrefix: string | undefined;
+  private readonly queryPrefix: string | undefined;
 
   constructor(options: OllamaEmbeddingsProviderOptions = {}) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_OLLAMA_BASE_URL);
@@ -234,6 +313,8 @@ export class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvider {
     this.keepAlive = options.keepAlive;
     this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_OLLAMA_REQUEST_TIMEOUT_MS;
     this.fetchFn = options.fetchFn ?? fetch;
+    this.documentPrefix = options.documentPrefix;
+    this.queryPrefix = options.queryPrefix;
 
     if (this.model.trim().length === 0) {
       throw new Error(`${ERROR_PREFIX} model name must not be empty.`);
@@ -289,7 +370,12 @@ export class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvider {
         throw new Error(`${ERROR_PREFIX} embed input text must be a string.`);
       }
 
-      return input.text.slice(0, this.maxInputChars);
+      const prefixed = applyInputTypePrefix(input.text, input.inputType, {
+        documentPrefix: this.documentPrefix,
+        queryPrefix: this.queryPrefix,
+      });
+
+      return prefixed.slice(0, this.maxInputChars);
     });
     const response = await this.requestEmbeddings(texts);
     const embeddings = validateOllamaEmbeddingResponse(response, inputs.length, this.dimensions);
@@ -358,6 +444,8 @@ export class OpenAIEmbeddingsProvider implements SemanticEmbeddingsProvider {
   private readonly organization: string | undefined;
   private readonly project: string | undefined;
   private readonly fetchFn: typeof fetch;
+  private readonly documentPrefix: string | undefined;
+  private readonly queryPrefix: string | undefined;
 
   constructor(options: OpenAIEmbeddingsProviderOptions = {}) {
     this.apiKey = (options.apiKey ?? "").trim();
@@ -369,6 +457,8 @@ export class OpenAIEmbeddingsProvider implements SemanticEmbeddingsProvider {
     this.organization = normalizeOptionalHeaderValue(options.organization);
     this.project = normalizeOptionalHeaderValue(options.project);
     this.fetchFn = options.fetchFn ?? fetch;
+    this.documentPrefix = options.documentPrefix;
+    this.queryPrefix = options.queryPrefix;
 
     if (this.apiKey.length === 0) {
       throw new Error(`${ERROR_PREFIX} openai apiKey is required.`);
@@ -428,7 +518,12 @@ export class OpenAIEmbeddingsProvider implements SemanticEmbeddingsProvider {
         throw new Error(`${ERROR_PREFIX} embed input text must be a string.`);
       }
 
-      return input.text.slice(0, this.maxInputChars);
+      const prefixed = applyInputTypePrefix(input.text, input.inputType, {
+        documentPrefix: this.documentPrefix,
+        queryPrefix: this.queryPrefix,
+      });
+
+      return prefixed.slice(0, this.maxInputChars);
     });
 
     const response = await this.requestEmbeddings(texts);
@@ -537,12 +632,15 @@ export function semanticToEmbeddingProvider(
     name: modelInfo.provider,
     dimensions: modelInfo.dimensions,
     modelInfo,
-    async embedTexts(texts: string[]): Promise<EmbeddingVector[]> {
+    async embedTexts(
+      texts: string[],
+      inputType?: EmbeddingInputType
+    ): Promise<EmbeddingVector[]> {
       if (!Array.isArray(texts)) {
         throw new Error(`${ERROR_PREFIX} embedTexts expects an array of strings.`);
       }
 
-      const results = await provider.embedMany(texts.map((text) => ({ text })));
+      const results = await provider.embedMany(texts.map((text) => ({ text, inputType })));
 
       return results.map((result) => result.vector);
     },
@@ -577,7 +675,7 @@ export function embeddingProviderToSemantic(
         throw new Error(`${ERROR_PREFIX} embed input text must be a string.`);
       }
 
-      const embeddings = await provider.embedTexts([input.text]);
+      const embeddings = await provider.embedTexts([input.text], input.inputType);
       const [vector] = embeddings;
 
       if (!Array.isArray(vector) || vector.length !== resolvedModelInfo.dimensions) {
@@ -599,7 +697,14 @@ export function embeddingProviderToSemantic(
         throw new Error(`${ERROR_PREFIX} embedMany inputs must be an array.`);
       }
 
-      const vectors = await provider.embedTexts(inputs.map((input) => input.text));
+      const firstInputType = inputs[0]?.inputType;
+      const sharedInputType = inputs.every((input) => input.inputType === firstInputType)
+        ? firstInputType
+        : undefined;
+      const vectors = await provider.embedTexts(
+        inputs.map((input) => input.text),
+        sharedInputType
+      );
 
       validateEmbeddings(vectors, inputs.length, {
         name: provider.name,
@@ -955,6 +1060,27 @@ function hashString(value: string): number {
   }
 
   return hash >>> 0;
+}
+
+/**
+ * Book cap. 12: apply the model's declared document/query prefix, when one
+ * is configured for the given `inputType`. Absent config or inputType is a
+ * no-op, so providers with symmetric models are unaffected.
+ */
+function applyInputTypePrefix(
+  text: string,
+  inputType: EmbeddingInputType | undefined,
+  prefixes: { documentPrefix?: string; queryPrefix?: string }
+): string {
+  if (inputType === "document" && prefixes.documentPrefix) {
+    return `${prefixes.documentPrefix}${text}`;
+  }
+
+  if (inputType === "query" && prefixes.queryPrefix) {
+    return `${prefixes.queryPrefix}${text}`;
+  }
+
+  return text;
 }
 
 function normalizeBaseUrl(baseUrl: string): string {

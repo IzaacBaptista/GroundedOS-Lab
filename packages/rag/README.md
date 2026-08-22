@@ -135,6 +135,37 @@ const ollamaProvider = semanticToEmbeddingProvider(
 const semanticChunks = await embedChunks(chunks, ollamaProvider);
 ```
 
+### Document vs query prefixes, and Matryoshka truncation (book cap. 12)
+
+Some models are trained asymmetrically and expect a different
+prefix/instruction depending on whether the text being embedded is a
+document to index or a query to search with — `embeddinggemma` (this
+package's default Ollama model) is one of them. Ignoring this for a model
+that expects it is a silent quality regression: the call succeeds, retrieval
+just gets worse with no error.
+
+`embedChunks()` always embeds with `inputType: "document"`; `retrieveFromIndex()`
+always embeds the query with `inputType: "query"`. `OllamaEmbeddingsProvider`
+and `OpenAIEmbeddingsProvider` accept `documentPrefix`/`queryPrefix` options
+that get prepended to the text for the matching `inputType` — unset by
+default, so behavior is unchanged unless you configure a prefix:
+
+```ts
+const ollamaProvider = new OllamaEmbeddingsProvider({
+  model: "embeddinggemma",
+  documentPrefix: "title: none | text: ",
+  queryPrefix: "task: search result | query: ",
+});
+```
+
+`truncateEmbedding(vector, targetDimensions)` and
+`truncateEmbeddedChunk(chunk, targetDimensions)` implement Matryoshka
+truncation: a Matryoshka-trained model's first N dimensions already
+concentrate most of the semantic signal, so a full vector (or an
+already-embedded chunk) can be truncated to a smaller size on demand —
+trading quality for storage/compute cost — without re-embedding or
+reindexing from scratch.
+
 The in-memory vector store supports insert, similarity search, `topK`
 limits and filtering over flat chunk metadata such as `documentId`,
 `sectionId`, `modality`, `page`, `sourceType`, `originalFilename` and
@@ -248,8 +279,11 @@ The end-to-end internals guide is documented in
 | `SemanticEmbeddingsProvider` | Higher-level embedding provider contract with model metadata |
 | `EmbeddingModelInfo` | Provider/model/dimension/similarity-metric metadata for compatibility and Dev Mode output |
 | `SimilarityMetric` | `"cosine" \| "dotProduct" \| "euclidean"` — which metric a model's vectors were trained to be compared with |
+| `EmbeddingInputType` | `"document" \| "query"` — which side of asymmetric embedding a text is |
+| `truncateEmbedding(vector, targetDimensions)` | Matryoshka truncation of a raw embedding vector |
+| `truncateEmbeddedChunk(chunk, targetDimensions)` | Matryoshka truncation of an `EmbeddedChunk`, keeping `embeddingMetadata.dimensions` consistent |
 | `LocalHashEmbeddingsProvider` | Local deterministic token/ngram hashing provider |
-| `OllamaEmbeddingsProvider` | Opt-in local semantic embedding provider using Ollama `/api/embed` |
+| `OllamaEmbeddingsProvider` | Opt-in local semantic embedding provider using Ollama `/api/embed`; supports `documentPrefix`/`queryPrefix` for asymmetric models |
 | `semanticToEmbeddingProvider(provider)` | Adapt a semantic provider to the existing retrieval pipeline |
 | `embeddingProviderToSemantic(provider, modelInfo?)` | Wrap a legacy provider with the semantic provider contract |
 | `createEmbeddingProviderRegistry(providers?)` | Create a small provider registry for semantic providers |

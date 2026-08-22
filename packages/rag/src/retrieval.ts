@@ -908,7 +908,7 @@ async function embedQuery(
   query: string,
   provider: EmbeddingProvider
 ): Promise<EmbeddingVector> {
-  const embeddings = await provider.embedTexts([query]);
+  const embeddings = await provider.embedTexts([query], "query");
 
   if (!Array.isArray(embeddings) || embeddings.length !== 1) {
     throw new Error(`${ERROR_PREFIX} provider must return exactly one query embedding.`);

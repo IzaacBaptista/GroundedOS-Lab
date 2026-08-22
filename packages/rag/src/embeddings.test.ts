@@ -9,6 +9,9 @@ import {
   createEmbeddingProviderRegistry,
   embedChunks,
   semanticToEmbeddingProvider,
+  truncateEmbedding,
+  truncateEmbeddedChunk,
+  type EmbeddingInputType,
   type EmbeddingProvider,
   type EmbeddingProviderId,
   type EmbeddingVector,
@@ -179,6 +182,28 @@ describe("OllamaEmbeddingsProvider", () => {
         normalized: true,
       },
     });
+  });
+
+  it("applies the configured document/query prefix based on inputType (book cap. 12)", async () => {
+    const requests: Array<{ body: Record<string, unknown> }> = [];
+    const provider = new OllamaEmbeddingsProvider({
+      dimensions: 3,
+      documentPrefix: "title: none | text: ",
+      queryPrefix: "task: search result | query: ",
+      fetchFn: async (_url, init) => {
+        requests.push({ body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+
+        return createJsonResponse({ embeddings: [[1, 0, 0]] });
+      },
+    });
+
+    await provider.embedOne({ text: "how to cancel a plan", inputType: "query" });
+    await provider.embedOne({ text: "Cancellation policy details.", inputType: "document" });
+    await provider.embedOne({ text: "no input type given" });
+
+    expect(requests[0]?.body.input).toEqual(["task: search result | query: how to cancel a plan"]);
+    expect(requests[1]?.body.input).toEqual(["title: none | text: Cancellation policy details."]);
+    expect(requests[2]?.body.input).toEqual(["no input type given"]);
   });
 
   it("rejects Ollama HTTP errors with a clear message", async () => {
@@ -382,6 +407,22 @@ describe("embedChunks", () => {
     expect(embedded[0]?.embeddingMetadata.similarityMetric).toBe("cosine");
   });
 
+  it("embeds chunks with inputType 'document' (book cap. 12)", async () => {
+    const seenInputTypes: Array<EmbeddingInputType | undefined> = [];
+    const provider: EmbeddingProvider = {
+      name: "spy",
+      dimensions: 2,
+      async embedTexts(texts, inputType) {
+        seenInputTypes.push(inputType);
+        return texts.map(() => [1, 0]);
+      },
+    };
+
+    await embedChunks([createChunk()], provider);
+
+    expect(seenInputTypes).toEqual(["document"]);
+  });
+
   it("returns an empty result for an empty chunk list", async () => {
     const embedded = await embedChunks(
       [],
@@ -467,6 +508,40 @@ function cosineSimilarity(left: EmbeddingVector, right: EmbeddingVector): number
 
   return dotProduct / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude));
 }
+
+describe("truncateEmbedding (book cap. 12, Matryoshka embeddings)", () => {
+  it("slices a vector down to the requested dimensionality", () => {
+    expect(truncateEmbedding([1, 2, 3, 4, 5, 6], 3)).toEqual([1, 2, 3]);
+  });
+
+  it("rejects a target larger than the source vector", () => {
+    expect(() => truncateEmbedding([1, 2], 4)).toThrow(/exceeds the vector's 2 dimensions/);
+  });
+
+  it("rejects a non-positive target dimensionality", () => {
+    expect(() => truncateEmbedding([1, 2, 3], 0)).toThrow(/positive integer/);
+  });
+});
+
+describe("truncateEmbeddedChunk", () => {
+  it("truncates the embedding and updates embeddingMetadata.dimensions to match", async () => {
+    const [embedded] = await embedChunks(
+      [createChunk()],
+      new DeterministicEmbeddingProvider({ dimensions: 8 })
+    );
+
+    const truncated = truncateEmbeddedChunk(embedded!, 4);
+
+    expect(truncated.embedding).toHaveLength(4);
+    expect(truncated.embedding).toEqual(embedded!.embedding.slice(0, 4));
+    expect(truncated.embeddingMetadata).toMatchObject({
+      ...embedded!.embeddingMetadata,
+      dimensions: 4,
+    });
+    // Original is untouched.
+    expect(embedded!.embedding).toHaveLength(8);
+  });
+});
 
 function createJsonResponse(body: unknown): Response {
   return {

@@ -462,4 +462,27 @@ describe("retrieval flow", () => {
       "[rag/retrieval] retrieval results must be an array."
     );
   });
+
+  it("embeds the query with inputType 'query', distinct from chunk indexing (book cap. 12)", async () => {
+    const seenInputTypes: string[] = [];
+    const spyProvider: EmbeddingProvider = {
+      name: "spy",
+      dimensions: 2,
+      async embedTexts(texts, inputType) {
+        seenInputTypes.push(inputType ?? "undefined");
+        return texts.map(() => [1, 0]);
+      },
+    };
+
+    const document = await ingest({
+      type: "text",
+      content: "Alpha note about vector search.",
+      metadata: { documentId: "doc-input-type" },
+    });
+    const index = await buildRetrievalIndex(document, { embeddingProvider: spyProvider });
+
+    await retrieveFromIndex(index, "what does this say?", { topK: 1 });
+
+    expect(seenInputTypes).toEqual(["document", "query"]);
+  });
 });
