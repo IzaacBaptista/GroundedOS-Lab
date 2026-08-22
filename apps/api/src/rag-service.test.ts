@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "fs/promises";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiRequestError,
@@ -116,6 +116,61 @@ describe("askRag", () => {
     });
     expect(output.devMode.replay?.snapshot.query).toBe("What explains vector search?");
     expect(output.devMode.replay?.command).toContain("npm run rag:replay");
+  });
+
+  describe("LLM generation (GROUNDEDOS_ENABLE_LLM_GENERATION)", () => {
+    const originalFetch = globalThis.fetch;
+    const originalFlag = process.env.GROUNDEDOS_ENABLE_LLM_GENERATION;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+      if (originalFlag === undefined) {
+        delete process.env.GROUNDEDOS_ENABLE_LLM_GENERATION;
+      } else {
+        process.env.GROUNDEDOS_ENABLE_LLM_GENERATION = originalFlag;
+      }
+    });
+
+    it("uses the real LLM answer when generation is enabled and Ollama responds", async () => {
+      process.env.GROUNDEDOS_ENABLE_LLM_GENERATION = "true";
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { content: "Vector search finds semantically similar chunks [chunk-1]." },
+        }),
+      }) as unknown as typeof fetch;
+
+      const output = await askRag(
+        makeRagTestCase({
+          title: "Generation Enabled Test",
+          documentId: "api-test-doc-gen",
+        })
+      );
+
+      expect(output.answer.grounded).toBe(true);
+      expect(output.answer.text).toBe(
+        "Vector search finds semantically similar chunks [chunk-1]."
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "http://localhost:11434/api/chat",
+        expect.any(Object)
+      );
+    });
+
+    it("falls back to the extractive answer when generation is enabled but Ollama is unreachable", async () => {
+      process.env.GROUNDEDOS_ENABLE_LLM_GENERATION = "true";
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")) as unknown as typeof fetch;
+
+      const output = await askRag(
+        makeRagTestCase({
+          title: "Generation Unreachable Test",
+          documentId: "api-test-doc-gen-fallback",
+        })
+      );
+
+      expect(output.answer.grounded).toBe(true);
+      expect(output.answer.text).toContain("Based on the top retrieved chunk:");
+    });
   });
 
   it("returns a semantic cache hit on repeated equivalent requests", async () => {

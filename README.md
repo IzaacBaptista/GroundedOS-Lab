@@ -51,6 +51,10 @@
 - **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
 - **Index management** API: list, delete persisted indexes
 - Phase 1 is **complete**. Baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json`.
+- **Real LLM generation (opt-in)**: set `GROUNDEDOS_ENABLE_LLM_GENERATION=true` to have `/rag/ask` call Ollama chat
+  (`GROUNDEDOS_OLLAMA_CHAT_MODEL`, default `llama3.2`) with a grounded prompt built from the retrieved chunks,
+  instead of returning the extractive top-chunk template. `GROUNDEDOS_LLM_TEMPERATURE` / `GROUNDEDOS_LLM_TOP_P`
+  control decoding. Falls back to the extractive answer automatically if generation fails or Ollama is unreachable.
 
 ### Phase 2 / 2b — Retrieval Quality + Memory ✅ Complete
 

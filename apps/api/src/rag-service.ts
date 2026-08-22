@@ -32,6 +32,7 @@ import {
   InMemoryVectorStore,
   isVectorDualWriteEnabled,
   LocalHashEmbeddingsProvider,
+  OllamaChatProvider,
   OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   QdrantVectorStore,
@@ -43,6 +44,7 @@ import {
   type EmbeddingProvider,
   type EmbeddingProviderId,
   type EmbeddingVector,
+  type GenerationProvider,
   type RetrievalIndex,
   type RetrievalDevModeOutput,
   type VectorStore,
@@ -643,6 +645,12 @@ export type RagSessionMemoryResponse = {
 export type GroundedAnswer = {
   grounded: boolean;
   text: string;
+  /**
+   * How `text` was produced. `"llm"` when a real generation provider
+   * answered the query; `"extractive"` for the top-chunk fallback. Used to
+   * skip the simulated multi-model orchestration overlay on real answers.
+   */
+  generationSource?: "llm" | "extractive";
   citations: Array<{
     chunkId: string;
     documentId: string;
@@ -1976,7 +1984,7 @@ async function runLocalRag(
           throw new ApiRequestError("RAG workflow retrieval output is missing.", 500);
         }
 
-        const answer = input.answer ?? createGroundedAnswer(input.devMode);
+        const answer = input.answer ?? (await createGroundedAnswer(input.devMode, input.rawQuery));
 
         if (!input.sessionId && !input.cacheHit && input.queryEmbedding) {
           const indexSummary = input.indexSummary ?? createIndexSummary(input.index!);
@@ -2002,7 +2010,7 @@ async function runLocalRag(
           question: input.rawQuery,
           retrievedContext: input.devMode.results.map((item) => item.text).join(" "),
           config: {
-            enabled: options?.useMultiModelOrchestration ?? true,
+            enabled: answer.generationSource !== "llm" && (options?.useMultiModelOrchestration ?? true),
             verifyGrounding: true,
             draftModel: "local-extractive",
             refineModel: input.routingDecision?.selectedModel ?? "groq",
@@ -2154,7 +2162,9 @@ async function runLocalRag(
 
   const cacheMetrics = semanticCache.getMetrics();
   const resolvedIndexSummary = result.output!.indexSummary ?? createIndexSummary(result.output!.index!);
-  const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
+  const finalAnswer =
+    result.output!.answer ??
+    (await createGroundedAnswer(result.output!.devMode!, result.output!.rawQuery));
   const rerankingCandidates = getRerankingCandidates(result.output!.devMode!);
   const reliability = await buildReliabilityAugmentation({
     query,
@@ -2657,7 +2667,7 @@ async function runPersistedRag(
           throw new ApiRequestError("Persisted RAG workflow retrieval output is missing.", 500);
         }
 
-        const answer = input.answer ?? createGroundedAnswer(input.devMode);
+        const answer = input.answer ?? (await createGroundedAnswer(input.devMode, input.rawQuery));
 
         if (!input.sessionId && !input.cacheHit && input.queryEmbedding) {
           const indexSummary = input.indexSummary ?? createIndexSummary(input.index);
@@ -2683,7 +2693,7 @@ async function runPersistedRag(
           question: input.rawQuery,
           retrievedContext: input.devMode.results.map((item) => item.text).join(" "),
           config: {
-            enabled: options?.useMultiModelOrchestration ?? true,
+            enabled: answer.generationSource !== "llm" && (options?.useMultiModelOrchestration ?? true),
             verifyGrounding: true,
             draftModel: "local-extractive",
             refineModel: input.routingDecision?.selectedModel ?? "groq",
@@ -2834,7 +2844,9 @@ async function runPersistedRag(
 
   const cacheMetrics = semanticCache.getMetrics();
   const indexSummary = result.output!.indexSummary ?? createIndexSummary(index);
-  const finalAnswer = result.output!.answer ?? createGroundedAnswer(result.output!.devMode!);
+  const finalAnswer =
+    result.output!.answer ??
+    (await createGroundedAnswer(result.output!.devMode!, result.output!.rawQuery));
   const rerankingCandidates = getRerankingCandidates(result.output!.devMode!);
   const reliability = await buildReliabilityAugmentation({
     query,
@@ -3853,7 +3865,54 @@ function inferModality(filePath: string): SupportedApiModality {
   return "text";
 }
 
-function createGroundedAnswer(devMode: RetrievalDevModeOutput): GroundedAnswer {
+const DEFAULT_OLLAMA_CHAT_MODEL = "llama3.2";
+const DEFAULT_GENERATION_CHUNK_COUNT = 3;
+
+/**
+ * Resolves the LLM generation provider from environment configuration.
+ *
+ * Real generation is opt-in (`GROUNDEDOS_ENABLE_LLM_GENERATION=true`) so the
+ * default extractive behavior — and the large existing test suite asserting
+ * it — stays unchanged unless a caller explicitly enables it.
+ */
+function isRealGenerationEnabled(): boolean {
+  return process.env.GROUNDEDOS_ENABLE_LLM_GENERATION === "true";
+}
+
+function resolveGenerationProvider(): GenerationProvider | undefined {
+  if (!isRealGenerationEnabled()) {
+    return undefined;
+  }
+
+  return new OllamaChatProvider({
+    baseUrl: process.env.GROUNDEDOS_OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL,
+    model: process.env.GROUNDEDOS_OLLAMA_CHAT_MODEL ?? DEFAULT_OLLAMA_CHAT_MODEL,
+    temperature: parseOptionalFloat(process.env.GROUNDEDOS_LLM_TEMPERATURE),
+    topP: parseOptionalFloat(process.env.GROUNDEDOS_LLM_TOP_P),
+  });
+}
+
+function parseOptionalFloat(rawValue: string | undefined): number | undefined {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * Builds the grounded answer for a query. When a generation provider is
+ * available, calls it with the top retrieved chunks and falls back to the
+ * extractive template (book cap. 105 "RAG mínimo" baseline) if generation is
+ * disabled, misconfigured, or fails for any reason — retrieval quality must
+ * never be blocked by a generation outage.
+ */
+async function createGroundedAnswer(
+  devMode: RetrievalDevModeOutput,
+  rawQuery?: string,
+  provider: GenerationProvider | undefined = resolveGenerationProvider()
+): Promise<GroundedAnswer> {
   const topResult = devMode.results[0];
 
   if (!topResult) {
@@ -3864,19 +3923,38 @@ function createGroundedAnswer(devMode: RetrievalDevModeOutput): GroundedAnswer {
     };
   }
 
+  const citations = [
+    {
+      chunkId: topResult.chunkId,
+      documentId: topResult.documentId,
+      sectionId: topResult.sectionId,
+      score: topResult.score,
+      source: topResult.source,
+      offsets: topResult.offsets,
+    },
+  ];
+
+  if (provider && rawQuery) {
+    try {
+      const chunks = devMode.results.slice(0, DEFAULT_GENERATION_CHUNK_COUNT).map((result) => ({
+        chunkId: result.chunkId,
+        text: result.text,
+      }));
+      const generated = await provider.generate({ query: rawQuery, chunks });
+
+      return { grounded: true, text: generated.text, generationSource: "llm", citations };
+    } catch {
+      // Generation failed (provider unavailable, timeout, bad response) —
+      // fall through to the extractive answer below instead of erroring the
+      // whole request.
+    }
+  }
+
   return {
     grounded: true,
     text: `Based on the top retrieved chunk: ${topResult.text}`,
-    citations: [
-      {
-        chunkId: topResult.chunkId,
-        documentId: topResult.documentId,
-        sectionId: topResult.sectionId,
-        score: topResult.score,
-        source: topResult.source,
-        offsets: topResult.offsets,
-      },
-    ],
+    generationSource: "extractive",
+    citations,
   };
 }
 

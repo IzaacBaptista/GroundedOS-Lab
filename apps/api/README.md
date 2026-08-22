@@ -357,6 +357,31 @@ Optional environment variables:
 For a full install and verification tutorial, see
 [`docs/ollama-setup.md`](../../docs/ollama-setup.md).
 
+### Ollama generation (opt-in, real LLM answers)
+
+By default `/rag/ask` returns an **extractive** answer (the top retrieved
+chunk verbatim). Set `GROUNDEDOS_ENABLE_LLM_GENERATION=true` to have it call
+a local Ollama model instead, with a prompt that restricts the model to the
+retrieved chunks and asks it to cite chunk ids:
+
+```bash
+ollama pull llama3.2
+```
+
+Optional environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `GROUNDEDOS_ENABLE_LLM_GENERATION` | unset (extractive) | Set to `"true"` to enable real generation |
+| `GROUNDEDOS_OLLAMA_CHAT_MODEL` | `llama3.2` | Chat model used for generation |
+| `GROUNDEDOS_LLM_TEMPERATURE` | `0.2` | Decoding temperature |
+| `GROUNDEDOS_LLM_TOP_P` | `0.9` | Nucleus sampling top-p |
+| `GROUNDEDOS_OLLAMA_BASE_URL` | `http://localhost:11434` | Shared with Ollama embeddings |
+
+If generation is enabled but the Ollama server is unreachable or errors, the
+request falls back to the extractive answer automatically rather than
+failing. See [`packages/rag/src/generation.ts`](../../packages/rag/src/generation.ts).
+
 ### OpenAI embeddings
 
 `embeddingProvider: "openai"` uses OpenAI embeddings via `POST /v1/embeddings`.
@@ -433,7 +458,9 @@ pairs and timestamps.
 
 - Multipart uploads are limited to one file and 5 MB.
 - Persisted indexes are local JSON files under `.groundedos/indexes/`.
-- The answer is extractive and based on the top retrieved chunk.
+- The answer is extractive (top retrieved chunk) by default. Real LLM generation via
+  Ollama is available opt-in (`GROUNDEDOS_ENABLE_LLM_GENERATION=true`); it falls back
+  to the extractive answer if generation fails.
 - Retrieval uses `"api-lexical"` by default. `"local-hash"` is available as an
   opt-in deterministic token/ngram hashing provider.
 - `"ollama"` is available as an opt-in local semantic embedding provider, but it

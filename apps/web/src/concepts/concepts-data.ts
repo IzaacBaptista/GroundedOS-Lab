@@ -1543,7 +1543,7 @@ export const CONCEPTS: Concept[] = [
     id: "temperature-top-p-top-k",
     title: "Temperature / Top-P / Top-K",
     category: "Generation Control",
-    status: "planned",
+    status: "partial",
     shortDefinition:
       "Generation parameters control the randomness and diversity of LLM outputs: temperature adjusts probability distribution, top-P filters by cumulative probability, top-K limits to top-K tokens.",
     explanation:
@@ -1556,17 +1556,17 @@ export const CONCEPTS: Concept[] = [
       "Study the effects of each parameter on output.",
     ],
     howToPracticeInProject: [
-      "Future: web UI will expose generation parameter controls.",
+      "Set GROUNDEDOS_LLM_TEMPERATURE / GROUNDEDOS_LLM_TOP_P env vars and re-run /rag/ask with generation enabled.",
       "Compare outputs with temperature=0 vs 0.9.",
-      "Observe diversity changes with top-p and top-k.",
+      "Future: web UI will expose these as request-time controls instead of env vars.",
     ],
     appliedInGroundedOS: [
-      "API accepts temperature parameter (planned).",
-      "Model providers (Groq, OpenAI) support these controls.",
+      "OllamaChatProvider (packages/rag/src/generation.ts) accepts temperature/topP per request and defaults from env vars.",
+      "Only wired for the Ollama generation path today; cloud providers (Groq, OpenAI) are not yet connected to real generation.",
       "Future: benchmarks will test temperature effects on RAG quality.",
     ],
     visibleInCurrentData: [
-      "Not yet. Will appear in provider settings (future).",
+      "Not in the web UI yet — configured via GROUNDEDOS_LLM_TEMPERATURE / GROUNDEDOS_LLM_TOP_P env vars.",
     ],
     whereToSeeInUI: ["Model settings (future)", "Benchmarks (future)"],
     suggestedExperiments: [

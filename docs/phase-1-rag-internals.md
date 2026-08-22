@@ -8,6 +8,12 @@ Use [`phase-1-local-rag.md`](./phase-1-local-rag.md) when you want commands.
 Use this guide when you want to understand where the behavior lives and why the
 current implementation behaves the way it does.
 
+> **Update:** real LLM generation now exists (opt-in), superseding the
+> "extractive only" description below for callers that enable it. See
+> [`packages/rag/src/generation.ts`](../packages/rag/src/generation.ts) and
+> `GROUNDEDOS_ENABLE_LLM_GENERATION` in the README. This document otherwise
+> still describes the Phase 1 default (extractive) baseline.
+
 ## Mental Model
 
 Think of Phase 1 as a deterministic pipeline:

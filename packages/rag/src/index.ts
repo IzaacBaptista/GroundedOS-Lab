@@ -116,6 +116,18 @@ export {
   detectIntent,
 } from "./query-understanding";
 
+// Grounded generation — turns retrieved evidence into an actual LLM answer
+export {
+  buildGroundedPrompt,
+  OllamaChatProvider,
+  type GenerationChunk,
+  type GenerationProvider,
+  type GenerationRequest,
+  type GenerationResult,
+  type GroundedPrompt,
+  type OllamaChatProviderOptions,
+} from "./generation";
+
 // Semantic Cache (Phase 2 — Concept 4)
 export {
   SemanticCache,

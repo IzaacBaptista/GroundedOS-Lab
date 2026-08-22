@@ -203,3 +203,6 @@ The end-to-end internals guide is documented in
 | `expandQuery(text)` | Generate lexical variants for retrieval recall |
 | `detectIntent(text)` | Classify query intent into a stable contract |
 | `SemanticCache` | In-memory semantic cache keyed by document scope and query embedding similarity |
+| `buildGroundedPrompt(request)` | Build a system/user prompt that restricts the model to the given chunks and asks it to cite chunk ids |
+| `OllamaChatProvider` | Opt-in real LLM generation provider using Ollama `/api/chat`; turns retrieved evidence into an actual grounded answer |
+| `GenerationProvider` | Interface for chat/completion providers consumed by grounded generation |

@@ -64,3 +64,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-014](./ADR-014-authentication-strategy.md) | Authentication strategy: JWT + session cookies with resource scoping | Accepted |
 | [ADR-015](./ADR-015-multi-agent-orchestration-strategy.md) | Multi-agent orchestration strategy | Accepted |
 | [ADR-016](./ADR-016-test-impact-analysis.md) | Test Impact Analysis: diff-based test selection via Vitest --changed | Proposed |
+| [ADR-017](./ADR-017-real-llm-generation.md) | Real LLM generation for /rag/ask: opt-in Ollama chat with extractive fallback | Accepted |
