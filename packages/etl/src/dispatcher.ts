@@ -13,7 +13,9 @@
 import type { Extractor, IngestionInput, NormalizedDocument } from "@groundedos/core";
 
 import { AudioExtractor } from "./extractors/audio";
+import { HtmlExtractor } from "./extractors/html";
 import { ImageExtractor } from "./extractors/image";
+import { MarkdownExtractor } from "./extractors/markdown";
 import { PdfExtractor } from "./extractors/pdf";
 import { TextExtractor } from "./extractors/text";
 
@@ -26,6 +28,8 @@ import { TextExtractor } from "./extractors/text";
  */
 const EXTRACTOR_REGISTRY: Extractor[] = [
   new TextExtractor(),
+  new MarkdownExtractor(),
+  new HtmlExtractor(),
   new PdfExtractor(),
   new ImageExtractor(),
   new AudioExtractor(),

@@ -114,8 +114,8 @@ from `packages/etl/src/index.ts` for convenience.
 | `image` | `ImageExtractor` | ✅ Baseline | OCR + image description via provider abstraction (mock/local/cloud adapters) |
 | `audio` | `AudioExtractor` | ✅ Baseline | Transcription via provider abstraction (mock/local/cloud adapters) |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
-| `markdown` | — | 🔲 Planned | Heading-aware section splitting |
-| `html` | — | 🔲 Planned | Tag-aware content extraction |
+| `markdown` | `MarkdownExtractor` | ✅ Complete | Heading-aware section splitting (ATX `#`..`######`) |
+| `html` | `HtmlExtractor` | ✅ Baseline | Regex-based tag stripping; drops `<script>`/`<style>`; no table/structure extraction yet |
 
 ### Adding a new extractor
 

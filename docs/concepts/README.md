@@ -86,6 +86,7 @@ Some concepts appear in more than one track. The table below lists the primary l
 | [ab-testing.md](./ab-testing.md) | A/B Testing | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
 | [benchmarking.md](./benchmarking.md) | Benchmarking | Track 4 - Evaluation & Comparison | Phase 4 - Lab |
 | [rag.md](./rag.md) | RAG | Track 5 - Advanced RAG | Phase 1 - Core RAG |
+| [rag-architectures.md](./rag-architectures.md) | RAG Architectures (Naive/Advanced/Modular/Agentic) | Track 5 - Advanced RAG | Cross-cutting (Phase 1 → 3) |
 | [embeddings.md](./embeddings.md) | Embeddings | Track 5 - Advanced RAG | Phase 1 - Core RAG |
 | [chunking.md](./chunking.md) | Chunking | Track 5 - Advanced RAG | Phase 1 - Core RAG |
 | [vector-database.md](./vector-database.md) | Vector Database | Track 5 - Advanced RAG | Phase 1 - Core RAG |
