@@ -64,7 +64,31 @@ Key fields:
 | `content.fullText` | `string` | Full extracted plain text |
 | `content.sections` | `DocumentSection[]` | Structured sections |
 | `lineage` | object | Extractor, version, checksum, timestamp |
-| `metadata` | `Record<string, unknown>` | Arbitrary domain-specific fields |
+| `metadata` | `NormalizedDocumentMetadata` | Enrichment fields (below) + arbitrary domain-specific fields |
+
+#### `NormalizedDocumentMetadata` (book cap. 9 — Metadata enrichment)
+
+Recognized enrichment fields, grouped as the book presents them. `packages/rag`'s
+`chunkDocument()` copies all of these onto every chunk's metadata, and
+`InMemoryVectorStore.search({ filter })` can filter on them *before* ranking —
+the book's core point that metadata (especially `permissions`/`tenantId`)
+must gate retrieval, not just decorate results after the fact.
+
+| Category | Field | Type | Notes |
+|---|---|---|---|
+| Provenance | `author` | `string?` | Document author, when known |
+| Provenance | `timestamp` | `string?` | ISO-8601 authored/updated time |
+| Identity | *(document_id, section)* | — | Already modeled as `NormalizedDocument.documentId` / `DocumentSection.id` |
+| Access | `permissions` | `string[]?` | Roles/groups allowed to see this doc. **Unset or empty means public** — filters match it regardless of the requested role |
+| Access | `tenantId` | `string?` | Owning tenant/workspace, for filtering within a shared index |
+| Organization | `tags` | `string[]?` | Free-form tags; a `tags` filter matches chunks whose tag array includes the requested value (or that have no tags at all) |
+| Organization | `relationships` | `DocumentRelationship[]?` | Links to related documents (`{ documentId, type? }`) |
+
+`SourceDocument.workspaceId` and the API's tenant/user ownership scoping
+(`apps/api/src/rag-index-store.ts`) remain the primary tenant isolation
+mechanism — each tenant gets a physically separate index. `tenantId` on chunk
+metadata is a second, finer-grained filter for a future shared-index design;
+it is not yet wired into any API request path.
 
 ## Usage
 

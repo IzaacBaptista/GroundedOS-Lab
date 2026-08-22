@@ -1,4 +1,8 @@
-import type { DocumentModality, NormalizedDocument } from "@groundedos/core";
+import type {
+  DocumentModality,
+  DocumentRelationship,
+  NormalizedDocument,
+} from "@groundedos/core";
 
 const ERROR_PREFIX = "[rag/chunking]";
 const DEFAULT_MAX_CHUNK_CHARS = 800;
@@ -52,6 +56,17 @@ export interface RetrievalChunkMetadata {
   chunkIndex: number;
   sectionChunkIndex: number;
   offsetBasis: ChunkOffsetBasis;
+  /**
+   * Cap. 9 enrichment metadata, carried over from `document.metadata` so it
+   * can be used as a pre-retrieval filter (e.g. `permissions`/`tenantId`)
+   * rather than passive annotation.
+   */
+  author?: string;
+  timestamp?: string;
+  tags?: string[];
+  permissions?: string[];
+  tenantId?: string;
+  relationships?: DocumentRelationship[];
 }
 
 export interface RetrievalChunk {
@@ -110,6 +125,14 @@ export function chunkDocument(
           chunkIndex,
           sectionChunkIndex,
           offsetBasis,
+          author: document.metadata.author as string | undefined,
+          timestamp: document.metadata.timestamp as string | undefined,
+          tags: document.metadata.tags as string[] | undefined,
+          permissions: document.metadata.permissions as string[] | undefined,
+          tenantId: document.metadata.tenantId as string | undefined,
+          relationships: document.metadata.relationships as
+            | DocumentRelationship[]
+            | undefined,
         },
       });
     }

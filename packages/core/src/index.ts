@@ -11,6 +11,8 @@ export type {
   DocumentModality,
   DocumentStatus,
   DocumentSection,
+  DocumentRelationship,
+  NormalizedDocumentMetadata,
   SourceDocument,
   NormalizedDocument,
 } from "./types/document";
@@ -60,6 +62,8 @@ export {
 
 export {
   NormalizedDocumentSchema,
+  NormalizedDocumentMetadataSchema,
+  DocumentRelationshipSchema,
   RetrievalChunkSchema,
   EmbeddedChunkSchema,
   VectorSearchResultSchema,

@@ -44,6 +44,22 @@ export const DocumentSectionSchema = z.object({
   endOffset: z.number().int().nonnegative().optional(),
 });
 
+export const DocumentRelationshipSchema = z.object({
+  documentId: z.string().min(1),
+  type: z.string().optional(),
+});
+
+export const NormalizedDocumentMetadataSchema = z
+  .object({
+    author: z.string().optional(),
+    timestamp: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    permissions: z.array(z.string()).optional(),
+    tenantId: z.string().optional(),
+    relationships: z.array(DocumentRelationshipSchema).optional(),
+  })
+  .catchall(z.unknown());
+
 export const NormalizedDocumentSchema = z.object({
   documentId: z.string().min(1),
   title: z.string().min(1),
@@ -62,7 +78,7 @@ export const NormalizedDocumentSchema = z.object({
     extractor: z.string().min(1),
     extractorVersion: z.string().optional(),
   }),
-  metadata: z.record(z.string(), z.unknown()),
+  metadata: NormalizedDocumentMetadataSchema,
 });
 
 // ---------------------------------------------------------------------------
@@ -79,6 +95,12 @@ export const RetrievalChunkMetadataSchema = z.object({
   chunkIndex: z.number().int().nonnegative(),
   sectionChunkIndex: z.number().int().nonnegative(),
   offsetBasis: z.enum(["document", "section"]),
+  author: z.string().optional(),
+  timestamp: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).optional(),
+  tenantId: z.string().optional(),
+  relationships: z.array(DocumentRelationshipSchema).optional(),
 });
 
 export const RetrievalChunkSchema = z.object({

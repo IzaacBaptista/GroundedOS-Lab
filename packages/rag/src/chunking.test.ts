@@ -68,6 +68,42 @@ describe("chunkDocument", () => {
     });
   });
 
+  it("propagates cap. 9 enrichment metadata (author/timestamp/tags/permissions/tenantId/relationships) onto chunks", () => {
+    const chunks = chunkDocument(
+      createDocument({
+        metadata: {
+          author: "Izaac Comze",
+          timestamp: "2026-01-10T00:00:00.000Z",
+          tags: ["policy", "hr"],
+          permissions: ["role:qa"],
+          tenantId: "tenant-42",
+          relationships: [{ documentId: "doc-9", type: "supersedes" }],
+        },
+      }),
+      { maxChunkChars: 100, overlapChars: 10 }
+    );
+
+    expect(chunks[0].metadata.author).toBe("Izaac Comze");
+    expect(chunks[0].metadata.timestamp).toBe("2026-01-10T00:00:00.000Z");
+    expect(chunks[0].metadata.tags).toEqual(["policy", "hr"]);
+    expect(chunks[0].metadata.permissions).toEqual(["role:qa"]);
+    expect(chunks[0].metadata.tenantId).toBe("tenant-42");
+    expect(chunks[0].metadata.relationships).toEqual([
+      { documentId: "doc-9", type: "supersedes" },
+    ]);
+  });
+
+  it("leaves cap. 9 enrichment metadata undefined when the document has none", () => {
+    const chunks = chunkDocument(createDocument(), {
+      maxChunkChars: 100,
+      overlapChars: 10,
+    });
+
+    expect(chunks[0].metadata.author).toBeUndefined();
+    expect(chunks[0].metadata.tags).toBeUndefined();
+    expect(chunks[0].metadata.permissions).toBeUndefined();
+  });
+
   it("splits long sections with deterministic overlap", () => {
     const chunks = chunkDocument(
       createDocument({

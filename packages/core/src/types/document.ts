@@ -165,6 +165,46 @@ export interface DocumentSection {
  * the full extracted text, a section breakdown, and complete data-lineage
  * information so that any result can be traced back to its source.
  */
+/**
+ * A reference from one document to another (book cap. 9, "Organização").
+ * Used to express things like "this section supersedes doc X" or
+ * "this doc is part of policy bundle Y" so retrieval can surface related
+ * context beyond pure semantic similarity.
+ */
+export interface DocumentRelationship {
+  /** The related document's id. */
+  documentId: string;
+  /** Free-form relationship label (e.g. "supersedes", "part_of", "references"). */
+  type?: string;
+}
+
+/**
+ * Enrichment metadata (book cap. 9). These fields are the ones the book
+ * treats as active pre-retrieval filters, not passive annotation — most
+ * importantly `permissions` and `tenantId`, which callers should apply
+ * *before* ranking, not as a post-hoc discard of already-ranked results.
+ * The index signature keeps the bag open for other domain-specific fields.
+ */
+export interface NormalizedDocumentMetadata {
+  /** Document author, when known. */
+  author?: string;
+  /** ISO-8601 timestamp of when the source content was authored/updated. */
+  timestamp?: string;
+  /** User-defined or auto-detected tags for filtering and search. */
+  tags?: string[];
+  /**
+   * Roles/groups allowed to see this document's chunks. An unset or empty
+   * array means the document is public (no restriction) — callers filtering
+   * by `permissions` should treat "no permissions set" as visible to anyone.
+   */
+  permissions?: string[];
+  /** Owning tenant/workspace id, for filtering within a shared index. */
+  tenantId?: string;
+  /** Other documents this one relates to. */
+  relationships?: DocumentRelationship[];
+  [key: string]: unknown;
+}
+
 export interface NormalizedDocument {
   /** References the originating {@link SourceDocument.id}. */
   documentId: string;
@@ -208,9 +248,10 @@ export interface NormalizedDocument {
   };
 
   /**
-   * Arbitrary key-value metadata.
-   * Use this for domain-specific fields not covered by the base schema
-   * (e.g. custom tags, external system IDs, model-specific annotations).
+   * Key-value metadata. `author`, `timestamp`, `tags`, `permissions`,
+   * `tenantId` and `relationships` are recognized enrichment fields (book
+   * cap. 9); the bag stays open for other domain-specific fields not
+   * covered by the base schema.
    */
-  metadata: Record<string, unknown>;
+  metadata: NormalizedDocumentMetadata;
 }

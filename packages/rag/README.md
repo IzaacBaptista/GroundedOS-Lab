@@ -136,9 +136,26 @@ const semanticChunks = await embedChunks(chunks, ollamaProvider);
 ```
 
 The in-memory vector store supports insert, cosine similarity search, `topK`
-limits and exact-match filtering over flat chunk metadata such as `documentId`,
+limits and filtering over flat chunk metadata such as `documentId`,
 `sectionId`, `modality`, `page`, `sourceType`, `originalFilename` and
-`embeddingProvider`.
+`embeddingProvider`. Filtering runs *before* scoring/ranking, not as a
+post-hoc discard of an already-ranked `topK` — the book cap. 9 principle for
+metadata like `permissions`/`tenantId`.
+
+### Cap. 9 metadata filters
+
+`chunkDocument()` copies `author`, `timestamp`, `tags`, `permissions`,
+`tenantId` and `relationships` from `NormalizedDocument.metadata` onto every
+chunk. `store.search({ filter })` treats the array-valued fields specially:
+
+| Filter key | Match semantics |
+|---|---|
+| `tags` | Chunk matches if its `tags` array includes the requested value, or if it has no tags at all |
+| `permissions` | **Security filter.** Chunk matches if its `permissions` array includes the requested role, or if `permissions` is unset/empty (no restriction = public) |
+| `tenantId` | Exact match |
+
+Everything else uses exact-match, as before. See `packages/core`'s README for
+the full field list and categories.
 
 ```ts
 import { InMemoryVectorStore } from "@groundedos/rag";

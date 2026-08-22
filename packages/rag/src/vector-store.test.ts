@@ -108,6 +108,130 @@ describe("InMemoryVectorStore", () => {
     expect(results[0]?.chunk.id).toBe("pdf-chunk");
   });
 
+  it("filters by tags: chunk's tags array must include the requested tag", () => {
+    const store = new InMemoryVectorStore();
+
+    store.insert([
+      createEmbeddedChunk({
+        id: "hr-chunk",
+        embedding: [1, 0],
+        metadata: {
+          documentTitle: "HR Policy",
+          modality: "text",
+          sourceType: "upload",
+          chunkIndex: 1,
+          sectionChunkIndex: 1,
+          offsetBasis: "document",
+          tags: ["hr", "policy"],
+        },
+      }),
+      createEmbeddedChunk({
+        id: "eng-chunk",
+        embedding: [0.9, 0.1],
+        metadata: {
+          documentTitle: "Engineering Runbook",
+          modality: "text",
+          sourceType: "upload",
+          chunkIndex: 1,
+          sectionChunkIndex: 1,
+          offsetBasis: "document",
+          tags: ["engineering"],
+        },
+      }),
+    ]);
+
+    const results = store.search({ embedding: [1, 0], filter: { tags: "hr" } });
+
+    expect(results.map((result) => result.chunk.id)).toEqual(["hr-chunk"]);
+  });
+
+  it("filters by permissions as a pre-retrieval security check: unrestricted chunks stay visible, restricted ones require a matching role", () => {
+    const store = new InMemoryVectorStore();
+
+    store.insert([
+      createEmbeddedChunk({
+        id: "public-chunk",
+        embedding: [1, 0],
+        metadata: {
+          documentTitle: "Public Doc",
+          modality: "text",
+          sourceType: "upload",
+          chunkIndex: 1,
+          sectionChunkIndex: 1,
+          offsetBasis: "document",
+        },
+      }),
+      createEmbeddedChunk({
+        id: "restricted-chunk",
+        embedding: [0.95, 0.05],
+        metadata: {
+          documentTitle: "Restricted Doc",
+          modality: "text",
+          sourceType: "upload",
+          chunkIndex: 1,
+          sectionChunkIndex: 1,
+          offsetBasis: "document",
+          permissions: ["role:finance"],
+        },
+      }),
+    ]);
+
+    const asAnonymous = store.search({
+      embedding: [1, 0],
+      filter: { permissions: "role:finance" },
+    });
+    expect(asAnonymous.map((result) => result.chunk.id).sort()).toEqual([
+      "public-chunk",
+      "restricted-chunk",
+    ]);
+
+    const asOutsider = store.search({
+      embedding: [1, 0],
+      filter: { permissions: "role:sales" },
+    });
+    expect(asOutsider.map((result) => result.chunk.id)).toEqual(["public-chunk"]);
+  });
+
+  it("filters by tenantId as an exact match", () => {
+    const store = new InMemoryVectorStore();
+
+    store.insert([
+      createEmbeddedChunk({
+        id: "tenant-a-chunk",
+        embedding: [1, 0],
+        metadata: {
+          documentTitle: "Tenant A Doc",
+          modality: "text",
+          sourceType: "upload",
+          chunkIndex: 1,
+          sectionChunkIndex: 1,
+          offsetBasis: "document",
+          tenantId: "tenant-a",
+        },
+      }),
+      createEmbeddedChunk({
+        id: "tenant-b-chunk",
+        embedding: [0.9, 0.1],
+        metadata: {
+          documentTitle: "Tenant B Doc",
+          modality: "text",
+          sourceType: "upload",
+          chunkIndex: 1,
+          sectionChunkIndex: 1,
+          offsetBasis: "document",
+          tenantId: "tenant-b",
+        },
+      }),
+    ]);
+
+    const results = store.search({
+      embedding: [1, 0],
+      filter: { tenantId: "tenant-b" },
+    });
+
+    expect(results.map((result) => result.chunk.id)).toEqual(["tenant-b-chunk"]);
+  });
+
   it("replaces existing chunks with the same id", () => {
     const store = new InMemoryVectorStore();
 

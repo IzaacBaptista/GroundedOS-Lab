@@ -613,7 +613,7 @@ Auth enforcement behavior:
 
 Current limitations / next steps:
 
-* **RBAC/ABAC expansion** — API key scopes are intentionally simple (`rag:*`, `jobs:*`, `admin:*`) and can evolve into richer role/policy engines.
+* **RBAC/ABAC expansion** — API key scopes are intentionally simple (`rag:*`, `jobs:*`, `admin:*`) and can evolve into richer role/policy engines. `packages/rag` now carries a `permissions`/`tenantId` chunk-metadata filter (book cap. 9) that applies *before* ranking rather than discarding after retrieval, but no `apps/api` request path builds that filter from the authenticated user yet — see [`packages/rag/README.md`](./packages/rag/README.md#cap-9-metadata-filters).
 * **External identity providers** — OAuth/OIDC provider integration and production-grade identity lifecycle.
 * **Production hardening** — distributed key management, advanced observability and additional tenancy controls for external vector backends.
 

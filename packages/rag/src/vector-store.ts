@@ -3,7 +3,10 @@ import type { EmbeddedChunk, EmbeddingVector } from "./embeddings";
 const ERROR_PREFIX = "[rag/vector-store]";
 const DEFAULT_TOP_K = 5;
 
-export type VectorMetadataFilter = Record<string, string | number | boolean | undefined>;
+export type VectorMetadataFilter = Record<
+  string,
+  string | number | boolean | undefined
+>;
 
 export interface VectorSearchQuery {
   embedding: EmbeddingVector;
@@ -163,13 +166,30 @@ function matchesFilter(
   const searchable = buildSearchableMetadata(chunk);
 
   return Object.entries(filter).every(([key, expectedValue]) => {
-    return searchable[key] === expectedValue;
+    if (expectedValue === undefined) {
+      return true;
+    }
+
+    const actual = searchable[key];
+
+    if (Array.isArray(actual)) {
+      // Cap. 9: `tags`/`permissions` are arrays on the chunk. An empty or
+      // unset array (e.g. `permissions`) means "no restriction" — visible
+      // to any filter value, matching the book's principle that filtering
+      // must run before ranking, not as a post-hoc discard.
+      return (
+        actual.length === 0 ||
+        (typeof expectedValue === "string" && actual.includes(expectedValue))
+      );
+    }
+
+    return actual === expectedValue;
   });
 }
 
 function buildSearchableMetadata(
   chunk: EmbeddedChunk
-): Record<string, string | number | boolean | undefined> {
+): Record<string, string | number | boolean | string[] | undefined> {
   return {
     id: chunk.id,
     documentId: chunk.documentId,
@@ -185,6 +205,11 @@ function buildSearchableMetadata(
     chunkIndex: chunk.metadata.chunkIndex,
     sectionChunkIndex: chunk.metadata.sectionChunkIndex,
     offsetBasis: chunk.metadata.offsetBasis,
+    author: chunk.metadata.author,
+    timestamp: chunk.metadata.timestamp,
+    tags: chunk.metadata.tags ?? [],
+    permissions: chunk.metadata.permissions ?? [],
+    tenantId: chunk.metadata.tenantId,
     embeddingProvider: chunk.embeddingMetadata.provider,
     embeddingDimensions: chunk.embeddingMetadata.dimensions,
   };

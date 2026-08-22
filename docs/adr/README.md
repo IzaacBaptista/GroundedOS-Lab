@@ -69,3 +69,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-019](./ADR-019-real-multimodal-providers.md) | Real OCR, vision and transcription providers (opt-in) | Accepted |
 | [ADR-020](./ADR-020-normalization-table-code-chunking-structured-docs.md) | Cap. 7 normalization pass, real table extraction, code-aware chunking, JSON/XML modalities | Accepted |
 | [ADR-021](./ADR-021-chunking-boundary-fix-and-strategies.md) | Chunk boundary word-snap fix, recursive/sentence strategies, parent-child chunking | Accepted |
+| [ADR-022](./ADR-022-metadata-enrichment-pre-retrieval-filters.md) | Cap. 9 metadata enrichment: real chunk-level fields, filtering before ranking | Accepted |
