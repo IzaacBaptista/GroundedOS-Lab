@@ -11,7 +11,9 @@ import {
   getRagTradeoffMetrics,
   indexRag,
   listPersistedRagIndexes,
+  listPersistedRagIndexVersions,
   replayRagFromSnapshot,
+  rollbackPersistedRagIndex,
 } from "./rag-service";
 import { makeRagTestCase, resetRagRuntimeState, createTempDir } from "@groundedos/test-harness";
 
@@ -705,6 +707,124 @@ describe("persisted RAG indexes", () => {
       ).resolves.toMatchObject({
         count: 0,
       });
+  });
+
+  it("skips re-embedding when the content checksum is unchanged (incremental indexing)", async () => {
+    const indexDir = await createTempIndexDir();
+    const content = "Alpha setup notes.\n\nBeta retrieval notes explain vector search.";
+
+    const first = await indexRag({
+      type: "text",
+      content,
+      documentId: "incremental-doc",
+      indexDir,
+    });
+    expect(first.reindexed).toBe(true);
+
+    const second = await indexRag({
+      type: "text",
+      content,
+      documentId: "incremental-doc",
+      indexDir,
+    });
+
+    expect(second.reindexed).toBe(false);
+    expect(second.previousChecksum).toBe(first.document.checksum);
+    expect(second.document.checksum).toBe(first.document.checksum);
+
+    const versions = await listPersistedRagIndexVersions("incremental-doc", indexDir);
+    expect(versions.count).toBe(0);
+  });
+
+  it("detects a stale document by content checksum and reindexes it, archiving the previous version", async () => {
+    const indexDir = await createTempIndexDir();
+
+    const first = await indexRag({
+      type: "text",
+      content: "Original content about alpha.",
+      documentId: "stale-doc",
+      indexDir,
+    });
+
+    const second = await indexRag({
+      type: "text",
+      content: "Updated content entirely about beta now.",
+      documentId: "stale-doc",
+      indexDir,
+    });
+
+    expect(second.reindexed).toBe(true);
+    expect(second.previousChecksum).toBe(first.document.checksum);
+    expect(second.document.checksum).not.toBe(first.document.checksum);
+
+    const versions = await listPersistedRagIndexVersions("stale-doc", indexDir);
+    expect(versions.count).toBe(1);
+    expect(versions.versions[0]?.checksum).toBe(first.document.checksum);
+  });
+
+  it("forces reindexing even when the checksum matches", async () => {
+    const indexDir = await createTempIndexDir();
+    const content = "Force reindex test content.";
+
+    const first = await indexRag({
+      type: "text",
+      content,
+      documentId: "force-doc",
+      indexDir,
+    });
+
+    const forced = await indexRag({
+      type: "text",
+      content,
+      documentId: "force-doc",
+      indexDir,
+      force: true,
+    });
+
+    expect(forced.reindexed).toBe(true);
+    expect(forced.document.checksum).toBe(first.document.checksum);
+
+    const versions = await listPersistedRagIndexVersions("force-doc", indexDir);
+    expect(versions.count).toBe(1);
+  });
+
+  it("rolls back a document to a previous version, restoring its content and answers", async () => {
+    const indexDir = await createTempIndexDir();
+
+    await indexRag({
+      type: "text",
+      content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+      documentId: "rollback-doc",
+      indexDir,
+    });
+
+    await indexRag({
+      type: "text",
+      content: "Gamma unrelated notes.\n\nDelta something else entirely.",
+      documentId: "rollback-doc",
+      indexDir,
+    });
+
+    const versions = await listPersistedRagIndexVersions("rollback-doc", indexDir);
+    expect(versions.count).toBe(1);
+    const oldVersionId = versions.versions[0]!.versionId;
+
+    const rolledBack = await rollbackPersistedRagIndex("rollback-doc", oldVersionId, indexDir);
+
+    expect(rolledBack.document.checksum).toBe(versions.versions[0]!.checksum);
+
+    const output = await askRag({
+      documentId: "rollback-doc",
+      query: "What explains vector search?",
+      indexDir,
+    });
+    expect(output.answer.text).toContain("Beta retrieval notes explain vector search.");
+
+    const versionsAfterRollback = await listPersistedRagIndexVersions(
+      "rollback-doc",
+      indexDir
+    );
+    expect(versionsAfterRollback.count).toBe(2);
   });
 });
 

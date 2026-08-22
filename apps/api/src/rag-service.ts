@@ -80,9 +80,13 @@ import {
 import {
   deleteRagIndex,
   listRagIndexes,
+  listRagIndexVersions,
   loadRagIndex,
+  rollbackRagIndex,
   saveRagIndex,
+  tryLoadRagIndex,
   type PersistedRagIndexListItem,
+  type RagIndexVersionSummary,
 } from "./rag-index-store";
 import {
   costLedger,
@@ -179,6 +183,11 @@ export type RagIndexRequest = {
   ownerId?: string;
   requestId?: string;
   apiKeyId?: string;
+  /**
+   * Book cap. 10 (reindexação): force full re-chunking/re-embedding even
+   * when the content checksum matches what's already persisted.
+   */
+  force?: boolean;
 };
 
 export type RagIndexFileRequest = {
@@ -194,6 +203,11 @@ export type RagIndexFileRequest = {
   ownerId?: string;
   requestId?: string;
   apiKeyId?: string;
+  /**
+   * Book cap. 10 (reindexação): force full re-chunking/re-embedding even
+   * when the content checksum matches what's already persisted.
+   */
+  force?: boolean;
 };
 
 export type RagDocumentSummary = {
@@ -468,6 +482,15 @@ export type RagIndexResponse = {
     persisted: true;
     indexPath: string;
   };
+  /**
+   * Book cap. 10: whether this call actually re-chunked/re-embedded the
+   * document. `false` means the content checksum matched the already
+   * persisted index and the existing embeddings were reused as-is
+   * (incremental indexing) — unless `force: true` was passed.
+   */
+  reindexed: boolean;
+  /** Present only when a prior version existed for this documentId. */
+  previousChecksum?: string;
 };
 
 export type RagIndexListResponse = {
@@ -478,6 +501,21 @@ export type RagIndexListResponse = {
 export type RagIndexDeleteResponse = {
   deleted: true;
   index: PersistedRagIndexListItem;
+};
+
+export type RagIndexVersionsResponse = {
+  documentId: string;
+  count: number;
+  versions: RagIndexVersionSummary[];
+};
+
+export type RagIndexRollbackResponse = {
+  document: RagDocumentSummary;
+  index: RagIndexSummary;
+  storage: {
+    persisted: true;
+    indexPath: string;
+  };
 };
 
 export type RagEmbeddingMapPoint = {
@@ -967,6 +1005,22 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
     .digest("hex");
   const documentId = normalizedRequest.documentId ?? `api-${checksum.slice(0, 16)}`;
   const title = normalizedRequest.title ?? "Inline text";
+  const ownership = resolveOwnershipForPersistence(request.ownerId, request.tenantId);
+  const existing = await tryLoadRagIndex(documentId, normalizedRequest.indexDir, ownership);
+
+  if (existing && !request.force && existing.record.document.checksum === checksum) {
+    return {
+      document: existing.record.document,
+      index: existing.record.index,
+      storage: {
+        persisted: true,
+        indexPath: existing.relativeIndexPath,
+      },
+      reindexed: false,
+      previousChecksum: existing.record.document.checksum,
+    };
+  }
+
   const document = await ingest({
     type: "text",
     content: normalizedRequest.content,
@@ -990,7 +1044,6 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
     checksum,
   };
   const indexSummary = createIndexSummary(index);
-  const ownership = resolveOwnershipForPersistence(request.ownerId, request.tenantId);
   const saved = await saveRagIndex(
     {
       ownership,
@@ -1011,6 +1064,8 @@ export async function indexRag(request: RagIndexRequest): Promise<RagIndexRespon
       persisted: true,
       indexPath: saved.relativeIndexPath,
     },
+    reindexed: true,
+    previousChecksum: existing?.record.document.checksum,
   };
 }
 
@@ -1025,6 +1080,22 @@ export async function indexRagFromFile(
     normalizedRequest.title ??
     normalizedRequest.originalFilename ??
     basename(normalizedRequest.filePath);
+  const ownership = resolveOwnershipForPersistence(request.ownerId, request.tenantId);
+  const existing = await tryLoadRagIndex(documentId, normalizedRequest.indexDir, ownership);
+
+  if (existing && !request.force && existing.record.document.checksum === checksum) {
+    return {
+      document: existing.record.document,
+      index: existing.record.index,
+      storage: {
+        persisted: true,
+        indexPath: existing.relativeIndexPath,
+      },
+      reindexed: false,
+      previousChecksum: existing.record.document.checksum,
+    };
+  }
+
   const document = await ingest({
     type: normalizedRequest.type,
     filePath: normalizedRequest.filePath,
@@ -1050,7 +1121,6 @@ export async function indexRagFromFile(
     originalFilename: normalizedRequest.originalFilename,
   };
   const indexSummary = createIndexSummary(index);
-  const ownership = resolveOwnershipForPersistence(request.ownerId, request.tenantId);
   const saved = await saveRagIndex(
     {
       ownership,
@@ -1071,6 +1141,8 @@ export async function indexRagFromFile(
       persisted: true,
       indexPath: saved.relativeIndexPath,
     },
+    reindexed: true,
+    previousChecksum: existing?.record.document.checksum,
   };
 }
 
@@ -1244,6 +1316,62 @@ export async function deletePersistedRagIndex(
   return {
     deleted: true,
     index,
+  };
+}
+
+export async function listPersistedRagIndexVersions(
+  documentId: string,
+  indexDir?: string,
+  ownerId?: string,
+  tenantId?: string
+): Promise<RagIndexVersionsResponse> {
+  if (typeof documentId !== "string" || documentId.trim().length === 0) {
+    throw new ApiRequestError("documentId must be a non-empty string.");
+  }
+
+  const versions = await listRagIndexVersions(
+    documentId.trim(),
+    indexDir,
+    resolveOwnershipForLookup(ownerId, tenantId)
+  );
+
+  return {
+    documentId: documentId.trim(),
+    count: versions.length,
+    versions,
+  };
+}
+
+export async function rollbackPersistedRagIndex(
+  documentId: string,
+  versionId: string,
+  indexDir?: string,
+  ownerId?: string,
+  tenantId?: string
+): Promise<RagIndexRollbackResponse> {
+  if (typeof documentId !== "string" || documentId.trim().length === 0) {
+    throw new ApiRequestError("documentId must be a non-empty string.");
+  }
+
+  if (typeof versionId !== "string" || versionId.trim().length === 0) {
+    throw new ApiRequestError("versionId must be a non-empty string.");
+  }
+
+  const saved = await rollbackRagIndex(
+    documentId.trim(),
+    versionId.trim(),
+    indexDir,
+    resolveOwnershipForLookup(ownerId, tenantId)
+  );
+  semanticCache.invalidate(documentId.trim());
+
+  return {
+    document: saved.record.document,
+    index: saved.record.index,
+    storage: {
+      persisted: true,
+      indexPath: saved.relativeIndexPath,
+    },
   };
 }
 

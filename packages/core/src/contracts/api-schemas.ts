@@ -333,6 +333,11 @@ export const RagIndexRequestBodySchema = z
     indexDir: z.string().optional(),
     /** Embedding backend. */
     embeddingProvider: ApiEmbeddingProviderIdSchema.optional(),
+    /**
+     * Book cap. 10 (reindexação): force full re-chunking/re-embedding even
+     * when the content checksum matches what's already persisted.
+     */
+    force: z.boolean().optional(),
   })
   .strict();
 

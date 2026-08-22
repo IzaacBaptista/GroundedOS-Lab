@@ -3,9 +3,13 @@ import {
   deletePersistedRagIndex,
   getPersistedRagEmbeddingMap,
   listPersistedRagIndexes,
+  listPersistedRagIndexVersions,
+  rollbackPersistedRagIndex,
   type RagEmbeddingMapResponse,
   type RagIndexDeleteResponse,
   type RagIndexListResponse,
+  type RagIndexRollbackResponse,
+  type RagIndexVersionsResponse,
 } from "../../rag-service";
 import { ApiConfigService } from "../../config/api-config";
 
@@ -27,5 +31,28 @@ export class RagIndexService {
 
   delete(documentId: string, ownerId?: string, tenantId?: string): Promise<RagIndexDeleteResponse> {
     return deletePersistedRagIndex(documentId, this.config.indexDir, ownerId, tenantId);
+  }
+
+  versions(
+    documentId: string,
+    ownerId?: string,
+    tenantId?: string
+  ): Promise<RagIndexVersionsResponse> {
+    return listPersistedRagIndexVersions(documentId, this.config.indexDir, ownerId, tenantId);
+  }
+
+  rollback(
+    documentId: string,
+    versionId: string,
+    ownerId?: string,
+    tenantId?: string
+  ): Promise<RagIndexRollbackResponse> {
+    return rollbackPersistedRagIndex(
+      documentId,
+      versionId,
+      this.config.indexDir,
+      ownerId,
+      tenantId
+    );
   }
 }

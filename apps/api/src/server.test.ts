@@ -1490,6 +1490,100 @@ describe("api server", () => {
     });
   });
 
+  it("serves POST /rag/index with force, and GET/POST version-lifecycle endpoints (cap. 10)", async () => {
+    const indexDir = await createTempIndexDir();
+    const app = await createTestServer({ indexDir });
+
+    const first = await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      payload: {
+        type: "text",
+        content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Lifecycle HTTP Test",
+        documentId: "lifecycle-http-test",
+      },
+    });
+    const firstBody = first.json() as { document: { checksum: string }; reindexed: boolean };
+    expect(firstBody.reindexed).toBe(true);
+
+    const unchanged = await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      payload: {
+        type: "text",
+        content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Lifecycle HTTP Test",
+        documentId: "lifecycle-http-test",
+      },
+    });
+    const unchangedBody = unchanged.json() as { reindexed: boolean; previousChecksum?: string };
+    expect(unchangedBody.reindexed).toBe(false);
+    expect(unchangedBody.previousChecksum).toBe(firstBody.document.checksum);
+
+    const forced = await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      payload: {
+        type: "text",
+        content: "Alpha setup notes.\n\nBeta retrieval notes explain vector search.",
+        title: "Lifecycle HTTP Test",
+        documentId: "lifecycle-http-test",
+        force: true,
+      },
+    });
+    expect((forced.json() as { reindexed: boolean }).reindexed).toBe(true);
+
+    const changed = await app.inject({
+      method: "POST",
+      url: "/rag/index",
+      payload: {
+        type: "text",
+        content: "Gamma completely different content now.",
+        title: "Lifecycle HTTP Test",
+        documentId: "lifecycle-http-test",
+      },
+    });
+    expect((changed.json() as { reindexed: boolean }).reindexed).toBe(true);
+
+    const versionsResponse = await app.inject({
+      method: "GET",
+      url: "/rag/indexes/lifecycle-http-test/versions",
+    });
+    const versionsBody = versionsResponse.json() as {
+      count: number;
+      versions: Array<{ versionId: string; checksum: string }>;
+    };
+    expect(versionsResponse.statusCode).toBe(200);
+    expect(versionsBody.count).toBe(2);
+
+    const oldVersionId = versionsBody.versions.find(
+      (version) => version.checksum === firstBody.document.checksum
+    )!.versionId;
+
+    const rollbackResponse = await app.inject({
+      method: "POST",
+      url: `/rag/indexes/lifecycle-http-test/rollback/${oldVersionId}`,
+    });
+    expect(rollbackResponse.statusCode).toBe(200);
+    expect(
+      (rollbackResponse.json() as { document: { checksum: string } }).document.checksum
+    ).toBe(firstBody.document.checksum);
+
+    const askAfterRollback = await app.inject({
+      method: "POST",
+      url: "/rag/ask",
+      payload: {
+        documentId: "lifecycle-http-test",
+        query: "What explains vector search?",
+        topK: 1,
+      },
+    });
+    expect(
+      (askAfterRollback.json() as { answer: { text: string } }).answer.text
+    ).toContain("Beta retrieval notes explain vector search.");
+  });
+
   it("serves GET /rag/indexes/:documentId/embedding-map", async () => {
     const indexDir = await createTempIndexDir();
     const app = await createTestServer({ indexDir });

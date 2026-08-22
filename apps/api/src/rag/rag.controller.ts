@@ -161,6 +161,7 @@ export class RagController {
         documentId: fields.documentId,
         metadata: parseMetadata(fields.metadata),
         embeddingProvider: fields.embeddingProvider as RagIndexFileRequest["embeddingProvider"],
+        force: parseBoolean(fields.force, "force"),
         ownerId: user?.userId,
         tenantId: user?.tenantId,
         requestId: String(request.id),

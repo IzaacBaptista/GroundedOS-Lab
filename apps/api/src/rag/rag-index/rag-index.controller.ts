@@ -1,9 +1,21 @@
-import { Controller, Delete, Get, Inject, Param, Req } from "@nestjs/common";
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  Post,
+  Req,
+} from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 import type {
   RagEmbeddingMapResponse,
   RagIndexDeleteResponse,
   RagIndexListResponse,
+  RagIndexRollbackResponse,
+  RagIndexVersionsResponse,
 } from "../../rag-service";
 import { getRequestTenantId, getRequestUserId } from "../../common/auth-context";
 import { RagIndexService } from "./rag-index.service";
@@ -36,6 +48,33 @@ export class RagIndexController {
   ): Promise<RagIndexDeleteResponse> {
     return this.ragIndex.delete(
       documentId ?? "",
+      getRequestUserId(request),
+      getRequestTenantId(request)
+    );
+  }
+
+  @Get(":documentId/versions")
+  versions(
+    @Req() request: FastifyRequest,
+    @Param("documentId") documentId: string
+  ): Promise<RagIndexVersionsResponse> {
+    return this.ragIndex.versions(
+      documentId ?? "",
+      getRequestUserId(request),
+      getRequestTenantId(request)
+    );
+  }
+
+  @Post(":documentId/rollback/:versionId")
+  @HttpCode(HttpStatus.OK)
+  rollback(
+    @Req() request: FastifyRequest,
+    @Param("documentId") documentId: string,
+    @Param("versionId") versionId: string
+  ): Promise<RagIndexRollbackResponse> {
+    return this.ragIndex.rollback(
+      documentId ?? "",
+      versionId ?? "",
       getRequestUserId(request),
       getRequestTenantId(request)
     );

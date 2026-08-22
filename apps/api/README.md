@@ -295,6 +295,37 @@ Response includes `document`, `index`, and `storage.indexPath`. `index`
 contains `embeddingProvider`, `embeddingDimensions`, and, for new indexes,
 `embeddingModel` with provider/model/dimension metadata.
 
+#### Document lifecycle (book cap. 10): staleness, incremental indexing, versioning
+
+Calling `POST /rag/index` again with the same `documentId` is how a document
+gets updated. Since the content checksum is already computed on every call,
+that same checksum now doubles as the staleness signal:
+
+- If the checksum matches what's persisted, the document is **not stale** —
+  nothing is re-chunked or re-embedded, the existing index is reused as-is,
+  and the response has `reindexed: false` (incremental indexing: unchanged
+  content costs nothing beyond a checksum comparison).
+- If the checksum differs (or no index existed yet), the document **is
+  stale** and gets fully reprocessed — `reindexed: true`, with
+  `previousChecksum` set when a prior version existed.
+- Pass `"force": true` (JSON) or `-F force=true` (multipart) to force a full
+  reindex even when the checksum is unchanged — e.g. after a chunking
+  strategy or embedding model change makes the old chunks worth regenerating.
+
+Every time an index is about to be overwritten, the previous version is
+archived first (never destroyed), which is what makes rollback possible:
+
+```bash
+# List archived versions for a document (newest first)
+curl http://localhost:3001/rag/indexes/smoke-text-001/versions
+
+# Roll back to a specific archived version
+curl -X POST http://localhost:3001/rag/indexes/smoke-text-001/rollback/<versionId>
+```
+
+Rolling back itself archives the version it replaces, so a rollback is
+reversible too — it's never a destructive operation.
+
 ### Deterministic replay
 
 Each successful RAG response now carries `devMode.replay.snapshot`, and the API

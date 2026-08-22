@@ -50,6 +50,10 @@
 - **Dev Mode output** per request: chunk IDs, relevance scores, source metadata, offsets, embedding provider, cache, cost, workflow steps and retrieval spans
 - **Embedding providers**: `api-lexical` (default, no server required), `local-hash` (deterministic), `ollama` (opt-in, requires Ollama)
 - **Index management** API: list, delete persisted indexes
+- **Document lifecycle** (book cap. 10): re-indexing the same `documentId` is a no-op when content is unchanged
+  (checksum-based staleness/incremental indexing), `force: true` reindexes anyway, and every overwrite is archived
+  first — `GET /rag/indexes/:documentId/versions` and `POST /rag/indexes/:documentId/rollback/:versionId` browse
+  and restore prior versions. See [`apps/api/README.md`](./apps/api/README.md#document-lifecycle-book-cap-10-staleness-incremental-indexing-versioning).
 - Phase 1 is **complete**. Baseline metrics recorded in `datasets/golden/baselines/phase-1-baseline.json`.
 - **Real LLM generation (opt-in)**: set `GROUNDEDOS_ENABLE_LLM_GENERATION=true` to have `/rag/ask` call Ollama chat
   (`GROUNDEDOS_OLLAMA_CHAT_MODEL`, default `llama3.2`) with a grounded prompt built from the retrieved chunks,
@@ -1114,7 +1118,9 @@ npm run api:dev
 ```
 
 The first API slice exposes `GET /health`, `POST /rag/index`, `POST /rag/ask`,
-`GET /rag/indexes`, and `DELETE /rag/indexes/:documentId` for inline JSON text,
+`GET /rag/indexes`, `DELETE /rag/indexes/:documentId`,
+`GET /rag/indexes/:documentId/versions`, and
+`POST /rag/indexes/:documentId/rollback/:versionId` for inline JSON text,
 multipart text/PDF uploads, selectable local embedding providers and persisted
 local indexes under `.groundedos/indexes/`.
 `ollama` requires a running local Ollama server and an embedding model such as
