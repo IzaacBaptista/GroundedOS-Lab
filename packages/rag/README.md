@@ -135,12 +135,29 @@ const ollamaProvider = semanticToEmbeddingProvider(
 const semanticChunks = await embedChunks(chunks, ollamaProvider);
 ```
 
-The in-memory vector store supports insert, cosine similarity search, `topK`
+The in-memory vector store supports insert, similarity search, `topK`
 limits and filtering over flat chunk metadata such as `documentId`,
 `sectionId`, `modality`, `page`, `sourceType`, `originalFilename` and
 `embeddingProvider`. Filtering runs *before* scoring/ranking, not as a
 post-hoc discard of an already-ranked `topK` — the book cap. 9 principle for
 metadata like `permissions`/`tenantId`.
+
+### Similarity metric (book cap. 11)
+
+`EmbeddingModelInfo.similarityMetric` (`"cosine"` | `"dotProduct"` |
+`"euclidean"`) declares which metric a model's vectors were trained/evaluated
+to be compared with — using the wrong metric for a given model is a silent
+quality regression, not an error, per the book's explicit warning. All
+built-in providers (`LocalHashEmbeddingsProvider`, `OllamaEmbeddingsProvider`,
+`OpenAIEmbeddingsProvider`, `DeterministicEmbeddingProvider`) declare
+`"cosine"`, the RAG default. `embedChunks()` copies the metric onto every
+`EmbeddedChunk.embeddingMetadata`, and `InMemoryVectorStore` uses it to pick
+the right scoring function automatically — cosine and dot product rank
+higher-is-more-similar; Euclidean distance is converted to a score
+(`1 / (1 + distance)`) so all three metrics sort consistently. A store
+rejects inserting chunks whose declared metric conflicts with what it
+already holds, since mixing metrics in one index produces meaningless
+scores.
 
 ### Cap. 9 metadata filters
 
@@ -229,7 +246,8 @@ The end-to-end internals guide is documented in
 | `EmbeddingProvider` | Interface for local or remote embedding providers |
 | `DeterministicEmbeddingProvider` | Local deterministic provider for tests and development |
 | `SemanticEmbeddingsProvider` | Higher-level embedding provider contract with model metadata |
-| `EmbeddingModelInfo` | Provider/model/dimension metadata for compatibility and Dev Mode output |
+| `EmbeddingModelInfo` | Provider/model/dimension/similarity-metric metadata for compatibility and Dev Mode output |
+| `SimilarityMetric` | `"cosine" \| "dotProduct" \| "euclidean"` — which metric a model's vectors were trained to be compared with |
 | `LocalHashEmbeddingsProvider` | Local deterministic token/ngram hashing provider |
 | `OllamaEmbeddingsProvider` | Opt-in local semantic embedding provider using Ollama `/api/embed` |
 | `semanticToEmbeddingProvider(provider)` | Adapt a semantic provider to the existing retrieval pipeline |

@@ -66,6 +66,7 @@ export {
   DocumentRelationshipSchema,
   RetrievalChunkSchema,
   EmbeddedChunkSchema,
+  SimilarityMetricSchema,
   VectorSearchResultSchema,
   ProcessedQuerySchema,
   RagAskResponseSchema,

@@ -108,6 +108,100 @@ describe("InMemoryVectorStore", () => {
     expect(results[0]?.chunk.id).toBe("pdf-chunk");
   });
 
+  it("ranks by dot product when the stored embeddings declare that metric (book cap. 11)", () => {
+    const store = new InMemoryVectorStore();
+
+    store.insert([
+      createEmbeddedChunk({
+        id: "short-vector",
+        embedding: [1, 0],
+        embeddingMetadata: {
+          provider: "test-provider",
+          dimensions: 2,
+          similarityMetric: "dotProduct",
+        },
+      }),
+      createEmbeddedChunk({
+        id: "long-vector-same-direction",
+        embedding: [3, 0],
+        embeddingMetadata: {
+          provider: "test-provider",
+          dimensions: 2,
+          similarityMetric: "dotProduct",
+        },
+      }),
+    ]);
+
+    const results = store.search({ embedding: [1, 0] });
+
+    // Dot product is magnitude-sensitive: the longer vector in the same
+    // direction scores higher, unlike cosine (which would tie at 1.0).
+    expect(results.map((result) => result.chunk.id)).toEqual([
+      "long-vector-same-direction",
+      "short-vector",
+    ]);
+    expect(results[0]?.score).toBeGreaterThan(results[1]?.score ?? 0);
+  });
+
+  it("ranks by euclidean distance (closer = higher score) when the stored embeddings declare that metric", () => {
+    const store = new InMemoryVectorStore();
+
+    store.insert([
+      createEmbeddedChunk({
+        id: "far",
+        embedding: [10, 10],
+        embeddingMetadata: {
+          provider: "test-provider",
+          dimensions: 2,
+          similarityMetric: "euclidean",
+        },
+      }),
+      createEmbeddedChunk({
+        id: "near",
+        embedding: [1, 1],
+        embeddingMetadata: {
+          provider: "test-provider",
+          dimensions: 2,
+          similarityMetric: "euclidean",
+        },
+      }),
+    ]);
+
+    const results = store.search({ embedding: [1, 1] });
+
+    expect(results.map((result) => result.chunk.id)).toEqual(["near", "far"]);
+  });
+
+  it("rejects inserting chunks with a similarity metric that conflicts with what's already stored", () => {
+    const store = new InMemoryVectorStore();
+
+    store.insert([
+      createEmbeddedChunk({
+        id: "cosine-chunk",
+        embedding: [1, 0],
+        embeddingMetadata: {
+          provider: "test-provider",
+          dimensions: 2,
+          similarityMetric: "cosine",
+        },
+      }),
+    ]);
+
+    expect(() =>
+      store.insert([
+        createEmbeddedChunk({
+          id: "dot-chunk",
+          embedding: [0, 1],
+          embeddingMetadata: {
+            provider: "test-provider",
+            dimensions: 2,
+            similarityMetric: "dotProduct",
+          },
+        }),
+      ])
+    ).toThrow(/similarity metric/i);
+  });
+
   it("filters by tags: chunk's tags array must include the requested tag", () => {
     const store = new InMemoryVectorStore();
 

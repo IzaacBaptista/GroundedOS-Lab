@@ -1,4 +1,4 @@
-import type { EmbeddedChunk, EmbeddingVector } from "./embeddings";
+import type { EmbeddedChunk, EmbeddingVector, SimilarityMetric } from "./embeddings";
 
 const ERROR_PREFIX = "[rag/vector-store]";
 const DEFAULT_TOP_K = 5;
@@ -29,6 +29,7 @@ export interface VectorStore {
 export class InMemoryVectorStore implements VectorStore {
   private readonly chunksById = new Map<string, EmbeddedChunk>();
   private dimensions?: number;
+  private metric?: SimilarityMetric;
 
   get size(): number {
     return this.chunksById.size;
@@ -40,12 +41,15 @@ export class InMemoryVectorStore implements VectorStore {
     }
 
     let nextDimensions = this.dimensions;
+    let nextMetric = this.metric;
 
     for (const chunk of chunks) {
       nextDimensions = this.validateChunk(chunk, nextDimensions);
+      nextMetric = this.validateMetric(chunk, nextMetric);
     }
 
     this.dimensions = nextDimensions;
+    this.metric = nextMetric;
 
     for (const chunk of chunks) {
       this.chunksById.set(chunk.id, chunk);
@@ -67,11 +71,13 @@ export class InMemoryVectorStore implements VectorStore {
       );
     }
 
+    const scoreFn = scoreFunctionFor(this.metric ?? "cosine");
+
     return Array.from(this.chunksById.values())
       .filter((chunk) => matchesFilter(chunk, query.filter))
       .map((chunk) => ({
         chunk,
-        score: cosineSimilarity(query.embedding, chunk.embedding),
+        score: scoreFn(query.embedding, chunk.embedding),
       }))
       .sort((left, right) => {
         if (right.score !== left.score) {
@@ -116,6 +122,23 @@ export class InMemoryVectorStore implements VectorStore {
 
     return expectedDimensions;
   }
+
+  private validateMetric(
+    chunk: EmbeddedChunk,
+    expectedMetric: SimilarityMetric | undefined
+  ): SimilarityMetric {
+    const chunkMetric = chunk.embeddingMetadata.similarityMetric ?? "cosine";
+
+    if (expectedMetric !== undefined && chunkMetric !== expectedMetric) {
+      throw new Error(
+        `${ERROR_PREFIX} chunk "${chunk.id}" declares similarity metric "${chunkMetric}"; ` +
+          `store already holds embeddings using "${expectedMetric}". Mixing metrics in one store ` +
+          `produces meaningless scores — use separate stores per metric.`
+      );
+    }
+
+    return chunkMetric;
+  }
 }
 
 function validateVector(vector: EmbeddingVector, label: string): void {
@@ -153,6 +176,52 @@ function cosineSimilarity(left: EmbeddingVector, right: EmbeddingVector): number
   }
 
   return dotProduct / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude));
+}
+
+/**
+ * Book cap. 11: dot product is magnitude-sensitive, unlike cosine — a
+ * longer vector in the same direction scores higher.
+ */
+function dotProductScore(left: EmbeddingVector, right: EmbeddingVector): number {
+  let dotProduct = 0;
+
+  for (let index = 0; index < left.length; index += 1) {
+    dotProduct += (left[index] ?? 0) * (right[index] ?? 0);
+  }
+
+  return dotProduct;
+}
+
+/**
+ * Book cap. 11: Euclidean distance is smaller for more similar vectors —
+ * the opposite direction of cosine/dot product. Transformed into a score
+ * (higher = more similar) via `1 / (1 + distance)` so every metric shares
+ * the same "higher score wins" sort used by `search()`; the transform is
+ * monotonic, so ranking is identical to sorting by raw distance ascending.
+ */
+function euclideanScore(left: EmbeddingVector, right: EmbeddingVector): number {
+  let sumSquaredDiff = 0;
+
+  for (let index = 0; index < left.length; index += 1) {
+    const diff = (left[index] ?? 0) - (right[index] ?? 0);
+    sumSquaredDiff += diff * diff;
+  }
+
+  return 1 / (1 + Math.sqrt(sumSquaredDiff));
+}
+
+function scoreFunctionFor(
+  metric: SimilarityMetric
+): (left: EmbeddingVector, right: EmbeddingVector) => number {
+  switch (metric) {
+    case "dotProduct":
+      return dotProductScore;
+    case "euclidean":
+      return euclideanScore;
+    case "cosine":
+    default:
+      return cosineSimilarity;
+  }
 }
 
 function matchesFilter(

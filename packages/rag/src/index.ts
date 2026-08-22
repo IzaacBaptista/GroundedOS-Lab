@@ -40,6 +40,7 @@ export {
   type OpenAIEmbeddingsProviderOptions,
   type OllamaEmbeddingsProviderOptions,
   type SemanticEmbeddingsProvider,
+  type SimilarityMetric,
 } from "./embeddings";
 
 export {

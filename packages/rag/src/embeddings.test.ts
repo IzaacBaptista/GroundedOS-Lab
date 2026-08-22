@@ -373,6 +373,15 @@ describe("embedChunks", () => {
     expect(embedded[1]?.metadata.chunkIndex).toBe(2);
   });
 
+  it("propagates the provider's similarity metric onto embedding metadata (book cap. 11)", async () => {
+    const embedded = await embedChunks(
+      [createChunk()],
+      semanticToEmbeddingProvider(new LocalHashEmbeddingsProvider({ dimensions: 8 }))
+    );
+
+    expect(embedded[0]?.embeddingMetadata.similarityMetric).toBe("cosine");
+  });
+
   it("returns an empty result for an empty chunk list", async () => {
     const embedded = await embedChunks(
       [],

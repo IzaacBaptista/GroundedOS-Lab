@@ -117,6 +117,8 @@ export const RetrievalChunkSchema = z.object({
 // EmbeddedChunk
 // ---------------------------------------------------------------------------
 
+export const SimilarityMetricSchema = z.enum(["cosine", "dotProduct", "euclidean"]);
+
 export const EmbeddedChunkSchema = RetrievalChunkSchema.extend({
   embedding: z.array(z.number()),
   embeddingMetadata: z.object({
@@ -124,6 +126,7 @@ export const EmbeddedChunkSchema = RetrievalChunkSchema.extend({
     model: z.string().min(1).optional(),
     dimensions: z.number().int().positive(),
     normalized: z.boolean().optional(),
+    similarityMetric: SimilarityMetricSchema.optional(),
   }),
 });
 
@@ -133,7 +136,10 @@ export const EmbeddedChunkSchema = RetrievalChunkSchema.extend({
 
 export const VectorSearchResultSchema = z.object({
   chunk: EmbeddedChunkSchema,
-  score: z.number().min(-1).max(1),
+  // Bounded to [-1, 1] for cosine, but dotProduct is magnitude-sensitive
+  // (unbounded) and the euclidean-distance-derived score is in (0, 1] —
+  // no single fixed range covers all three cap. 11 metrics correctly.
+  score: z.number(),
 });
 
 // ---------------------------------------------------------------------------

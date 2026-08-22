@@ -27,12 +27,23 @@ export type EmbeddingProviderId =
   | "openai"
   | "semantic-placeholder";
 
+/**
+ * Book cap. 11: the metric a model's vectors were trained/evaluated to be
+ * compared with. Cosine is the RAG default (direction only, magnitude-
+ * insensitive); dotProduct is magnitude-sensitive for models that encode
+ * extra signal in vector length; euclidean is straight-line distance.
+ * Using the wrong metric for a given model is a silent quality regression,
+ * not an error — declaring it here lets the vector store pick correctly.
+ */
+export type SimilarityMetric = "cosine" | "dotProduct" | "euclidean";
+
 export interface EmbeddingModelInfo {
   provider: EmbeddingProviderId;
   model: string;
   dimensions: number;
   normalized: boolean;
   maxInputChars?: number;
+  similarityMetric?: SimilarityMetric;
 }
 
 export interface EmbedTextInput {
@@ -71,6 +82,7 @@ export interface EmbeddedChunk extends RetrievalChunk {
     dimensions: number;
     model?: string;
     normalized?: boolean;
+    similarityMetric?: SimilarityMetric;
   };
 }
 
@@ -135,6 +147,7 @@ export async function embedChunks(
       dimensions: provider.dimensions,
       model: provider.modelInfo?.model,
       normalized: provider.modelInfo?.normalized,
+      similarityMetric: provider.modelInfo?.similarityMetric ?? "cosine",
     },
   }));
 
@@ -170,6 +183,7 @@ export class LocalHashEmbeddingsProvider implements SemanticEmbeddingsProvider {
       dimensions: this.dimensions,
       normalized: true,
       maxInputChars: this.maxInputChars,
+      similarityMetric: "cosine",
     };
   }
 
@@ -247,6 +261,7 @@ export class OllamaEmbeddingsProvider implements SemanticEmbeddingsProvider {
       dimensions: this.dimensions,
       normalized: true,
       maxInputChars: this.maxInputChars,
+      similarityMetric: "cosine",
     };
   }
 
@@ -385,6 +400,7 @@ export class OpenAIEmbeddingsProvider implements SemanticEmbeddingsProvider {
       dimensions: this.dimensions,
       normalized: true,
       maxInputChars: this.maxInputChars,
+      similarityMetric: "cosine",
     };
   }
 

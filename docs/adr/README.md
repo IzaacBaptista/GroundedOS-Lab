@@ -71,3 +71,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-021](./ADR-021-chunking-boundary-fix-and-strategies.md) | Chunk boundary word-snap fix, recursive/sentence strategies, parent-child chunking | Accepted |
 | [ADR-022](./ADR-022-metadata-enrichment-pre-retrieval-filters.md) | Cap. 9 metadata enrichment: real chunk-level fields, filtering before ranking | Accepted |
 | [ADR-023](./ADR-023-document-lifecycle-staleness-versioning.md) | Document lifecycle: checksum-based staleness, incremental indexing, version history | Accepted |
+| [ADR-024](./ADR-024-similarity-metric-per-embedding-model.md) | Declared similarity metric per embedding model (cosine/dotProduct/euclidean) | Accepted |
