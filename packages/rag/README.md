@@ -49,6 +49,11 @@ const chunks = chunkDocument(normalizedDocument, {
 returns retrieval chunks with stable IDs, source section IDs, offsets, text and
 metadata needed by future Dev Mode retrieval diagnostics.
 
+When `document.lineage.originalFilename` has a recognized code extension
+(`.ts`, `.py`, `.go`, `.java`, ...), chunking switches to a unit-aware mode
+that avoids splitting a function/class body mid-way (book cap. 8,
+"Chunking para código") instead of the default fixed-size sliding window.
+
 Defaults:
 
 | Option | Default | Description |

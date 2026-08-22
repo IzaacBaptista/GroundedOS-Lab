@@ -146,4 +146,56 @@ describe("PdfExtractor", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("preserves detected table structure as Markdown instead of flattening it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "groundedos-pdf-table-"));
+    const filePath = join(dir, "sample.pdf");
+
+    try {
+      await writeFile(filePath, createSimplePdfBuffer(["Report intro."]));
+
+      const fakeParser = {
+        getText: async () => ({
+          pages: [{ num: 1, text: "Report intro." }],
+          total: 1,
+        }),
+        getTable: async () => ({
+          pages: [
+            {
+              num: 1,
+              tables: [
+                [
+                  ["Name", "Price"],
+                  ["Widget", "$10"],
+                ],
+              ],
+            },
+          ],
+          mergedTables: [],
+          total: 1,
+        }),
+        destroy: async () => {},
+      };
+
+      const doc = await new PdfExtractor(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        () => fakeParser as never
+      ).extract({
+        type: "pdf",
+        filePath,
+        metadata: { documentId: "doc-pdf-table" },
+      });
+
+      expect(doc.content.fullText).toContain("| Name | Price |");
+      expect(doc.content.fullText).toContain("| Widget | $10 |");
+      expect(doc.content.fullText).toContain("Report intro.");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

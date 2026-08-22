@@ -20,6 +20,8 @@ export const DocumentModalitySchema = z.enum([
   "csv",
   "markdown",
   "html",
+  "json",
+  "xml",
 ]);
 
 export const DocumentStatusSchema = z.enum([

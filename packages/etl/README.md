@@ -110,12 +110,40 @@ from `packages/etl/src/index.ts` for convenience.
 | Modality | Class | Status | Notes |
 |---|---|---|---|
 | `text` | `TextExtractor` | ✅ Complete | Inline `content` or `filePath`; paragraph-based section splitting |
-| `pdf` | `PdfExtractor` | ✅ Complete | Local `filePath` or remote `url`; page-based text extraction |
+| `pdf` | `PdfExtractor` | ✅ Complete | Local `filePath` or remote `url`; page-based text extraction; detected tables (via `PDFParse.getTable()`, real vector-geometry detection) rendered as Markdown tables, not flattened |
 | `image` | `ImageExtractor` | ✅ Baseline | OCR + image description via provider abstraction. Real providers exist (`TesseractOcrProvider`, `OllamaVisionProvider`) but default to `Mock*Provider` unless opted in — see "Real multimodal providers (opt-in)" below |
 | `audio` | `AudioExtractor` | ✅ Baseline | Transcription via provider abstraction. Real provider exists (`OpenAIWhisperProvider`) but defaults to `MockTranscriptionProvider` unless `OPENAI_API_KEY` is set |
 | `csv` | — | 🔲 Planned | Row/column → section mapping |
 | `markdown` | `MarkdownExtractor` | ✅ Complete | Heading-aware section splitting (ATX `#`..`######`) |
 | `html` | `HtmlExtractor` | ✅ Baseline | Regex-based tag stripping; drops `<script>`/`<style>`; no table/structure extraction yet |
+| `json` | `JsonExtractor` | ✅ Complete | One section per top-level key; nested values rendered hierarchically (`renderStructuredValue`), not flattened |
+| `xml` | `XmlExtractor` | ✅ Complete | Parsed via `fast-xml-parser`, one section per root child; same hierarchical renderer as JSON |
+
+### Normalization (book cap. 7)
+
+Every document returned by `ingest()` passes through `normalizeDocument()`
+(`src/normalization/normalize.ts`) before reaching the caller — this runs
+regardless of modality, unlike the multimodal providers above:
+
+- Fixes common mojibake encoding (e.g. `"CafÃ©"` → `"Café"`).
+- Strips non-printable control characters and collapses excess whitespace/blank lines (Unicode NFKC).
+- Detects and strips a header/footer line repeated across ≥50% of page-like sections (pattern-matched, so a page number inside the line doesn't defeat detection).
+- Drops exact-duplicate sections, keeping the first occurrence.
+- Recomputes `fullText` and every section's `startOffset`/`endOffset` against the cleaned content.
+
+Header/footer detection only runs with 3+ sections by default
+(`minSectionsForHeaderFooterDetection`), to avoid false positives on short
+documents where a repeated short line might be real content, not a footer.
+
+### Code-aware chunking (book cap. 8)
+
+`@groundedos/rag`'s `chunkDocument()` detects code files by
+`lineage.originalFilename` extension (`.ts`, `.py`, `.go`, etc.) and switches
+to a unit-based chunker that never splits a function/class body across
+chunks unless the unit alone exceeds `maxChunkChars`. Unit boundaries are
+heuristic (blank line followed by a non-indented line) — see the `ponytail:`
+comment on `sliceCodeSectionText` for the upgrade path if this needs real
+per-language parsing.
 
 ### Real multimodal providers (opt-in)
 

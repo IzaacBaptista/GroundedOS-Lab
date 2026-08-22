@@ -9,7 +9,7 @@
 import { createHash, randomUUID } from "crypto";
 import { readFile } from "fs/promises";
 import { basename } from "path";
-import { PDFParse } from "pdf-parse";
+import { PDFParse, type TableResult, type TextResult } from "pdf-parse";
 import type {
   DocumentModality,
   DocumentSection,
@@ -30,9 +30,17 @@ import {
 import type { OCRProvider } from "../multimodal/providers/ocr";
 import type { ImageDescriptionProvider } from "../multimodal/providers/vision";
 import { resolveOcrProvider, resolveVisionProvider } from "../multimodal/providers/resolve";
+import { renderTableAsMarkdown } from "./table-markdown";
 
 const EXTRACTOR_NAME = "pdf-extractor";
 const EXTRACTOR_VERSION = "0.1.0";
+
+/** The subset of `PDFParse`'s API this extractor depends on — injectable for tests. */
+export interface PdfParserLike {
+  getText(): Promise<TextResult>;
+  getTable(): Promise<TableResult>;
+  destroy(): Promise<void>;
+}
 
 export class PdfExtractor implements Extractor {
   readonly supportedModalities: DocumentModality[] = ["pdf"];
@@ -43,7 +51,10 @@ export class PdfExtractor implements Extractor {
     private readonly imageStore: ExtractedImageStore = new ExtractedImageStore(),
     private readonly assetRegistry: ImageAssetRegistry = new ImageAssetRegistry(),
     private readonly ocrProvider: OCRProvider = resolveOcrProvider(),
-    private readonly visionProvider: ImageDescriptionProvider = resolveVisionProvider()
+    private readonly visionProvider: ImageDescriptionProvider = resolveVisionProvider(),
+    private readonly pdfParserFactory: (
+      loadParams: ConstructorParameters<typeof PDFParse>[0]
+    ) => PdfParserLike = (loadParams) => new PDFParse(loadParams)
   ) {}
 
   async extract(input: IngestionInput): Promise<NormalizedDocument> {
@@ -54,12 +65,16 @@ export class PdfExtractor implements Extractor {
     }
 
     const source = await this._resolveSource(input);
-    const parser = new PDFParse(source.loadParams);
+    const parser = this.pdfParserFactory(source.loadParams);
 
     try {
       const result = await parser.getText();
+      const tablesByPage = await this._extractTables(parser);
       const pageTexts = result.pages
-        .map((page) => ({ page: page.num, text: page.text.trim() }))
+        .map((page) => ({
+          page: page.num,
+          text: this._mergeTables(page.text.trim(), tablesByPage.get(page.num)),
+        }))
         .filter((page) => page.text.length > 0);
       const documentId = this._resolveDocumentId(input);
       const { fullText, sections } = this._buildContent(pageTexts);
@@ -149,6 +164,44 @@ export class PdfExtractor implements Extractor {
     throw new Error(
       `[${EXTRACTOR_NAME}] Either 'filePath' or 'url' must be provided for modality "pdf".`
     );
+  }
+
+  /**
+   * Detects tables via `PDFParse.getTable()` (grid geometry, not just
+   * column-aligned text) and returns their Markdown rendering per page.
+   * Books cap. 6 warns that flattening a table to plain text destroys the
+   * row/column relationship — this preserves it instead of relying on
+   * whatever order `getText()` happened to emit the cell text in.
+   */
+  private async _extractTables(parser: PdfParserLike): Promise<Map<number, string[]>> {
+    const tablesByPage = new Map<number, string[]>();
+
+    let tableResult: TableResult;
+    try {
+      tableResult = await parser.getTable();
+    } catch {
+      // Table detection is best-effort; a failure here must not break plain
+      // text extraction, which already succeeded by the time this runs.
+      return tablesByPage;
+    }
+
+    for (const page of tableResult.pages) {
+      const rendered = page.tables
+        .map((table) => renderTableAsMarkdown(table))
+        .filter((markdown) => markdown.length > 0);
+      if (rendered.length > 0) {
+        tablesByPage.set(page.num, rendered);
+      }
+    }
+
+    return tablesByPage;
+  }
+
+  private _mergeTables(pageText: string, tables: string[] | undefined): string {
+    if (!tables || tables.length === 0) {
+      return pageText;
+    }
+    return [pageText, ...tables].filter((value) => value.length > 0).join("\n\n");
   }
 
   private _buildContent(pages: Array<{ page: number; text: string }>): {

@@ -15,9 +15,12 @@ import type { Extractor, IngestionInput, NormalizedDocument } from "@groundedos/
 import { AudioExtractor } from "./extractors/audio";
 import { HtmlExtractor } from "./extractors/html";
 import { ImageExtractor } from "./extractors/image";
+import { JsonExtractor } from "./extractors/json";
 import { MarkdownExtractor } from "./extractors/markdown";
 import { PdfExtractor } from "./extractors/pdf";
 import { TextExtractor } from "./extractors/text";
+import { XmlExtractor } from "./extractors/xml";
+import { normalizeDocument } from "./normalization/normalize";
 
 /**
  * All registered extractors, consulted in order.
@@ -30,6 +33,8 @@ const EXTRACTOR_REGISTRY: Extractor[] = [
   new TextExtractor(),
   new MarkdownExtractor(),
   new HtmlExtractor(),
+  new JsonExtractor(),
+  new XmlExtractor(),
   new PdfExtractor(),
   new ImageExtractor(),
   new AudioExtractor(),
@@ -67,5 +72,8 @@ export async function ingest(input: IngestionInput): Promise<NormalizedDocument>
     );
   }
 
-  return extractor.extract(input);
+  const extracted = await extractor.extract(input);
+  const { document } = normalizeDocument(extracted);
+
+  return document;
 }

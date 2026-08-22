@@ -3,6 +3,27 @@ import type { DocumentModality, NormalizedDocument } from "@groundedos/core";
 const ERROR_PREFIX = "[rag/chunking]";
 const DEFAULT_MAX_CHUNK_CHARS = 800;
 const DEFAULT_OVERLAP_CHARS = 100;
+const CODE_FILE_EXTENSIONS = new Set([
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "go",
+  "java",
+  "rb",
+  "rs",
+  "c",
+  "h",
+  "cpp",
+  "hpp",
+  "cs",
+  "php",
+  "kt",
+  "swift",
+]);
 
 export interface ChunkDocumentOptions {
   maxChunkChars?: number;
@@ -41,6 +62,7 @@ export function chunkDocument(
 ): RetrievalChunk[] {
   const resolvedOptions = resolveOptions(options);
   const chunks: RetrievalChunk[] = [];
+  const isCode = isCodeFile(document.lineage.originalFilename);
   let chunkIndex = 0;
 
   for (const section of document.content.sections) {
@@ -53,7 +75,11 @@ export function chunkDocument(
     const sectionBaseOffset = offsetBasis === "document" ? section.startOffset ?? 0 : 0;
     let sectionChunkIndex = 0;
 
-    for (const slice of sliceSectionText(section.text, resolvedOptions)) {
+    const slices = isCode
+      ? sliceCodeSectionText(section.text, resolvedOptions)
+      : sliceSectionText(section.text, resolvedOptions);
+
+    for (const slice of slices) {
       sectionChunkIndex += 1;
       chunkIndex += 1;
 
@@ -99,6 +125,113 @@ function resolveOptions(options: ChunkDocumentOptions): ResolvedChunkOptions {
   }
 
   return { maxChunkChars, overlapChars };
+}
+
+function isCodeFile(filename: string | undefined): boolean {
+  if (!filename) {
+    return false;
+  }
+  const extension = filename.split(".").pop()?.toLowerCase();
+  return extension !== undefined && CODE_FILE_EXTENSIONS.has(extension);
+}
+
+/**
+ * Splits code into logical units (functions/classes/top-level blocks) and
+ * packs them into chunks without cutting a unit in half — book cap. 8
+ * ("Chunking para código"): a function split mid-body loses meaning for
+ * both search and generation.
+ *
+ * ponytail: unit boundaries are detected heuristically (blank line followed
+ * by a non-indented line), not via a real per-language parser. Works for
+ * conventionally-formatted brace and indentation-based code; upgrade to a
+ * syntax-aware parser (e.g. tree-sitter) if fidelity on unconventional
+ * formatting becomes a real requirement.
+ */
+function sliceCodeSectionText(
+  text: string,
+  options: ResolvedChunkOptions
+): Array<{ text: string; startOffset: number; endOffset: number }> {
+  const units = splitIntoCodeUnits(text);
+  const slices: Array<{ text: string; startOffset: number; endOffset: number }> = [];
+  let buffer: { text: string; startOffset: number; endOffset: number } | null = null;
+
+  const flush = () => {
+    if (buffer) {
+      slices.push(buffer);
+      buffer = null;
+    }
+  };
+
+  for (const unit of units) {
+    if (unit.text.length > options.maxChunkChars) {
+      flush();
+      for (const slice of sliceSectionText(unit.text, options)) {
+        slices.push({
+          text: slice.text,
+          startOffset: unit.startOffset + slice.startOffset,
+          endOffset: unit.startOffset + slice.endOffset,
+        });
+      }
+      continue;
+    }
+
+    if (buffer && buffer.text.length + 2 + unit.text.length > options.maxChunkChars) {
+      flush();
+    }
+
+    if (!buffer) {
+      buffer = { text: unit.text, startOffset: unit.startOffset, endOffset: unit.endOffset };
+    } else {
+      buffer.text += `\n\n${unit.text}`;
+      buffer.endOffset = unit.endOffset;
+    }
+  }
+  flush();
+
+  return slices;
+}
+
+function splitIntoCodeUnits(
+  text: string
+): Array<{ text: string; startOffset: number; endOffset: number }> {
+  const lines = text.split("\n");
+  const units: Array<{ text: string; startOffset: number; endOffset: number }> = [];
+  let unitLines: string[] = [];
+  let unitStartOffset = 0;
+  let offset = 0;
+
+  const flush = (endOffset: number) => {
+    const joined = unitLines.join("\n").trim();
+    if (joined.length > 0) {
+      units.push({ text: joined, startOffset: unitStartOffset, endOffset });
+    }
+    unitLines = [];
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!;
+    const isBlank = line.trim().length === 0;
+    const nextLine = lines[i + 1];
+    const nextStartsTopLevel = nextLine !== undefined && /^\S/.test(nextLine);
+
+    if (unitLines.length === 0 && isBlank) {
+      offset += line.length + 1;
+      unitStartOffset = offset;
+      continue;
+    }
+
+    unitLines.push(line);
+
+    if (isBlank && nextStartsTopLevel) {
+      flush(offset + line.length);
+      unitStartOffset = offset + line.length + 1;
+    }
+
+    offset += line.length + 1;
+  }
+  flush(text.length);
+
+  return units;
 }
 
 function sliceSectionText(

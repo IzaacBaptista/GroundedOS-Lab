@@ -253,4 +253,65 @@ describe("chunkDocument", () => {
       "[rag/chunking] overlapChars must be smaller than maxChunkChars."
     );
   });
+
+  it("does not split a function body in the middle for recognized code files", () => {
+    const code = [
+      "function alpha() {",
+      "  return 1;",
+      "}",
+      "",
+      "function beta() {",
+      "  const x = 1;",
+      "",
+      "  return x;",
+      "}",
+      "",
+      "class Gamma {",
+      "  method() {",
+      "    return true;",
+      "  }",
+      "}",
+    ].join("\n");
+
+    const doc = createDocument({
+      content: {
+        fullText: code,
+        sections: [{ id: "section-1", text: code, startOffset: 0, endOffset: code.length }],
+      },
+      lineage: {
+        sourceType: "upload",
+        originalFilename: "sample.ts",
+        mimeType: "text/plain",
+        extractedAt: "2026-04-21T00:00:00.000Z",
+        extractor: "text-extractor",
+        extractorVersion: "0.1.0",
+      },
+    });
+
+    const chunks = chunkDocument(doc, { maxChunkChars: 60, overlapChars: 0 });
+
+    const betaChunk = chunks.find((c) => c.text.includes("function beta"));
+    expect(betaChunk?.text).toContain("const x = 1;");
+    expect(betaChunk?.text).toContain("return x;");
+
+    const gammaChunk = chunks.find((c) => c.text.includes("class Gamma"));
+    expect(gammaChunk?.text).toContain("method() {");
+    expect(gammaChunk?.text).toContain("return true;");
+
+    expect(chunks.some((c) => c.text.includes("function alpha"))).toBe(true);
+  });
+
+  it("falls back to fixed-size slicing for non-code files even with blank-line-separated blocks", () => {
+    const text = "Paragraph one.\n\nParagraph two.\n\nParagraph three.";
+    const doc = createDocument({
+      content: {
+        fullText: text,
+        sections: [{ id: "section-1", text, startOffset: 0, endOffset: text.length }],
+      },
+    });
+
+    const chunks = chunkDocument(doc, { maxChunkChars: 20, overlapChars: 0 });
+
+    expect(chunks.length).toBeGreaterThan(1);
+  });
 });

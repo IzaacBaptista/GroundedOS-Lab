@@ -21,9 +21,21 @@ export { ingest } from "./dispatcher";
 
 // Extractors
 export { TextExtractor } from "./extractors/text";
+export { MarkdownExtractor } from "./extractors/markdown";
+export { HtmlExtractor } from "./extractors/html";
+export { JsonExtractor } from "./extractors/json";
+export { XmlExtractor } from "./extractors/xml";
 export { PdfExtractor } from "./extractors/pdf";
 export { ImageExtractor } from "./extractors/image";
 export { AudioExtractor } from "./extractors/audio";
+export { renderStructuredValue } from "./extractors/structured-text";
+export { renderTableAsMarkdown } from "./extractors/table-markdown";
+export {
+  normalizeDocument,
+  type NormalizeOptions,
+  type NormalizeResult,
+  type NormalizeTrace,
+} from "./normalization/normalize";
 export {
   PdfImageExtractor,
   PdfPageRenderer,

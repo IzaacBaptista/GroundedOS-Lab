@@ -21,7 +21,9 @@ export type DocumentModality =
   | "audio"
   | "csv"
   | "markdown"
-  | "html";
+  | "html"
+  | "json"
+  | "xml";
 
 /** Lifecycle of a document as it moves through the ETL pipeline. */
 export type DocumentStatus =
