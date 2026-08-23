@@ -143,6 +143,20 @@ export {
   detectIntent,
 } from "./query-understanding";
 
+// Sparse retrieval — TF-IDF and BM25 (book cap. 15)
+export {
+  bm25Score,
+  buildCorpusStats,
+  computeTermFrequencies,
+  scoreCandidatesWithBm25,
+  tfIdfScore,
+  tokenize as tokenizeForSparseRetrieval,
+  type Bm25Params,
+  type CorpusStats,
+  type SparseDocument,
+  type TermFrequencies,
+} from "./sparse-retrieval";
+
 // Grounded generation — turns retrieved evidence into an actual LLM answer
 export {
   buildGroundedPrompt,

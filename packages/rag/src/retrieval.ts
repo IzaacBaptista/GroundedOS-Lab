@@ -58,6 +58,7 @@ import {
   type EmbeddingProvider,
   type EmbeddingVector,
 } from "./embeddings";
+import { scoreCandidatesWithBm25 } from "./sparse-retrieval";
 import {
   InMemoryVectorStore,
   type VectorMetadataFilter,
@@ -461,12 +462,23 @@ async function retrieveInternal(
     };
   }
 
+  // Book cap. 15: real BM25 over the candidate pool, not a character-overlap
+  // heuristic — min-max normalized to [0, 1] so it fuses sanely with the
+  // already-bounded cosine-based dense score below.
+  const bm25Scores =
+    adaptivePlan.executionPlan.retrievalMode === "dense"
+      ? new Map<string, number>()
+      : scoreCandidatesWithBm25(
+          query,
+          validatedDenseCandidates.map((candidate) => ({
+            id: candidate.chunk.id,
+            text: candidate.chunk.text,
+          }))
+        );
+
   const scoredCandidates = validatedDenseCandidates.map((candidate, index) => {
       const denseScore = normalizeDenseScore(candidate.score);
-      const sparseScore =
-        adaptivePlan.executionPlan.retrievalMode === "dense"
-          ? 0
-          : sparseNgramCosine(query, candidate.chunk.text);
+      const sparseScore = bm25Scores.get(candidate.chunk.id) ?? 0;
       const combined = denseWeight * denseScore + sparseWeight * sparseScore;
 
       return {
@@ -963,59 +975,6 @@ function normalizeDenseScore(score: number): number {
   }
 
   return Math.max(0, Math.min(1, (score + 1) / 2));
-}
-
-function tokenize(text: string): string[] {
-  return text.normalize("NFKC").toLowerCase().match(/[a-z0-9]+/g) ?? [];
-}
-
-function sparseNgramCosine(query: string, chunkText: string): number {
-  const queryTerms = tokenize(query);
-
-  if (queryTerms.length === 0) {
-    return 0;
-  }
-
-  const queryNgrams = buildCharacterNgrams(queryTerms.join(" "));
-  const chunkNgrams = buildCharacterNgrams(tokenize(chunkText).join(" "));
-
-  if (queryNgrams.size === 0 || chunkNgrams.size === 0) {
-    return 0;
-  }
-
-  let overlap = 0;
-
-  for (const ngram of queryNgrams) {
-    if (chunkNgrams.has(ngram)) {
-      overlap += 1;
-    }
-  }
-
-  if (overlap === 0) {
-    return 0;
-  }
-
-  return overlap / Math.sqrt(queryNgrams.size * chunkNgrams.size);
-}
-
-function buildCharacterNgrams(text: string, n = 3): Set<string> {
-  const normalized = text.replace(/\s+/g, "").trim();
-
-  if (normalized.length === 0) {
-    return new Set<string>();
-  }
-
-  if (normalized.length <= n) {
-    return new Set<string>([normalized]);
-  }
-
-  const ngrams = new Set<string>();
-
-  for (let index = 0; index <= normalized.length - n; index += 1) {
-    ngrams.add(normalized.slice(index, index + n));
-  }
-
-  return ngrams;
 }
 
 function fuseRetrievalSignals(

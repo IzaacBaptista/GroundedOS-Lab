@@ -311,6 +311,37 @@ const devOutput = await retrieveForDevMode(index, "what does this document say?"
 When `mode: "hybrid"` is used, Dev Mode includes a `hybrid` block with
 `denseWeight`, `sparseWeight`, and `candidateCount`.
 
+### Sparse retrieval: real BM25, not a character-overlap heuristic (book cap. 15)
+
+The "sparse" half of hybrid search is real BM25 (`bm25Score`/
+`scoreCandidatesWithBm25`), computed over the candidate pool that dense
+search already returned — term frequency with saturation (`k1`) and
+document-length normalization (`b`), weighted by inverse document
+frequency, exactly as the book describes it. Scores are min-max normalized
+to `[0, 1]` across the candidate pool before being blended with the
+(already-bounded) dense score, since raw BM25 scores are unbounded and
+depend on corpus size.
+
+`tfIdfScore`/`buildCorpusStats`/`computeTermFrequencies` are exported too —
+TF-IDF is BM25's conceptual foundation per the book, useful on its own for
+simpler lexical scoring needs.
+
+```ts
+import { scoreCandidatesWithBm25 } from "@groundedos/rag";
+
+const scores = scoreCandidatesWithBm25("dispatcher normalized document", [
+  { id: "chunk-1", text: "..." },
+  { id: "chunk-2", text: "..." },
+]);
+```
+
+This replaces a prior character-trigram overlap heuristic that had no IDF
+weighting, no term-frequency saturation, and no document-length
+normalization — see ADR-028. "Sparse embeddings" (learned sparse vectors,
+e.g. SPLADE) — the book's third cap. 15 concept — are **not** implemented;
+they need a real trained model, not a formula, and this package doesn't
+integrate one.
+
 In the API workflow, retrieval can fetch a larger candidate set and apply a
 dedicated reranking step before answer generation. The API Dev Mode includes
 reranking/stage telemetry for that orchestration layer.
@@ -361,6 +392,10 @@ The end-to-end internals guide is documented in
 | `rewriteQuery(text)` | Normalize and simplify a raw query |
 | `expandQuery(text)` | Generate lexical variants for retrieval recall |
 | `detectIntent(text)` | Classify query intent into a stable contract |
+| `bm25Score(queryTokens, doc, documentFrequency, totalDocuments, averageDocumentLength, params?)` | BM25 relevance score for one document (book cap. 15) |
+| `scoreCandidatesWithBm25(query, candidates, params?)` | BM25-score and min-max normalize a candidate pool — what hybrid search uses |
+| `tfIdfScore(queryTokens, doc, documentFrequency, totalDocuments)` | TF-IDF relevance score, BM25's conceptual foundation |
+| `buildCorpusStats(documents)` | Document frequency + average document length over a corpus |
 | `SemanticCache` | In-memory semantic cache keyed by document scope and query embedding similarity |
 | `buildGroundedPrompt(request)` | Build a system/user prompt that restricts the model to the given chunks and asks it to cite chunk ids |
 | `OllamaChatProvider` | Opt-in real LLM generation provider using Ollama `/api/chat`; turns retrieved evidence into an actual grounded answer |
