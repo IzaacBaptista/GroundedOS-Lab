@@ -101,6 +101,8 @@ export const RetrievalChunkMetadataSchema = z.object({
   permissions: z.array(z.string()).optional(),
   tenantId: z.string().optional(),
   relationships: z.array(DocumentRelationshipSchema).optional(),
+  /** Book cap. 21: LLM-generated situating text (contextual chunking), prepended before embedding/BM25 — not the chunk's own content. */
+  context: z.string().optional(),
 });
 
 export const RetrievalChunkSchema = z.object({
@@ -111,6 +113,8 @@ export const RetrievalChunkSchema = z.object({
   startOffset: z.number().int().nonnegative(),
   endOffset: z.number().int().nonnegative(),
   metadata: RetrievalChunkMetadataSchema,
+  /** Book cap. 21 (parent-child retrieval): id of the full-section `ParentChunk` this chunk was cut from, when produced by `chunkDocumentWithParents`. */
+  parentChunkId: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------

@@ -541,4 +541,79 @@ describe("retrieval flow", () => {
     expect(rrfScore).toBeLessThan(0.05);
     expect(rrfScore).not.toBeCloseTo(weightedScore, 3);
   });
+
+  it("book cap. 21: contextualChunks attaches an LLM-generated context to each chunk and combines it into the embedded text", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Revenue grew 3% versus last quarter.",
+      metadata: { documentId: "doc-context" },
+    });
+    const complete = vi.fn(async () => "Acme Corp's Q2 2023 revenue update.");
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      contextualChunks: true,
+      llmProvider: { id: "fake", complete },
+    });
+
+    expect(complete).toHaveBeenCalled();
+    expect(index.embeddedChunks[0]?.metadata.context).toBe("Acme Corp's Q2 2023 revenue update.");
+    // The chunk's own displayed text stays the original excerpt, not the blurb.
+    expect(index.embeddedChunks[0]?.text).toBe("Revenue grew 3% versus last quarter.");
+  });
+
+  it("book cap. 21: contextualChunks is a no-op without an llmProvider (opt-in, not default)", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Revenue grew 3% versus last quarter.",
+      metadata: { documentId: "doc-context-noop" },
+    });
+
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      contextualChunks: true,
+    });
+
+    expect(index.embeddedChunks[0]?.metadata.context).toBeUndefined();
+  });
+
+  it("book cap. 21: injectParentChunks swaps the returned chunk's text for its full parent section", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Short child line.\n\nAnother section entirely, about something else.",
+      metadata: { documentId: "doc-parent-child" },
+    });
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: { maxChunkChars: 10, overlapChars: 0 },
+    });
+
+    const withoutSwap = await retrieveFromIndex(index, "short child line", { topK: 1 });
+    const withSwap = await retrieveFromIndex(index, "short child line", {
+      topK: 1,
+      injectParentChunks: true,
+    });
+
+    expect(withoutSwap[0]?.chunk.text.length).toBeLessThan("Short child line.".length + 1);
+    expect(withSwap[0]?.chunk.text).toBe("Short child line.");
+  });
+
+  it("book cap. 21: injectParentChunks is a no-op when the index has no parent data (e.g. reconstructed without buildRetrievalIndex)", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Some content here.",
+      metadata: { documentId: "doc-no-parents" },
+    });
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+    });
+    const indexWithoutParents: typeof index = { ...index, parents: undefined };
+
+    const result = await retrieveFromIndex(indexWithoutParents, "some content", {
+      topK: 1,
+      injectParentChunks: true,
+    });
+
+    expect(result[0]?.chunk.text).toBe("Some content here.");
+  });
 });

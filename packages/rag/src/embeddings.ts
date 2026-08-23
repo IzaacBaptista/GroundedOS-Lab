@@ -1,4 +1,5 @@
 import type { RetrievalChunk } from "./chunking";
+import { contextualizedChunkText } from "./contextual-chunking";
 import { validateEmbeddedChunks, validateRetrievalChunks } from "@groundedos/core";
 
 const ERROR_PREFIX = "[rag/embeddings]";
@@ -161,7 +162,7 @@ export async function embedChunks(
   }
 
   const embeddings = await provider.embedTexts(
-    chunks.map((chunk) => chunk.text),
+    chunks.map((chunk) => contextualizedChunkText(chunk)),
     "document"
   );
   validateEmbeddings(embeddings, chunks.length, provider);

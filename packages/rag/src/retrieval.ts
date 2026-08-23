@@ -48,10 +48,12 @@ import {
   type RaptorTree,
 } from "./advanced-retrieval";
 import {
-  chunkDocument,
+  chunkDocumentWithParents,
   type ChunkDocumentOptions,
   type ChunkOffsetBasis,
+  type HierarchicalChunk,
 } from "./chunking";
+import { annotateChunksWithContext, contextualizedChunkText } from "./contextual-chunking";
 import {
   DeterministicEmbeddingProvider,
   embedChunks,
@@ -79,12 +81,29 @@ export interface BuildRetrievalIndexOptions {
   enableGraphRag?: boolean;
   enableRaptor?: boolean;
   store?: VectorStore;
+  /**
+   * Book cap. 21: generate a situating LLM blurb per chunk at indexing
+   * time (contextual chunks), embedded and BM25-indexed combined with the
+   * chunk's own text. Requires `llmProvider`; a no-op without one — one
+   * LLM call per chunk, so opt-in rather than default.
+   */
+  contextualChunks?: boolean;
+  /** LLM used for `contextualChunks` at indexing time. */
+  llmProvider?: LlmTextProvider;
 }
 
 export interface RetrievalIndex {
   embeddingProvider: EmbeddingProvider;
   store: VectorStore;
   embeddedChunks: EmbeddedChunk[];
+  /**
+   * Book cap. 21 (parent-child retrieval): full-section text per
+   * `parentChunkId`, for `injectParentChunks`. Populated by
+   * `buildRetrievalIndex`; unset for an index reconstructed some other way
+   * (e.g. from a persisted snapshot that doesn't serialize parent text) —
+   * `injectParentChunks` is then a documented no-op, not a silent lie.
+   */
+  parents?: Map<string, string>;
   knowledgeGraph?: KnowledgeGraph;
   graphStore?: GraphStore;
   raptorTree?: RaptorTree;
@@ -123,6 +142,14 @@ export interface RetrieveFromIndexOptions {
   llmProvider?: LlmTextProvider;
   /** Book cap. 20: generalize the query (step-back prompting) and merge its results in, alongside dense/HyDE/expansion candidates. */
   stepBack?: boolean;
+  /**
+   * Book cap. 21 (parent-child retrieval): once a child chunk scores well,
+   * swap its `text` for the full parent section text before it's returned
+   * — search still matches on the precise child, but the caller gets the
+   * broader context. Off by default (backward compatible): callers get the
+   * child's own text unless they opt in.
+   */
+  injectParentChunks?: boolean;
 }
 
 export type RetrievalResult = VectorSearchResult;
@@ -232,10 +259,20 @@ export async function buildRetrievalIndex(
   const embeddingProvider =
     options.embeddingProvider ?? new DeterministicEmbeddingProvider();
   const store = options.store ?? new InMemoryVectorStore();
-  const chunks = chunkDocument(document, options.chunkOptions);
+  // Book cap. 21: parent-child chunking always runs (pure, free) so the
+  // parent text is available for `injectParentChunks` at retrieval time.
+  const { chunks: hierarchicalChunks, parents } = chunkDocumentWithParents(
+    document,
+    options.chunkOptions
+  );
+  const chunks =
+    options.contextualChunks && options.llmProvider
+      ? await annotateChunksWithContext(hierarchicalChunks, document.content.fullText, options.llmProvider)
+      : hierarchicalChunks;
   validateRetrievalChunks(chunks);
   const embeddedChunks = await embedChunks(chunks, embeddingProvider);
   validateEmbeddedChunks(embeddedChunks);
+  const parentsById = new Map(parents.map((parent) => [parent.id, parent.text]));
 
   store.insert(embeddedChunks);
   const graphStore =
@@ -261,6 +298,7 @@ export async function buildRetrievalIndex(
     embeddingProvider,
     store,
     embeddedChunks,
+    parents: parentsById,
     knowledgeGraph,
     graphStore,
     raptorTree,
@@ -272,7 +310,7 @@ export async function retrieveFromIndex(
   query: string,
   options: RetrieveFromIndexOptions = {}
 ): Promise<RetrievalResult[]> {
-  const internal = await retrieveInternal(index, query, options);
+  const internal = applyParentChunkSwap(await retrieveInternal(index, query, options), index, options);
 
   return internal.results;
 }
@@ -282,7 +320,7 @@ export async function retrieveForDevMode(
   query: string,
   options: RetrieveFromIndexOptions = {}
 ): Promise<RetrievalDevModeOutput> {
-  const internal = await retrieveInternal(index, query, options);
+  const internal = applyParentChunkSwap(await retrieveInternal(index, query, options), index, options);
   const output = createRetrievalDevOutput(query, internal.results);
 
   if (internal.hybridMeta) {
@@ -365,6 +403,33 @@ type InternalRetrievalResult = {
   raptorTrace?: RaptorTrace;
   retrievalFusionTrace?: RetrievalFusionTrace;
 };
+
+/**
+ * Book cap. 21 (parent-child retrieval): when opted in, swaps each result
+ * chunk's `text` for its parent section's full text — search already
+ * matched on the precise child, this only changes what gets handed back.
+ * Note: `startOffset`/`endOffset` still describe the child's window, not
+ * the parent's — a known limitation, not a claim that they were updated.
+ */
+function applyParentChunkSwap(
+  internal: InternalRetrievalResult,
+  index: RetrievalIndex,
+  options: RetrieveFromIndexOptions
+): InternalRetrievalResult {
+  if (!options.injectParentChunks || !index.parents || index.parents.size === 0) {
+    return internal;
+  }
+
+  return {
+    ...internal,
+    results: internal.results.map((result) => {
+      const parentChunkId = (result.chunk as Partial<HierarchicalChunk>).parentChunkId;
+      const parentText = parentChunkId ? index.parents?.get(parentChunkId) : undefined;
+
+      return parentText ? { ...result, chunk: { ...result.chunk, text: parentText } } : result;
+    }),
+  };
+}
 
 async function retrieveInternal(
   index: RetrievalIndex,
@@ -510,7 +575,7 @@ async function retrieveInternal(
           query,
           validatedDenseCandidates.map((candidate) => ({
             id: candidate.chunk.id,
-            text: candidate.chunk.text,
+            text: contextualizedChunkText(candidate.chunk),
           }))
         );
 

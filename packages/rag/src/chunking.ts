@@ -67,6 +67,13 @@ export interface RetrievalChunkMetadata {
   permissions?: string[];
   tenantId?: string;
   relationships?: DocumentRelationship[];
+  /**
+   * Book cap. 21: LLM-generated situating text (contextual chunking) — a
+   * short blurb identifying entities/topic/section implicit in the chunk
+   * but not stated in it, generated from the whole document at indexing
+   * time. Set by `annotateChunksWithContext`, not by `chunkDocument` itself.
+   */
+  context?: string;
 }
 
 export interface RetrievalChunk {

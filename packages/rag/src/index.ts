@@ -18,6 +18,13 @@ export {
   type RetrievalChunkMetadata,
 } from "./chunking";
 
+// Contextual chunks/embeddings (book cap. 21)
+export {
+  annotateChunksWithContext,
+  buildChunkContext,
+  contextualizedChunkText,
+} from "./contextual-chunking";
+
 export {
   DeterministicEmbeddingProvider,
   LocalHashEmbeddingsProvider,

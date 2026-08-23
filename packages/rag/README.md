@@ -69,6 +69,12 @@ returns the same fine-grained `chunks` as `chunkDocument()` (for precise
 retrieval matching) plus a `parents` array — one entry per section, the
 "contexto amplo" a caller can inject into the prompt once a child chunk
 scores well. Each child carries `parentChunkId` pointing to its parent.
+`buildRetrievalIndex` always runs this (it's free — no extra LLM call, just
+extra metadata), and `retrieveFromIndex(..., { injectParentChunks: true })`
+does the actual swap the book's Figure 8.2 describes: search still matches
+the precise child, but the returned chunk's `text` becomes the full parent
+section (book cap. 21, "Parent-child retrieval") — this used to be a real
+primitive with zero callers; it's wired end-to-end now. Off by default.
 `structure-aware` chunking already happens implicitly: chunking runs
 per-section, and sections already come from heading/page boundaries set by
 the extractors (Part 2).
@@ -410,6 +416,27 @@ text-completion primitive distinct from `GenerationProvider` (which is
 shaped specifically for grounded question-answering), reused by HyDE,
 step-back, and the LLM reranker instead of three separate provider shapes.
 
+### Contextual chunks/embeddings and parent-child retrieval (book cap. 21)
+
+A chunk like "revenue grew 3%" is useless for retrieval alone — which
+company, which quarter? `buildRetrievalIndex(document, { contextualChunks:
+true, llmProvider })` generates a one-sentence situating blurb per chunk
+(one LLM call per chunk, using the whole document as reference) and
+attaches it as `metadata.context` — the chunk's own `text` stays the
+original excerpt (citations still point at real content), but both the
+dense embedding *and* the BM25 candidate text are the context + chunk
+combined (`contextualizedChunkText()`), so the entities/topic implicit in
+the chunk are actually searchable on both sides of hybrid search. Opt-in
+and requires `llmProvider` — a no-op without one, not a silent heuristic
+standing in for the technique.
+
+`retrieveFromIndex(..., { injectParentChunks: true })` is the retrieval-time
+half of parent-child chunking (see the chunking section above): once a
+child chunk scores well, its returned `text` is swapped for the full
+parent section. `startOffset`/`endOffset` still describe the child's
+window, not the parent's — a known, disclosed limitation, not a claim that
+they were updated too.
+
 The output contract is documented in
 [`docs/phase-1-dev-mode-output.md`](../../docs/phase-1-dev-mode-output.md).
 The local CLI usage guide is documented in
@@ -422,8 +449,11 @@ The end-to-end internals guide is documented in
 | Export | Purpose |
 |---|---|
 | `chunkDocument(document, options?)` | Convert normalized document sections into retrieval chunks |
+| `chunkDocumentWithParents(document, options?)` | Parent-child chunking — children carry `parentChunkId` (book cap. 8/21) |
 | `RetrievalChunk` | Stable chunk shape for retrieval and Dev Mode diagnostics |
 | `ChunkDocumentOptions` | Optional chunk size and overlap settings |
+| `annotateChunksWithContext(chunks, documentText, llmProvider)` | Generate and attach a situating `metadata.context` blurb per chunk (book cap. 21) |
+| `contextualizedChunkText(chunk)` | Context + text combined — what's actually embedded/BM25-indexed |
 | `embedChunks(chunks, provider)` | Attach embedding vectors to retrieval chunks |
 | `EmbeddingProvider` | Interface for local or remote embedding providers |
 | `DeterministicEmbeddingProvider` | Local deterministic provider for tests and development |

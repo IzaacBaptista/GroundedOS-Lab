@@ -77,3 +77,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-027](./ADR-027-ann-index-metric-and-recall-latency-tuning.md) | ANN index metric correctness and recall/latency tuning knobs | Accepted |
 | [ADR-028](./ADR-028-real-bm25-sparse-retrieval.md) | Real BM25/TF-IDF sparse retrieval, replacing a character-overlap heuristic | Accepted |
 | [ADR-029](./ADR-029-retrieval-query-understanding-rerank-and-query-transformation-caps-16-20.md) | Caps 16-20: similarity threshold, real query rewriting, RRF, a real LLM reranker, real HyDE/step-back | Accepted |
+| [ADR-030](./ADR-030-contextual-chunks-and-parent-child-retrieval-time-swap-cap-21.md) | Cap 21: contextual chunks/embeddings, and wiring the parent-child retrieval-time swap | Accepted |
