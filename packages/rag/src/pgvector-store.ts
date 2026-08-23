@@ -36,6 +36,61 @@ import type {
 
 const ERROR_PREFIX = "[rag/pgvector-store]";
 
+/** RetrievalChunk fields backed by a real table column (see bootstrapSchema). */
+const ROOT_COLUMNS: Record<string, string> = {
+  documentId: "document_id",
+  sectionId: "section_id",
+  startOffset: "start_offset",
+  endOffset: "end_offset",
+};
+/** EmbeddedChunk.embeddingMetadata fields, stored in the embedding_metadata JSONB column. */
+const EMBEDDING_METADATA_FIELDS: Record<string, string> = {
+  embeddingProvider: "provider",
+  embeddingDimensions: "dimensions",
+};
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+/**
+ * Book cap. 13/9: builds one WHERE clause per filter key. Fields that live
+ * in the `metadata` JSONB column (everything not a real column or embedding
+ * metadata field — e.g. tenantId, permissions, tags, modality) are matched
+ * generically: if the stored value is a JSON array, the filter matches when
+ * the array contains the requested value OR the array is empty/absent (no
+ * restriction = visible to everyone, mirroring InMemoryVectorStore's
+ * permissions/tags semantics); otherwise it's an exact match.
+ */
+function buildFilterClause(
+  key: string,
+  value: string | number | boolean,
+  paramIndex: number
+): { clause: string; param: unknown } {
+  if (!SAFE_IDENTIFIER.test(key)) {
+    throw new Error(`${ERROR_PREFIX} invalid filter key "${key}".`);
+  }
+
+  if (ROOT_COLUMNS[key]) {
+    return { clause: `${ROOT_COLUMNS[key]} = $${paramIndex}`, param: value };
+  }
+
+  if (EMBEDDING_METADATA_FIELDS[key]) {
+    const field = EMBEDDING_METADATA_FIELDS[key];
+    return {
+      clause: `embedding_metadata->>'${field}' = $${paramIndex}::text`,
+      param: String(value),
+    };
+  }
+
+  return {
+    clause: `(
+      (jsonb_typeof(metadata->'${key}') = 'array' AND (
+        jsonb_array_length(metadata->'${key}') = 0 OR metadata->'${key}' ? $${paramIndex}::text
+      ))
+      OR (jsonb_typeof(metadata->'${key}') IS DISTINCT FROM 'array' AND metadata->>'${key}' = $${paramIndex}::text)
+    )`,
+    param: String(value),
+  };
+}
+
 export interface PgClient {
   query<T = Record<string, unknown>>(
     sql: string,
@@ -176,9 +231,9 @@ export class PgvectorVectorStore implements VectorStore {
       let idx = params.length + 1;
       for (const [key, value] of Object.entries(query.filter)) {
         if (value === undefined) continue;
-        const pgKey = camelToSnake(key);
-        filterClauses.push(`${pgKey} = $${idx}`);
-        params.push(value);
+        const { clause, param } = buildFilterClause(key, value, idx);
+        filterClauses.push(clause);
+        params.push(param);
         idx++;
       }
     }
@@ -231,10 +286,6 @@ export class PgvectorVectorStore implements VectorStore {
     });
     this._size = 0;
   }
-}
-
-function camelToSnake(str: string): string {
-  return str.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 }
 
 /**

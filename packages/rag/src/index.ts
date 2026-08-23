@@ -60,6 +60,9 @@ export {
   IdentityEmbeddingStorageAdapter,
   PgVectorProvider,
   QdrantProvider,
+  PineconeProvider,
+  WeaviateProvider,
+  ElasticsearchProvider,
   VectorStoreCollection,
   createDualWriteStore,
   type EmbeddingStorageAdapter,
@@ -79,6 +82,21 @@ export {
   QdrantVectorStore,
   type QdrantStoreOptions,
 } from "./qdrant-store";
+
+export {
+  PineconeVectorStore,
+  type PineconeStoreOptions,
+} from "./pinecone-store";
+
+export {
+  WeaviateVectorStore,
+  type WeaviateStoreOptions,
+} from "./weaviate-store";
+
+export {
+  ElasticsearchVectorStore,
+  type ElasticsearchStoreOptions,
+} from "./elasticsearch-store";
 
 export {
   DualWriteVectorStore,

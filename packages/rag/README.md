@@ -205,6 +205,39 @@ chunk. `store.search({ filter })` treats the array-valued fields specially:
 Everything else uses exact-match, as before. See `packages/core`'s README for
 the full field list and categories.
 
+### Real vector store backends (book cap. 13)
+
+Besides `InMemoryVectorStore`, this package ships real HTTP-backed stores for
+the options the book discusses. All of them implement the same `VectorStore`
+interface, fall back to `InMemoryVectorStore` (as a "mirror" or on connection
+failure) when unconfigured or unreachable, and apply the cap. 9 metadata
+semantics — array fields match by contains-or-open (unset/empty = visible to
+everyone), everything else by exact match — as a genuine **pre-filter**, not
+a post-hoc discard of an already-ranked result set:
+
+| Store | Options | Namespaces/tenants |
+|---|---|---|
+| `PgvectorVectorStore` | `createVectorStore({ connect, tableName?, dimensions? })` | none — use a separate table/schema per tenant |
+| `QdrantVectorStore` | `new QdrantVectorStore({ baseUrl, collectionName, apiKey? })` | none — use a separate collection per tenant |
+| `PineconeVectorStore` | `new PineconeVectorStore({ baseUrl, apiKey, namespace? })` | native `namespace` |
+| `WeaviateVectorStore` | `new WeaviateVectorStore({ baseUrl, className, tenant? })` | native `tenant` (class needs `multiTenancyConfig.enabled: true`) |
+| `ElasticsearchVectorStore` | `new ElasticsearchVectorStore({ baseUrl, index })` | none — use a separate index per tenant |
+
+Each store's `insert()`/`search()` are synchronous (writing/reading through
+an in-memory mirror) for interface compatibility; use `insertAsync()` /
+`searchAsync()` to actually round-trip to the real backend.
+
+`PgvectorVectorStore` and `QdrantVectorStore` fixed a real bug in this round:
+filtering by any cap. 9 metadata field (`tenantId`, `permissions`, `tags`,
+`modality`, ...) used to either throw a SQL error (pgvector, which assumed
+every filter key was a real table column) or silently match nothing (Qdrant,
+whose filter keys didn't point at the nested `payload.metadata.*` path
+where those fields actually live) — see ADR-026.
+
+`relationships` (an array of objects) has no flat representation in Pinecone
+or Weaviate's schema-typed properties, so both serialize it to a JSON string
+field and parse it back on read; it isn't filterable on those two backends.
+
 ```ts
 import { InMemoryVectorStore } from "@groundedos/rag";
 
@@ -290,6 +323,12 @@ The end-to-end internals guide is documented in
 | `EmbeddedChunk` | Retrieval chunk plus embedding vector and embedding metadata |
 | `InMemoryVectorStore` | Local vector store with insert, similarity search and metadata filtering |
 | `VectorSearchResult` | Search result containing an embedded chunk and cosine similarity score |
+| `PgvectorVectorStore`, `createVectorStore(options)` | PostgreSQL + pgvector backend (book cap. 13) |
+| `QdrantVectorStore` | Qdrant backend (book cap. 13) |
+| `PineconeVectorStore` | Pinecone backend, with native namespace support (book cap. 13) |
+| `WeaviateVectorStore` | Weaviate backend, with native tenant support (book cap. 13) |
+| `ElasticsearchVectorStore` | Elasticsearch/OpenSearch backend using native `knn` pre-filtered search (book cap. 13) |
+| `PgVectorProvider`, `QdrantProvider`, `PineconeProvider`, `WeaviateProvider`, `ElasticsearchProvider` | `VectorStoreProvider` wrappers for each backend, falling back to in-memory when unconfigured |
 | `buildRetrievalIndex(document, options?)` | Chunk, embed and insert a normalized document into a local retrieval index |
 | `retrieveFromIndex(index, query, options?)` | Embed a query and retrieve ranked chunks from an index |
 | `RetrievalIndex` | Local retrieval index with provider, store and embedded chunks |

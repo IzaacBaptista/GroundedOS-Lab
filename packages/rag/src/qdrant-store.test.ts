@@ -119,4 +119,66 @@ describe("QdrantVectorStore", () => {
     expect(results[0]?.chunk.text).toBe("remote chunk");
     expect(results[0]?.score).toBeCloseTo(0.91);
   });
+
+  it("book cap. 13: filters on metadata fields target the nested payload.metadata path, not the payload root", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: true }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: [] }));
+
+    const store = new QdrantVectorStore({
+      baseUrl: "http://localhost:6333",
+      collectionName: "rag_chunks",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      mirrorStore: { insert: () => {}, search: () => [], clear: () => {}, size: 0 },
+    });
+
+    await store.searchAsync({
+      embedding: [0, 1],
+      topK: 1,
+      filter: { tenantId: "tenant-a", modality: "text" },
+    });
+
+    const searchCall = fetchImpl.mock.calls[1];
+    const body = JSON.parse(String(searchCall[1].body));
+
+    expect(body.filter.must).toEqual(
+      expect.arrayContaining([
+        { key: "metadata.tenantId", match: { value: "tenant-a" } },
+        { key: "metadata.modality", match: { value: "text" } },
+      ])
+    );
+  });
+
+  it("book cap. 13: permissions/tags filters also match chunks where the field is unset (open-by-default, matching InMemoryVectorStore)", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: true }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: [] }));
+
+    const store = new QdrantVectorStore({
+      baseUrl: "http://localhost:6333",
+      collectionName: "rag_chunks",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      mirrorStore: { insert: () => {}, search: () => [], clear: () => {}, size: 0 },
+    });
+
+    await store.searchAsync({
+      embedding: [0, 1],
+      topK: 1,
+      filter: { permissions: "role:qa" },
+    });
+
+    const searchCall = fetchImpl.mock.calls[1];
+    const body = JSON.parse(String(searchCall[1].body));
+
+    expect(body.filter.must).toEqual([
+      {
+        should: [
+          { key: "metadata.permissions", match: { value: "role:qa" } },
+          { is_empty: { key: "metadata.permissions" } },
+        ],
+      },
+    ]);
+  });
 });

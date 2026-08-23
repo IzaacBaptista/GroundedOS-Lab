@@ -1,6 +1,9 @@
 import type { EmbeddedChunk } from "./embeddings";
+import { ElasticsearchVectorStore, type ElasticsearchStoreOptions } from "./elasticsearch-store";
 import { createVectorStore, type PgvectorStoreOptions } from "./pgvector-store";
+import { PineconeVectorStore, type PineconeStoreOptions } from "./pinecone-store";
 import { QdrantVectorStore, type QdrantStoreOptions } from "./qdrant-store";
+import { WeaviateVectorStore, type WeaviateStoreOptions } from "./weaviate-store";
 import { createVectorStoreForDualWrite } from "./vector-backend";
 import { InMemoryVectorStore } from "./vector-store";
 import type { VectorSearchQuery, VectorSearchResult, VectorStore } from "./vector-store";
@@ -25,7 +28,7 @@ export interface EmbeddingStorageAdapter {
 }
 
 export interface VectorStoreProvider {
-  readonly providerId: "memory" | "pgvector" | "qdrant";
+  readonly providerId: "memory" | "pgvector" | "qdrant" | "pinecone" | "weaviate" | "elasticsearch";
   createStore(): Promise<VectorStore>;
 }
 
@@ -123,6 +126,66 @@ export class QdrantProvider implements VectorStoreProvider {
       baseUrl,
       collectionName,
     } as QdrantStoreOptions);
+  }
+}
+
+export class PineconeProvider implements VectorStoreProvider {
+  readonly providerId = "pinecone" as const;
+
+  constructor(private readonly options: Partial<PineconeStoreOptions>) {}
+
+  async createStore(): Promise<VectorStore> {
+    const baseUrl = this.options.baseUrl?.trim();
+    const apiKey = this.options.apiKey?.trim();
+
+    if (!baseUrl || !apiKey) {
+      console.warn(
+        `${ERROR_PREFIX} pinecone provider is not fully configured; falling back to in-memory store.`
+      );
+      return new InMemoryVectorStore();
+    }
+
+    return new PineconeVectorStore({ ...this.options, baseUrl, apiKey } as PineconeStoreOptions);
+  }
+}
+
+export class WeaviateProvider implements VectorStoreProvider {
+  readonly providerId = "weaviate" as const;
+
+  constructor(private readonly options: Partial<WeaviateStoreOptions>) {}
+
+  async createStore(): Promise<VectorStore> {
+    const baseUrl = this.options.baseUrl?.trim();
+    const className = this.options.className?.trim();
+
+    if (!baseUrl || !className) {
+      console.warn(
+        `${ERROR_PREFIX} weaviate provider is not fully configured; falling back to in-memory store.`
+      );
+      return new InMemoryVectorStore();
+    }
+
+    return new WeaviateVectorStore({ ...this.options, baseUrl, className } as WeaviateStoreOptions);
+  }
+}
+
+export class ElasticsearchProvider implements VectorStoreProvider {
+  readonly providerId = "elasticsearch" as const;
+
+  constructor(private readonly options: Partial<ElasticsearchStoreOptions>) {}
+
+  async createStore(): Promise<VectorStore> {
+    const baseUrl = this.options.baseUrl?.trim();
+    const index = this.options.index?.trim();
+
+    if (!baseUrl || !index) {
+      console.warn(
+        `${ERROR_PREFIX} elasticsearch provider is not fully configured; falling back to in-memory store.`
+      );
+      return new InMemoryVectorStore();
+    }
+
+    return new ElasticsearchVectorStore({ ...this.options, baseUrl, index } as ElasticsearchStoreOptions);
   }
 }
 

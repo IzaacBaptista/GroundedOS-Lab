@@ -4,12 +4,20 @@ import type { VectorSearchQuery, VectorSearchResult, VectorStore } from "./vecto
 
 const ERROR_PREFIX = "[rag/vector-backend]";
 
-export type VectorBackend = "memory" | "pgvector" | "qdrant";
+export type VectorBackend = "memory" | "pgvector" | "qdrant" | "pinecone" | "weaviate" | "elasticsearch";
+
+const KNOWN_BACKENDS = new Set<VectorBackend>([
+  "pgvector",
+  "qdrant",
+  "pinecone",
+  "weaviate",
+  "elasticsearch",
+]);
 
 export function resolveVectorBackend(env: NodeJS.ProcessEnv = process.env): VectorBackend {
   const backend = env.VECTOR_BACKEND?.toLowerCase().trim();
-  if (backend === "pgvector" || backend === "qdrant") {
-    return backend;
+  if (backend && KNOWN_BACKENDS.has(backend as VectorBackend)) {
+    return backend as VectorBackend;
   }
 
   return "memory";

@@ -11,6 +11,31 @@ const ERROR_PREFIX = "[rag/qdrant-store]";
 const DEFAULT_TOP_K = 5;
 const DEFAULT_TIMEOUT_MS = 5_000;
 
+/**
+ * RetrievalChunk fields stored at the payload root (see buildChunkPayload).
+ * Everything else lives nested under payload.metadata / payload.embeddingMetadata.
+ */
+const ROOT_PAYLOAD_FIELDS = new Set(["documentId", "sectionId", "startOffset", "endOffset"]);
+const EMBEDDING_METADATA_FIELDS: Record<string, string> = {
+  embeddingProvider: "embeddingMetadata.provider",
+  embeddingDimensions: "embeddingMetadata.dimensions",
+};
+/**
+ * Book cap. 9: array-valued metadata fields where an unset/empty value means
+ * "no restriction" (matches InMemoryVectorStore's open-by-default rule).
+ * Qdrant's filter DSL can't introspect a field's runtime type the way
+ * pgvector's jsonb_typeof can, so this list is explicit rather than generic.
+ */
+const OPEN_ARRAY_METADATA_FIELDS = new Set(["tags", "permissions"]);
+
+function resolveQdrantFieldPath(key: string): string {
+  if (ROOT_PAYLOAD_FIELDS.has(key)) {
+    return key;
+  }
+
+  return EMBEDDING_METADATA_FIELDS[key] ?? `metadata.${key}`;
+}
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 interface QdrantSearchPoint {
@@ -259,14 +284,28 @@ export class QdrantVectorStore implements VectorStore {
       return undefined;
     }
 
-    const must = Object.entries(filter)
-      .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => ({
-        key,
-        match: {
-          value,
-        },
-      }));
+    const must: Record<string, unknown>[] = [];
+
+    for (const [key, value] of Object.entries(filter)) {
+      if (value === undefined) {
+        continue;
+      }
+
+      const path = resolveQdrantFieldPath(key);
+
+      if (OPEN_ARRAY_METADATA_FIELDS.has(key)) {
+        // Book cap. 9: match chunks whose array contains the value, OR whose
+        // array is unset/empty (no restriction = visible to everyone).
+        // Nested as its own `should` so multiple open-array filters in the
+        // same query still AND together, each OR-ing its own two conditions.
+        must.push({
+          should: [{ key: path, match: { value } }, { is_empty: { key: path } }],
+        });
+        continue;
+      }
+
+      must.push({ key: path, match: { value } });
+    }
 
     return must.length > 0 ? { must } : undefined;
   }
