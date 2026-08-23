@@ -1,4 +1,4 @@
-import type { EmbeddedChunk, EmbeddingVector } from "./embeddings";
+import type { EmbeddedChunk, EmbeddingVector, SimilarityMetric } from "./embeddings";
 import { InMemoryVectorStore } from "./vector-store";
 import type {
   VectorMetadataFilter,
@@ -36,6 +36,17 @@ function resolveQdrantFieldPath(key: string): string {
   return EMBEDDING_METADATA_FIELDS[key] ?? `metadata.${key}`;
 }
 
+/**
+ * Book cap. 11/14: must match the metric the embedding model declares
+ * (ADR-024) — using "Cosine" for a dotProduct-optimized model is a silent
+ * correctness bug, not an error.
+ */
+const METRIC_TO_QDRANT_DISTANCE: Record<SimilarityMetric, "Cosine" | "Dot" | "Euclid"> = {
+  cosine: "Cosine",
+  dotProduct: "Dot",
+  euclidean: "Euclid",
+};
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 interface QdrantSearchPoint {
@@ -57,6 +68,24 @@ export interface QdrantStoreOptions {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   mirrorStore?: VectorStore;
+  /** Book cap. 11: must match the embedding model's declared metric (default: "cosine"). */
+  similarityMetric?: SimilarityMetric;
+  /** Book cap. 14: HNSW max connections per graph layer at build time. */
+  hnswM?: number;
+  /** Book cap. 14: HNSW candidate list size during graph construction. */
+  hnswEfConstruct?: number;
+  /**
+   * Book cap. 14: recall/latency knob applied per search — candidate list
+   * size searched at query time. Higher = better recall, slower. Unset uses
+   * Qdrant's own collection-level default.
+   */
+  hnswEf?: number;
+  /**
+   * Book cap. 14: bypass HNSW and run an exact brute-force search for this
+   * query — useful as a recall baseline (Qdrant's own equivalent of
+   * `InMemoryVectorStore`'s exact search) at the cost of latency.
+   */
+  exact?: boolean;
 }
 
 export class QdrantVectorStore implements VectorStore {
@@ -67,6 +96,11 @@ export class QdrantVectorStore implements VectorStore {
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
   private readonly mirrorStore: VectorStore;
+  private readonly metric: SimilarityMetric;
+  private readonly hnswM: number | undefined;
+  private readonly hnswEfConstruct: number | undefined;
+  private readonly hnswEf: number | undefined;
+  private readonly exact: boolean | undefined;
   private dimensions?: number;
   private collectionInitialized = false;
 
@@ -89,6 +123,11 @@ export class QdrantVectorStore implements VectorStore {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.mirrorStore = options.mirrorStore ?? new InMemoryVectorStore();
+    this.metric = options.similarityMetric ?? "cosine";
+    this.hnswM = options.hnswM;
+    this.hnswEfConstruct = options.hnswEfConstruct;
+    this.hnswEf = options.hnswEf;
+    this.exact = options.exact;
   }
 
   get size(): number {
@@ -120,6 +159,14 @@ export class QdrantVectorStore implements VectorStore {
           limit: topK,
           with_payload: true,
           filter: this.toQdrantFilter(query.filter),
+          ...(this.hnswEf !== undefined || this.exact !== undefined
+            ? {
+                params: {
+                  ...(this.hnswEf !== undefined ? { hnsw_ef: this.hnswEf } : {}),
+                  ...(this.exact !== undefined ? { exact: this.exact } : {}),
+                },
+              }
+            : {}),
         }
       );
 
@@ -182,8 +229,16 @@ export class QdrantVectorStore implements VectorStore {
     await this.request("PUT", `/collections/${encodeURIComponent(this.collectionName)}`, {
       vectors: {
         size: dimensions,
-        distance: "Cosine",
+        distance: METRIC_TO_QDRANT_DISTANCE[this.metric],
       },
+      ...(this.hnswM !== undefined || this.hnswEfConstruct !== undefined
+        ? {
+            hnsw_config: {
+              ...(this.hnswM !== undefined ? { m: this.hnswM } : {}),
+              ...(this.hnswEfConstruct !== undefined ? { ef_construct: this.hnswEfConstruct } : {}),
+            },
+          }
+        : {}),
     });
 
     this.dimensions = dimensions;

@@ -181,4 +181,50 @@ describe("QdrantVectorStore", () => {
       },
     ]);
   });
+
+  it("book cap. 11/14: creates the collection with the distance matching the declared similarity metric and HNSW build config", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: true }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: { points: [] } }));
+
+    const store = new QdrantVectorStore({
+      baseUrl: "http://localhost:6333",
+      collectionName: "rag_chunks",
+      similarityMetric: "dotProduct",
+      hnswM: 32,
+      hnswEfConstruct: 200,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await store.searchAsync({ embedding: [0, 1] });
+
+    const createCall = fetchImpl.mock.calls[0]!;
+    const body = JSON.parse(String(createCall[1].body));
+
+    expect(body.vectors.distance).toBe("Dot");
+    expect(body.hnsw_config).toEqual({ m: 32, ef_construct: 200 });
+  });
+
+  it("book cap. 14: passes hnsw_ef and exact as query-time recall/latency params", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: true }))
+      .mockResolvedValueOnce(jsonResponse({ status: "ok", result: [] }));
+
+    const store = new QdrantVectorStore({
+      baseUrl: "http://localhost:6333",
+      collectionName: "rag_chunks",
+      hnswEf: 256,
+      exact: true,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await store.searchAsync({ embedding: [0, 1] });
+
+    const searchCall = fetchImpl.mock.calls[1]!;
+    const body = JSON.parse(String(searchCall[1].body));
+
+    expect(body.params).toEqual({ hnsw_ef: 256, exact: true });
+  });
 });

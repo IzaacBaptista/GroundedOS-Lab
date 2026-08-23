@@ -25,7 +25,7 @@
  *     WITH (lists = 100);
  */
 
-import type { EmbeddedChunk } from "./embeddings";
+import type { EmbeddedChunk, SimilarityMetric } from "./embeddings";
 import { InMemoryVectorStore } from "./vector-store";
 import type {
   VectorMetadataFilter,
@@ -35,6 +35,45 @@ import type {
 } from "./vector-store";
 
 const ERROR_PREFIX = "[rag/pgvector-store]";
+
+/**
+ * Book cap. 11/14: pgvector requires the index's operator class to match
+ * the distance operator used at query time, and both must match the
+ * metric the embedding model was actually trained/evaluated on (ADR-024)
+ * — using cosine ops/operator for a dotProduct-optimized model is a
+ * silent correctness bug, not an error.
+ */
+const METRIC_OPERATOR: Record<SimilarityMetric, { opclass: string; operator: string }> = {
+  cosine: { opclass: "vector_cosine_ops", operator: "<=>" },
+  euclidean: { opclass: "vector_l2_ops", operator: "<->" },
+  dotProduct: { opclass: "vector_ip_ops", operator: "<#>" },
+};
+
+/**
+ * Converts the raw pgvector operator result into a score where higher is
+ * always more similar, matching InMemoryVectorStore's convention (ADR-024):
+ * cosine/dotProduct already return a similarity-like value once adjusted;
+ * pgvector's `<#>` is a *negative* inner product, and `<->` is a plain
+ * Euclidean distance, both requiring their own transform.
+ */
+function scoreExpression(metric: SimilarityMetric, operatorExpr: string): string {
+  switch (metric) {
+    case "euclidean":
+      return `1 / (1 + (${operatorExpr}))`;
+    case "dotProduct":
+      return `-(${operatorExpr})`;
+    case "cosine":
+    default:
+      return `1 - (${operatorExpr})`;
+  }
+}
+
+const POSITIVE_INTEGER = (value: number, label: string): number => {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${ERROR_PREFIX} ${label} must be a positive integer.`);
+  }
+  return value;
+};
 
 /** RetrievalChunk fields backed by a real table column (see bootstrapSchema). */
 const ROOT_COLUMNS: Record<string, string> = {
@@ -108,7 +147,42 @@ export interface PgvectorStoreOptions {
   dimensions?: number;
   /** Number of results returned per search when topK is not specified (default: 5). */
   defaultTopK?: number;
+  /**
+   * Book cap. 11: must match the metric the embedding model declares
+   * (ADR-024) — determines the index's operator class and the operator
+   * used at query time (default: "cosine").
+   */
+  similarityMetric?: SimilarityMetric;
+  /**
+   * Book cap. 14: ANN index structure. ivfflat is pgvector's original
+   * index type (cheaper to build, needs `lists`/`probes` tuning); hnsw
+   * (pgvector >= 0.5) generally gives better recall/latency without
+   * needing a training pass, at higher build cost (default: "ivfflat").
+   */
+  indexType?: "ivfflat" | "hnsw";
+  /** ivfflat: number of lists to partition vectors into at build time (default: 100). */
+  ivfflatLists?: number;
+  /**
+   * ivfflat: number of lists probed per query — the book's recall/latency
+   * knob for this index type. Higher = better recall, slower. Unset uses
+   * pgvector's own session default.
+   */
+  probes?: number;
+  /** hnsw: max connections per graph layer at build time (default: 16). */
+  hnswM?: number;
+  /** hnsw: candidate list size during graph construction (default: 64). */
+  hnswEfConstruction?: number;
+  /**
+   * hnsw: candidate list size searched per query — the book's recall/latency
+   * knob for this index type. Higher = better recall, slower. Unset uses
+   * pgvector's own session default.
+   */
+  hnswEfSearch?: number;
 }
+
+const DEFAULT_IVFFLAT_LISTS = 100;
+const DEFAULT_HNSW_M = 16;
+const DEFAULT_HNSW_EF_CONSTRUCTION = 64;
 
 /**
  * Build a PgvectorVectorStore.
@@ -121,7 +195,7 @@ export async function createVectorStore(
 ): Promise<VectorStore> {
   try {
     const client = await options.connect();
-    await bootstrapSchema(client, options.tableName ?? "rag_chunks", options.dimensions ?? 1536);
+    await bootstrapSchema(client, options.tableName ?? "rag_chunks", options.dimensions ?? 1536, options);
     return new PgvectorVectorStore(client, options);
   } catch (err) {
     console.warn(
@@ -135,8 +209,13 @@ export async function createVectorStore(
 async function bootstrapSchema(
   client: PgClient,
   table: string,
-  dimensions: number
+  dimensions: number,
+  options: PgvectorStoreOptions
 ): Promise<void> {
+  const metric = options.similarityMetric ?? "cosine";
+  const indexType = options.indexType ?? "ivfflat";
+  const { opclass } = METRIC_OPERATOR[metric];
+
   await client.query("CREATE EXTENSION IF NOT EXISTS vector");
   await client.query(`
     CREATE TABLE IF NOT EXISTS ${table} (
@@ -151,10 +230,28 @@ async function bootstrapSchema(
       embedding          vector(${dimensions})
     )
   `);
+
+  if (indexType === "hnsw") {
+    const m = POSITIVE_INTEGER(options.hnswM ?? DEFAULT_HNSW_M, "hnswM");
+    const efConstruction = POSITIVE_INTEGER(
+      options.hnswEfConstruction ?? DEFAULT_HNSW_EF_CONSTRUCTION,
+      "hnswEfConstruction"
+    );
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ${table}_embedding_idx
+        ON ${table} USING hnsw (embedding ${opclass})
+        WITH (m = ${m}, ef_construction = ${efConstruction})
+    `);
+    return;
+  }
+
+  const lists = POSITIVE_INTEGER(options.ivfflatLists ?? DEFAULT_IVFFLAT_LISTS, "ivfflatLists");
+
   await client.query(`
     CREATE INDEX IF NOT EXISTS ${table}_embedding_idx
-      ON ${table} USING ivfflat (embedding vector_cosine_ops)
-      WITH (lists = 100)
+      ON ${table} USING ivfflat (embedding ${opclass})
+      WITH (lists = ${lists})
   `);
 }
 
@@ -162,12 +259,20 @@ export class PgvectorVectorStore implements VectorStore {
   private readonly client: PgClient;
   private readonly table: string;
   private readonly defaultTopK: number;
+  private readonly metric: SimilarityMetric;
+  private readonly indexType: "ivfflat" | "hnsw";
+  private readonly probes: number | undefined;
+  private readonly hnswEfSearch: number | undefined;
   private _size = 0;
 
   constructor(client: PgClient, options: PgvectorStoreOptions) {
     this.client = client;
     this.table = options.tableName ?? "rag_chunks";
     this.defaultTopK = options.defaultTopK ?? 5;
+    this.metric = options.similarityMetric ?? "cosine";
+    this.indexType = options.indexType ?? "ivfflat";
+    this.probes = options.probes;
+    this.hnswEfSearch = options.hnswEfSearch;
   }
 
   get size(): number {
@@ -240,6 +345,16 @@ export class PgvectorVectorStore implements VectorStore {
 
     const where = filterClauses.length > 0 ? `WHERE ${filterClauses.join(" AND ")}` : "";
 
+    // Book cap. 14: recall/latency is tunable per query via the ANN index's
+    // own session parameters, not fixed once at index-build time.
+    if (this.indexType === "ivfflat" && this.probes !== undefined) {
+      await this.client.query(`SET ivfflat.probes = ${POSITIVE_INTEGER(this.probes, "probes")}`);
+    } else if (this.indexType === "hnsw" && this.hnswEfSearch !== undefined) {
+      await this.client.query(
+        `SET hnsw.ef_search = ${POSITIVE_INTEGER(this.hnswEfSearch, "hnswEfSearch")}`
+      );
+    }
+
     type Row = {
       id: string;
       document_id: string;
@@ -249,17 +364,20 @@ export class PgvectorVectorStore implements VectorStore {
       text: string;
       metadata: Record<string, unknown>;
       embedding_metadata: Record<string, unknown>;
-      cosine_distance: number;
+      similarity_score: number;
     };
+
+    const { operator } = METRIC_OPERATOR[this.metric];
+    const operatorExpr = `embedding ${operator} $1::vector`;
 
     const { rows } = await this.client.query<Row>(
       `SELECT
          id, document_id, section_id, start_offset, end_offset, text,
          metadata, embedding_metadata,
-         1 - (embedding <=> $1::vector) AS cosine_distance
+         ${scoreExpression(this.metric, operatorExpr)} AS similarity_score
        FROM ${this.table}
        ${where}
-       ORDER BY embedding <=> $1::vector
+       ORDER BY ${operatorExpr}
        LIMIT $2`,
       params
     );
@@ -268,7 +386,7 @@ export class PgvectorVectorStore implements VectorStore {
       chunk: {
         id: row.id,
         documentId: row.document_id,
-        sectionId: row.section_id ?? "", 
+        sectionId: row.section_id ?? "",
         startOffset: row.start_offset,
         endOffset: row.end_offset,
         text: row.text,
@@ -276,7 +394,7 @@ export class PgvectorVectorStore implements VectorStore {
         embeddingMetadata: row.embedding_metadata as unknown as EmbeddedChunk["embeddingMetadata"],
         embedding: [], // embeddings are stored in PG; not re-hydrated for perf
       },
-      score: row.cosine_distance,
+      score: row.similarity_score,
     }));
   }
 
@@ -285,6 +403,17 @@ export class PgvectorVectorStore implements VectorStore {
       console.error(`${ERROR_PREFIX} truncate failed:`, err);
     });
     this._size = 0;
+  }
+
+  /**
+   * Book cap. 14: ANN index quality degrades as rows are inserted/updated
+   * over time without a full rebuild. `REINDEX ... CONCURRENTLY` rebuilds
+   * the index without holding a lock that blocks concurrent reads/writes —
+   * call this periodically (e.g. from a scheduled maintenance job), not on
+   * every write.
+   */
+  async reindexAnn(): Promise<void> {
+    await this.client.query(`REINDEX INDEX CONCURRENTLY ${this.table}_embedding_idx`);
   }
 }
 

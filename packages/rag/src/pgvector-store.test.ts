@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EmbeddedChunk } from "./embeddings";
-import { PgvectorVectorStore, type PgClient } from "./pgvector-store";
+import { PgvectorVectorStore, createVectorStore, type PgClient } from "./pgvector-store";
 
 function createEmbeddedChunk(overrides: Partial<EmbeddedChunk> = {}): EmbeddedChunk {
   const embedding = overrides.embedding ?? [1, 0];
@@ -109,7 +109,7 @@ describe("PgvectorVectorStore.searchAsync filter building (book cap. 13)", () =>
         text: "chunk text",
         metadata: { documentTitle: "doc", modality: "text" },
         embedding_metadata: { provider: "test", dimensions: 2 },
-        cosine_distance: 0.98,
+        similarity_score: 0.98,
       },
     ]);
     const store = new PgvectorVectorStore(client, {} as never);
@@ -119,5 +119,76 @@ describe("PgvectorVectorStore.searchAsync filter building (book cap. 13)", () =>
     expect(results).toHaveLength(1);
     expect(results[0]?.chunk.id).toBe("chunk-1");
     expect(results[0]?.score).toBeCloseTo(0.98);
+  });
+});
+
+describe("PgvectorVectorStore ANN index (book cap. 14)", () => {
+  it("builds an ivfflat index with the operator class matching the declared similarity metric", async () => {
+    const { client, queries } = createFakeClient();
+
+    await createVectorStore({ connect: async () => client, similarityMetric: "dotProduct" });
+
+    const indexQuery = queries.find((q) => q.sql.includes("CREATE INDEX"))!;
+    expect(indexQuery.sql).toContain("USING ivfflat (embedding vector_ip_ops)");
+    expect(indexQuery.sql).toContain("lists = 100");
+  });
+
+  it("builds an hnsw index with configured m/ef_construction when indexType is hnsw", async () => {
+    const { client, queries } = createFakeClient();
+
+    await createVectorStore({
+      connect: async () => client,
+      indexType: "hnsw",
+      hnswM: 32,
+      hnswEfConstruction: 128,
+    });
+
+    const indexQuery = queries.find((q) => q.sql.includes("CREATE INDEX"))!;
+    expect(indexQuery.sql).toContain("USING hnsw (embedding vector_cosine_ops)");
+    expect(indexQuery.sql).toContain("m = 32");
+    expect(indexQuery.sql).toContain("ef_construction = 128");
+  });
+
+  it("uses the operator matching the declared metric when scoring and ordering results", async () => {
+    const { client, queries } = createFakeClient();
+    const store = new PgvectorVectorStore(client, { similarityMetric: "euclidean" } as never);
+
+    await store.searchAsync({ embedding: [1, 0] });
+
+    const searchQuery = queries[0]!;
+    expect(searchQuery.sql).toContain("embedding <-> $1::vector");
+    expect(searchQuery.sql).toContain("1 / (1 + (embedding <-> $1::vector))");
+    expect(searchQuery.sql).not.toContain("<=>");
+  });
+
+  it("sets ivfflat.probes before searching when configured (recall/latency knob)", async () => {
+    const { client, queries } = createFakeClient();
+    const store = new PgvectorVectorStore(client, { probes: 10 } as never);
+
+    await store.searchAsync({ embedding: [1, 0] });
+
+    expect(queries[0]!.sql).toBe("SET ivfflat.probes = 10");
+    expect(queries[1]!.sql).toContain("SELECT");
+  });
+
+  it("sets hnsw.ef_search before searching when indexType is hnsw and configured", async () => {
+    const { client, queries } = createFakeClient();
+    const store = new PgvectorVectorStore(client, {
+      indexType: "hnsw",
+      hnswEfSearch: 200,
+    } as never);
+
+    await store.searchAsync({ embedding: [1, 0] });
+
+    expect(queries[0]!.sql).toBe("SET hnsw.ef_search = 200");
+  });
+
+  it("reindexAnn() rebuilds the index without blocking concurrent access", async () => {
+    const { client, queries } = createFakeClient();
+    const store = new PgvectorVectorStore(client, { tableName: "custom_chunks" } as never);
+
+    await store.reindexAnn();
+
+    expect(queries[0]!.sql).toBe("REINDEX INDEX CONCURRENTLY custom_chunks_embedding_idx");
   });
 });

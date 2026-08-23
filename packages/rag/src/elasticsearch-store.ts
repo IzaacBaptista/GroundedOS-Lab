@@ -43,6 +43,13 @@ export interface ElasticsearchStoreOptions {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   mirrorStore?: VectorStore;
+  /**
+   * Book cap. 14: recall/latency knob for the native `knn` query — number
+   * of nearest-neighbor candidates gathered per shard before ranking.
+   * Higher = better recall, slower. Unset derives it from `topK`
+   * (`max(topK * 10, 50)`, ES's own suggested starting point).
+   */
+  numCandidates?: number;
 }
 
 interface EsHit {
@@ -59,6 +66,7 @@ export class ElasticsearchVectorStore implements VectorStore {
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
   private readonly mirrorStore: VectorStore;
+  private readonly numCandidates: number | undefined;
 
   constructor(options: ElasticsearchStoreOptions) {
     const baseUrl = options.baseUrl?.trim();
@@ -79,6 +87,7 @@ export class ElasticsearchVectorStore implements VectorStore {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.mirrorStore = options.mirrorStore ?? new InMemoryVectorStore();
+    this.numCandidates = options.numCandidates;
   }
 
   get size(): number {
@@ -109,7 +118,7 @@ export class ElasticsearchVectorStore implements VectorStore {
             field: EMBEDDING_FIELD,
             query_vector: query.embedding,
             k: topK,
-            num_candidates: Math.max(topK * 10, 50),
+            num_candidates: this.numCandidates ?? Math.max(topK * 10, 50),
             filter: toEsFilter(query.filter),
           },
           _source: { excludes: [EMBEDDING_FIELD] },

@@ -238,6 +238,29 @@ where those fields actually live) — see ADR-026.
 or Weaviate's schema-typed properties, so both serialize it to a JSON string
 field and parse it back on read; it isn't filterable on those two backends.
 
+### Index type, similarity metric, and recall/latency tuning (book cap. 14)
+
+`InMemoryVectorStore` is brute-force by design — the correctness baseline
+the book describes, not an approximation. The real backends build an ANN
+index and must be told which similarity metric to build it for, since the
+book is explicit that the index's distance function has to match the
+embedding model's declared metric (`EmbeddingModelInfo.similarityMetric`,
+ADR-024) — using cosine ops for a dot-product-optimized model is a silent
+correctness bug, not an error. `PgvectorVectorStore` and `QdrantVectorStore`
+both fixed this: they used to hardcode cosine distance regardless of what
+the embedding model actually declared (ADR-027).
+
+| Store | `similarityMetric` → | Build-time tuning | Query-time recall/latency knob |
+|---|---|---|---|
+| `PgvectorVectorStore` | operator class (`vector_cosine_ops`/`vector_l2_ops`/`vector_ip_ops`) + operator (`<=>`/`<->`/`<#>`) | `indexType: "ivfflat" \| "hnsw"`, `ivfflatLists`, `hnswM`, `hnswEfConstruction` | `probes` (ivfflat) or `hnswEfSearch` (hnsw) |
+| `QdrantVectorStore` | collection `distance` (`Cosine`/`Dot`/`Euclid`) | `hnswM`, `hnswEfConstruct` | `hnswEf`, `exact: true` (brute-force baseline for a given query) |
+| `ElasticsearchVectorStore` | n/a (ES native `knn` always uses cosine internally for `dense_vector`) | — | `numCandidates` (defaults to `max(topK * 10, 50)`) |
+
+`PgvectorVectorStore.reindexAnn()` runs `REINDEX INDEX CONCURRENTLY` on the
+ANN index — the book notes index quality degrades as rows are inserted over
+time without a full rebuild; call this periodically (e.g. a scheduled
+maintenance job), not on every write.
+
 ```ts
 import { InMemoryVectorStore } from "@groundedos/rag";
 

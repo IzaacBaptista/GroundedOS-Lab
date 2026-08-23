@@ -74,3 +74,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-024](./ADR-024-similarity-metric-per-embedding-model.md) | Declared similarity metric per embedding model (cosine/dotProduct/euclidean) | Accepted |
 | [ADR-025](./ADR-025-embedding-input-type-prefixes-and-matryoshka-truncation.md) | Document/query input-type prefixes and Matryoshka vector truncation | Accepted |
 | [ADR-026](./ADR-026-vector-store-metadata-filter-fixes-and-new-backends.md) | Vector store metadata filter fixes (pgvector, Qdrant) and three new backends (Pinecone, Weaviate, Elasticsearch) | Accepted |
+| [ADR-027](./ADR-027-ann-index-metric-and-recall-latency-tuning.md) | ANN index metric correctness and recall/latency tuning knobs | Accepted |

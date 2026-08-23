@@ -134,4 +134,32 @@ describe("ElasticsearchVectorStore", () => {
     expect(results[0]?.chunk.text).toBe("chunk text");
     expect(results[0]?.score).toBeCloseTo(0.93);
   });
+
+  it("book cap. 14: derives num_candidates from topK by default, but honors an explicit override", async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({ hits: { hits: [] } })
+    );
+    const defaultStore = new ElasticsearchVectorStore({
+      baseUrl: "http://localhost:9200",
+      index: "chunks",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      mirrorStore: NULL_STORE,
+    });
+
+    await defaultStore.searchAsync({ embedding: [1, 0], topK: 20 });
+    const defaultBody = JSON.parse(String(fetchImpl.mock.calls[0]![1]!.body));
+    expect(defaultBody.knn.num_candidates).toBe(200);
+
+    const tunedStore = new ElasticsearchVectorStore({
+      baseUrl: "http://localhost:9200",
+      index: "chunks",
+      numCandidates: 500,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      mirrorStore: NULL_STORE,
+    });
+
+    await tunedStore.searchAsync({ embedding: [1, 0], topK: 20 });
+    const tunedBody = JSON.parse(String(fetchImpl.mock.calls[1]![1]!.body));
+    expect(tunedBody.knn.num_candidates).toBe(500);
+  });
 });
