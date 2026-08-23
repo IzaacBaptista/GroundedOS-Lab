@@ -24,6 +24,34 @@ const FILLER_WORDS = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// Abbreviation expansion — a real dictionary lookup, not a stopword filter.
+// Book cap. 17: "corrigir erros de digitação, expandir abreviações [...]".
+// ---------------------------------------------------------------------------
+
+const ABBREVIATION_MAP: Record<string, string> = {
+  db: "database",
+  auth: "authentication",
+  config: "configuration",
+  repo: "repository",
+  api: "application programming interface",
+  ui: "user interface",
+  ux: "user experience",
+  k8s: "kubernetes",
+  ci: "continuous integration",
+  cd: "continuous deployment",
+  env: "environment",
+  perf: "performance",
+  infra: "infrastructure",
+  docs: "documentation",
+};
+
+/**
+ * Book cap. 17: words that signal the query refers back to something from
+ * an earlier turn ("what about it?", "does that scale?") without naming it.
+ */
+const ANAPHORIC_REFERENCE_WORDS = new Set(["it", "that", "this", "those", "them", "he", "she"]);
+
+// ---------------------------------------------------------------------------
 // Synonym / expansion map
 // ---------------------------------------------------------------------------
 // Keys are canonical terms; values are synonyms to merge into the query
@@ -98,16 +126,36 @@ const INTENT_PATTERNS: Array<{
 // Stage 1: Query Rewriting
 // ---------------------------------------------------------------------------
 
+export interface RewriteQueryOptions {
+  /**
+   * Book cap. 17: the previous turn's query, used to resolve a bare
+   * anaphoric reference ("what about it?") by appending what "it" likely
+   * refers to. Heuristic — real reference resolution needs an LLM or
+   * coreference model; this just reuses the last turn's content words.
+   */
+  previousQuery?: string;
+  /**
+   * Book cap. 17: a known-good vocabulary (e.g. terms seen in the corpus)
+   * used for typo correction via edit distance. Unset by default — without
+   * a real vocabulary there's no way to tell a typo from a rare-but-valid
+   * term, so no correction is attempted.
+   */
+  vocabulary?: string[];
+}
+
 /**
  * Normalise the raw query for better lexical matching.
  *
  * Rules (Phase 2 — rule-based, no LLM):
  *   - Lowercase and normalise Unicode
+ *   - Expand known abbreviations (real dictionary lookup)
+ *   - Resolve a bare anaphoric reference using the previous turn, if given
+ *   - Correct typos against a supplied vocabulary, if given
  *   - Strip common filler words
  *   - Collapse multiple spaces
  *   - Returns undefined when the rewritten form matches the original
  */
-export function rewriteQuery(text: string): string | undefined {
+export function rewriteQuery(text: string, options: RewriteQueryOptions = {}): string | undefined {
   const normalised = text
     .normalize("NFKC")
     .toLowerCase()
@@ -115,8 +163,30 @@ export function rewriteQuery(text: string): string | undefined {
     .replace(/\s+/g, " ")
     .trim();
 
-  const tokens = normalised.split(/\s+/).filter((t) => !FILLER_WORDS.has(t) && t.length > 0);
-  const rewritten = tokens.join(" ");
+  let tokens = normalised.split(/\s+/).filter((t) => t.length > 0);
+
+  tokens = tokens.flatMap((token) => {
+    const expansion = ABBREVIATION_MAP[token];
+    return expansion ? expansion.split(" ") : [token];
+  });
+
+  if (options.previousQuery && tokens.some((token) => ANAPHORIC_REFERENCE_WORDS.has(token))) {
+    const previousContentWords = options.previousQuery
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[^\w\s'-]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 0 && !FILLER_WORDS.has(token));
+
+    tokens = [...tokens, ...previousContentWords];
+  }
+
+  if (options.vocabulary && options.vocabulary.length > 0) {
+    const vocabularySet = new Set(options.vocabulary.map((term) => term.toLowerCase()));
+    tokens = tokens.map((token) => correctTypo(token, vocabularySet));
+  }
+
+  const rewritten = tokens.filter((t) => !FILLER_WORDS.has(t) && t.length > 0).join(" ");
 
   // Return undefined if the result is empty or identical to the lowercased original
   if (rewritten.length === 0 || rewritten === normalised) {
@@ -124,6 +194,48 @@ export function rewriteQuery(text: string): string | undefined {
   }
 
   return rewritten;
+}
+
+/**
+ * Replaces `token` with the closest word in `vocabulary` when it's exactly
+ * one edit (insertion/deletion/substitution) away and `token` itself isn't
+ * already a known word — corrects an actual typo without touching rare but
+ * valid terms that just happen to be short.
+ */
+function correctTypo(token: string, vocabulary: Set<string>): string {
+  if (token.length < 3 || vocabulary.has(token)) {
+    return token;
+  }
+
+  for (const candidate of vocabulary) {
+    if (Math.abs(candidate.length - token.length) <= 1 && levenshteinDistance(token, candidate) === 1) {
+      return candidate;
+    }
+  }
+
+  return token;
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const distances: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+
+  for (let i = 0; i < rows; i += 1) distances[i]![0] = i;
+  for (let j = 0; j < cols; j += 1) distances[0]![j] = j;
+
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      distances[i]![j] = Math.min(
+        distances[i - 1]![j]! + 1,
+        distances[i]![j - 1]! + 1,
+        distances[i - 1]![j - 1]! + cost
+      );
+    }
+  }
+
+  return distances[rows - 1]![cols - 1]!;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +302,50 @@ export function detectIntent(text: string): { intent: QueryIntent; confidence: n
   }
 
   return { intent: "unknown", confidence: 0.5 };
+}
+
+// ---------------------------------------------------------------------------
+// Query filters — implicit constraints extracted into structured metadata
+// filters (book cap. 17). Only explicit `key:value` tokens are recognized
+// (e.g. "tag:billing", "author:maria", "tenant:acme") — free natural-
+// language constraints ("a política de reembolso em 2023") are NOT parsed:
+// that needs NER/an LLM, not a formula, and chunks don't carry a bare
+// "year" field to filter against anyway. Disclosed limitation, not theater.
+// ---------------------------------------------------------------------------
+
+const QUERY_FILTER_FIELDS: Record<string, string> = {
+  tag: "tags",
+  author: "author",
+  tenant: "tenantId",
+};
+
+export interface ExtractedQueryFilters {
+  filters: Record<string, string>;
+  /** The query text with every recognized `key:value` token removed. */
+  residualQuery: string;
+}
+
+/**
+ * Extracts explicit `key:value` tokens (tag:, author:, tenant:) from a
+ * query into a structured filter object, and returns the remaining query
+ * text with those tokens stripped.
+ */
+export function extractQueryFilters(text: string): ExtractedQueryFilters {
+  const filters: Record<string, string> = {};
+  const pattern = /\b(tag|author|tenant):(\S+)\b/gi;
+
+  const residualQuery = text
+    .replace(pattern, (_match, rawKey: string, rawValue: string) => {
+      const field = QUERY_FILTER_FIELDS[rawKey.toLowerCase()];
+      if (field) {
+        filters[field] = rawValue;
+      }
+      return "";
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { filters, residualQuery };
 }
 
 // ---------------------------------------------------------------------------

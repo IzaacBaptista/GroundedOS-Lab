@@ -1,4 +1,5 @@
 import type { EmbeddedChunk, EmbeddingProvider } from "./embeddings";
+import type { LlmTextProvider } from "./llm-text-provider";
 import type { RetrievalResult } from "./retrieval";
 
 export interface HyDETrace {
@@ -83,13 +84,46 @@ export interface RaptorRetrievalResult {
   }>;
 }
 
-export function buildHypotheticalDocument(
+/**
+ * Book cap. 20 — HyDE (Hypothetical Document Embeddings): generate a
+ * plausible answer to the query and embed *that*, not the query, since a
+ * real document tends to look linguistically much more like an answer
+ * than like a question.
+ *
+ * With `llmProvider`, this actually asks an LLM for a hypothetical answer
+ * — the real technique. Without one, it falls back to a fixed template
+ * (query + boilerplate) whose embedding is only a weak proxy for a real
+ * answer's — a disclosed heuristic fallback, not the technique itself, for
+ * callers who haven't configured an LLM.
+ */
+export async function buildHypotheticalDocument(
   query: string,
   options: {
     rewrittenQuery?: string;
     expansionTerms?: string[];
+    llmProvider?: LlmTextProvider;
   } = {}
-): string {
+): Promise<string> {
+  if (options.llmProvider) {
+    try {
+      return await options.llmProvider.complete({
+        system:
+          "You write a short, plausible passage that could be the answer to the " +
+          "user's question, as if it were a real excerpt from documentation. " +
+          "Do not say you don't know or ask for clarification — commit to a " +
+          "concrete, specific answer even if you're not certain it's correct.",
+        user: options.rewrittenQuery
+          ? `Question: ${query.trim()}\n(Interpreted as: ${options.rewrittenQuery})`
+          : `Question: ${query.trim()}`,
+      });
+    } catch (error) {
+      console.warn(
+        "[rag/advanced-retrieval] HyDE llmProvider failed; falling back to template.",
+        error
+      );
+    }
+  }
+
   const expansion = (options.expansionTerms ?? []).slice(0, 4).join(", ");
   return [
     `Hypothetical grounded answer for retrieval: ${query.trim()}.`,
@@ -99,6 +133,50 @@ export function buildHypotheticalDocument(
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+/**
+ * Book cap. 20 — step-back prompting: generalize a specific query into a
+ * broader, more abstract version before retrieval, so it aligns better
+ * with reference documentation that answers the general case rather than
+ * the caller's exact specific situation.
+ *
+ * With `llmProvider`, an LLM performs the actual generalization. Without
+ * one, this falls back to a naive heuristic (drop numbers/specifics, keep
+ * the remaining keywords) — a much cruder approximation, disclosed as a
+ * fallback, not the real technique.
+ */
+export async function buildStepBackQuery(
+  query: string,
+  options: { llmProvider?: LlmTextProvider } = {}
+): Promise<string> {
+  const trimmed = query.trim();
+
+  if (options.llmProvider) {
+    try {
+      return await options.llmProvider.complete({
+        system:
+          "Generalize the user's specific question into a broader, more " +
+          "abstract question about the underlying topic — the kind of " +
+          "question reference documentation would actually answer. Return " +
+          "only the generalized question, nothing else.",
+        user: trimmed,
+      });
+    } catch (error) {
+      console.warn(
+        "[rag/advanced-retrieval] step-back llmProvider failed; falling back to heuristic.",
+        error
+      );
+    }
+  }
+
+  const keywords = trimmed
+    .replace(/\b\d+([:.]\d+)?\b/g, " ")
+    .replace(/[^\p{L}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 2);
+
+  return keywords.length > 0 ? `overview of ${keywords.join(" ")}` : trimmed;
 }
 
 export function buildHyDETrace(

@@ -60,6 +60,39 @@ describe("InMemoryVectorStore", () => {
     expect(results[1]?.score).toBeLessThan(results[0]?.score ?? 0);
   });
 
+  it("book cap. 16: minScore excludes chunks below the cutoff, even if that returns fewer than topK", () => {
+    const store = new InMemoryVectorStore();
+    store.insert([
+      createEmbeddedChunk({ id: "chunk-close", embedding: [1, 0] }),
+      createEmbeddedChunk({ id: "chunk-far", embedding: [0, 1] }),
+    ]);
+
+    const results = store.search({ embedding: [1, 0], topK: 2, minScore: 0.5 });
+
+    expect(results.map((result) => result.chunk.id)).toEqual(["chunk-close"]);
+  });
+
+  it("book cap. 16: minScore of 0 keeps everything topK already would (no-op boundary)", () => {
+    const store = new InMemoryVectorStore();
+    store.insert([
+      createEmbeddedChunk({ id: "chunk-close", embedding: [1, 0] }),
+      createEmbeddedChunk({ id: "chunk-far", embedding: [0, 1] }),
+    ]);
+
+    const results = store.search({ embedding: [1, 0], topK: 2, minScore: 0 });
+
+    expect(results).toHaveLength(2);
+  });
+
+  it("rejects a non-finite minScore", () => {
+    const store = new InMemoryVectorStore();
+    store.insert([createEmbeddedChunk()]);
+
+    expect(() => store.search({ embedding: [1, 0], minScore: NaN })).toThrow(
+      "minScore must be a finite number"
+    );
+  });
+
   it("filters results by searchable metadata", () => {
     const store = new InMemoryVectorStore();
 

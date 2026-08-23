@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   detectIntent,
   expandQuery,
+  extractQueryFilters,
   processQuery,
   rewriteQuery,
 } from "./query-understanding";
@@ -45,6 +46,68 @@ describe("rewriteQuery", () => {
 
   it("returns undefined for an already minimal query", () => {
     expect(rewriteQuery("embedding vector retrieval")).toBeUndefined();
+  });
+
+  it("book cap. 17: expands known abbreviations via a real dictionary lookup", () => {
+    expect(rewriteQuery("db config for auth")).toBe(
+      "database configuration authentication"
+    );
+  });
+
+  it("book cap. 17: resolves a bare anaphoric reference using the previous turn", () => {
+    const rewritten = rewriteQuery("does it scale", { previousQuery: "what is the vector database" });
+    expect(rewritten).toContain("vector");
+    expect(rewritten).toContain("database");
+  });
+
+  it("book cap. 17: leaves the query untouched when there's no anaphoric reference, even with history given", () => {
+    expect(rewriteQuery("embedding vector retrieval", { previousQuery: "what is a database" })).toBeUndefined();
+  });
+
+  it("book cap. 17: corrects a token within edit distance 1 of a supplied vocabulary word", () => {
+    expect(rewriteQuery("embeding vector", { vocabulary: ["embedding", "retrieval"] })).toBe(
+      "embedding vector"
+    );
+  });
+
+  it("book cap. 17: does not touch a token that's already in the vocabulary", () => {
+    expect(rewriteQuery("embedding vector", { vocabulary: ["embedding"] })).toBeUndefined();
+  });
+
+  it("book cap. 17: does not correct a token more than 1 edit away from any vocabulary word", () => {
+    // "xyzabc" isn't close to "embedding" — left untouched, so the query is
+    // unchanged from its normalized form and rewriteQuery returns undefined.
+    expect(rewriteQuery("xyzabc vector", { vocabulary: ["embedding"] })).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractQueryFilters
+// ---------------------------------------------------------------------------
+
+describe("extractQueryFilters (book cap. 17)", () => {
+  it("extracts a tag:value token into a tags filter and strips it from the query", () => {
+    const result = extractQueryFilters("refund policy tag:billing");
+    expect(result.filters).toEqual({ tags: "billing" });
+    expect(result.residualQuery).toBe("refund policy");
+  });
+
+  it("extracts author: and tenant: tokens", () => {
+    const result = extractQueryFilters("author:maria tenant:acme onboarding guide");
+    expect(result.filters).toEqual({ author: "maria", tenantId: "acme" });
+    expect(result.residualQuery).toBe("onboarding guide");
+  });
+
+  it("returns an empty filter set and the original query when there's nothing to extract", () => {
+    const result = extractQueryFilters("how do I cancel my subscription");
+    expect(result.filters).toEqual({});
+    expect(result.residualQuery).toBe("how do I cancel my subscription");
+  });
+
+  it("does not extract free natural-language constraints like a bare year (disclosed limitation)", () => {
+    const result = extractQueryFilters("refund policy in 2023");
+    expect(result.filters).toEqual({});
+    expect(result.residualQuery).toBe("refund policy in 2023");
   });
 });
 

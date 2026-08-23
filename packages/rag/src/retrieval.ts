@@ -40,6 +40,7 @@ import {
   buildHypotheticalDocument,
   buildHyDETrace,
   buildRaptorTree,
+  buildStepBackQuery,
   retrieveFromRaptorTree,
   type HyDETrace,
   type RetrievalFusionTrace,
@@ -58,6 +59,8 @@ import {
   type EmbeddingProvider,
   type EmbeddingVector,
 } from "./embeddings";
+import { reciprocalRankFusion } from "./fusion";
+import type { LlmTextProvider } from "./llm-text-provider";
 import { scoreCandidatesWithBm25 } from "./sparse-retrieval";
 import {
   InMemoryVectorStore,
@@ -101,6 +104,25 @@ export interface RetrieveFromIndexOptions {
   costBudget?: number;
   userMode?: "FAST" | "BALANCED" | "DEEP";
   confidenceThreshold?: number;
+  /** Book cap. 16: minimum-similarity cutoff — see `VectorSearchQuery.minScore`. */
+  minScore?: number;
+  /**
+   * Book cap. 18: how the dense and sparse (BM25) rankings are combined in
+   * hybrid mode. `"weighted"` (default) sums normalized scores by
+   * `hybridDenseWeight`. `"rrf"` ignores score values entirely and fuses by
+   * rank position (Reciprocal Rank Fusion) — robust when the two scales
+   * aren't meaningfully comparable, at the cost of losing the "how much
+   * better" signal a raw score carries.
+   */
+  fusionMethod?: "weighted" | "rrf";
+  /**
+   * Book cap. 20: optional LLM used for HyDE's hypothetical document and
+   * step-back query generalization. Unset falls back to the disclosed
+   * heuristics in `advanced-retrieval.ts`.
+   */
+  llmProvider?: LlmTextProvider;
+  /** Book cap. 20: generalize the query (step-back prompting) and merge its results in, alongside dense/HyDE/expansion candidates. */
+  stepBack?: boolean;
 }
 
 export type RetrievalResult = VectorSearchResult;
@@ -368,6 +390,7 @@ async function retrieveInternal(
       embedding: queryEmbedding,
       topK: options.topK,
       filter: options.filter,
+      minScore: options.minScore,
     });
 
     return {
@@ -422,10 +445,25 @@ async function retrieveInternal(
     candidateTopK,
     options.filter
   );
+  // Book cap. 20: step-back prompting — retrieve with a generalized version
+  // of the query too, and fold those hits into the same candidate pool
+  // (same mechanism as query expansion above: generate a variant, search
+  // it, merge by max score).
+  const stepBackCandidates = options.stepBack
+    ? ((await searchStore(index.store, {
+        embedding: await embedQuery(
+          await buildStepBackQuery(query, { llmProvider: options.llmProvider }),
+          index.embeddingProvider
+        ),
+        topK: candidateTopK,
+        filter: options.filter,
+      })) as RetrievalResult[])
+    : [];
   const validatedDenseCandidates = mergeRetrievalResults(
     validateVectorSearchResults(denseCandidates) as RetrievalResult[],
     expansionCandidates,
-    planExecution.results
+    planExecution.results,
+    stepBackCandidates
   );
 
   if (validatedDenseCandidates.length === 0) {
@@ -476,10 +514,28 @@ async function retrieveInternal(
           }))
         );
 
+  const fusionMethod = options.fusionMethod ?? "weighted";
+
+  // Book cap. 18: RRF fuses by rank position, not raw score value — build
+  // the dense ranking (validatedDenseCandidates is already in that order)
+  // and the sparse (BM25) ranking, then combine both with 1/(k+rank).
+  const rrfScores =
+    fusionMethod === "rrf"
+      ? reciprocalRankFusion([
+          validatedDenseCandidates.map((candidate) => ({ id: candidate.chunk.id })),
+          [...validatedDenseCandidates]
+            .sort((left, right) => (bm25Scores.get(right.chunk.id) ?? 0) - (bm25Scores.get(left.chunk.id) ?? 0))
+            .map((candidate) => ({ id: candidate.chunk.id })),
+        ])
+      : undefined;
+
   const scoredCandidates = validatedDenseCandidates.map((candidate, index) => {
       const denseScore = normalizeDenseScore(candidate.score);
       const sparseScore = bm25Scores.get(candidate.chunk.id) ?? 0;
-      const combined = denseWeight * denseScore + sparseWeight * sparseScore;
+      const combined =
+        fusionMethod === "rrf"
+          ? rrfScores!.get(candidate.chunk.id) ?? 0
+          : denseWeight * denseScore + sparseWeight * sparseScore;
 
       return {
         ...candidate,
@@ -491,6 +547,7 @@ async function retrieveInternal(
     });
 
   const sortedCandidates = scoredCandidates
+    .filter((candidate) => options.minScore === undefined || candidate.score >= options.minScore)
     .sort((left, right) => {
       if (right.score === left.score) {
         return right.chunk.text.length - left.chunk.text.length;
@@ -504,7 +561,7 @@ async function retrieveInternal(
     adaptivePlan.executionPlan.queryExpansion.strategies.includes("hyde") ||
     adaptivePlan.executionMode === "HYDE_RAG" ||
     adaptivePlan.executionMode === "FULL_PIPELINE"
-      ? buildHypotheticalDocument(query)
+      ? await buildHypotheticalDocument(query, { llmProvider: options.llmProvider })
       : undefined;
   const hydeResults = hypotheticalDocument
     ? ((await searchStore(index.store, {

@@ -76,3 +76,4 @@ accepted decisions through the current implementation baseline.
 | [ADR-026](./ADR-026-vector-store-metadata-filter-fixes-and-new-backends.md) | Vector store metadata filter fixes (pgvector, Qdrant) and three new backends (Pinecone, Weaviate, Elasticsearch) | Accepted |
 | [ADR-027](./ADR-027-ann-index-metric-and-recall-latency-tuning.md) | ANN index metric correctness and recall/latency tuning knobs | Accepted |
 | [ADR-028](./ADR-028-real-bm25-sparse-retrieval.md) | Real BM25/TF-IDF sparse retrieval, replacing a character-overlap heuristic | Accepted |
+| [ADR-029](./ADR-029-retrieval-query-understanding-rerank-and-query-transformation-caps-16-20.md) | Caps 16-20: similarity threshold, real query rewriting, RRF, a real LLM reranker, real HyDE/step-back | Accepted |

@@ -175,6 +175,78 @@ describe("askRag", () => {
     });
   });
 
+  describe("LLM re-ranking (GROUNDEDOS_ENABLE_LLM_RERANK, book cap. 19)", () => {
+    const originalFetch = globalThis.fetch;
+    const originalFlag = process.env.GROUNDEDOS_ENABLE_LLM_RERANK;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+      if (originalFlag === undefined) {
+        delete process.env.GROUNDEDOS_ENABLE_LLM_RERANK;
+      } else {
+        process.env.GROUNDEDOS_ENABLE_LLM_RERANK = originalFlag;
+      }
+    });
+
+    it("labels reranked candidates 'llm' and still charges the reranking cost when enabled and Ollama responds", async () => {
+      process.env.GROUNDEDOS_ENABLE_LLM_RERANK = "true";
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ message: { content: "some ranking of candidate ids" } }),
+      }) as unknown as typeof fetch;
+
+      const output = await askRag(
+        makeRagTestCase({
+          content:
+            "Alpha section about vector search fundamentals.\n\nBeta section about vector search fundamentals.\n\nGamma section about vector search fundamentals.",
+          query: "What explains vector search?",
+          title: "LLM Rerank Enabled Test",
+          documentId: "api-test-doc-rerank",
+        })
+      );
+
+      expect(output.devMode.reranking?.applied).toBe(true);
+      expect(output.devMode.reranking?.candidates?.[0]?.method).toBe("llm");
+      expect(output.devMode.cost?.breakdown.some((item) => item.stage === "reranking")).toBe(true);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "http://localhost:11434/api/chat",
+        expect.any(Object)
+      );
+    });
+
+    it("falls back to the lexical heuristic, honestly labeled, when Ollama is unreachable", async () => {
+      process.env.GROUNDEDOS_ENABLE_LLM_RERANK = "true";
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")) as unknown as typeof fetch;
+
+      const output = await askRag(
+        makeRagTestCase({
+          content:
+            "Alpha section about vector search fundamentals.\n\nBeta section about vector search fundamentals.\n\nGamma section about vector search fundamentals.",
+          query: "What explains vector search?",
+          title: "LLM Rerank Unreachable Test",
+          documentId: "api-test-doc-rerank-fallback",
+        })
+      );
+
+      expect(output.devMode.reranking?.applied).toBe(true);
+      expect(output.devMode.reranking?.candidates?.[0]?.method).toBe("lexical-heuristic");
+    });
+
+    it("uses the lexical heuristic, labeled as such, when the flag is unset (default, unchanged behavior)", async () => {
+      const output = await askRag(
+        makeRagTestCase({
+          content:
+            "Alpha section about vector search fundamentals.\n\nBeta section about vector search fundamentals.\n\nGamma section about vector search fundamentals.",
+          query: "What explains vector search?",
+          title: "LLM Rerank Disabled Test",
+          documentId: "api-test-doc-rerank-disabled",
+        })
+      );
+
+      expect(output.devMode.reranking?.candidates?.[0]?.method).toBe("lexical-heuristic");
+    });
+  });
+
   it("returns a semantic cache hit on repeated equivalent requests", async () => {
     const request = makeRagTestCase({
       title: "Cache API Test",

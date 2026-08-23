@@ -485,4 +485,60 @@ describe("retrieval flow", () => {
 
     expect(seenInputTypes).toEqual(["document", "query"]);
   });
+
+  it("book cap. 16: minScore excludes weak dense matches instead of always returning topK", async () => {
+    const document = await ingest({
+      type: "text",
+      content: "Alpha launch notes describe setup work.\n\nCompletely unrelated gamma filler text.",
+      metadata: { documentId: "doc-minscore" },
+    });
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: { maxChunkChars: 200, overlapChars: 0 },
+    });
+
+    const unfiltered = await retrieveFromIndex(index, "alpha launch setup", { topK: 5 });
+    const filtered = await retrieveFromIndex(index, "alpha launch setup", {
+      topK: 5,
+      minScore: unfiltered[0]!.score - 0.001,
+    });
+
+    expect(unfiltered.length).toBeGreaterThan(filtered.length);
+    expect(filtered.every((result) => result.score >= unfiltered[0]!.score - 0.001)).toBe(true);
+  });
+
+  it("book cap. 18: fusionMethod 'rrf' fuses by rank, producing a different order than weighted fusion when dense/sparse strongly disagree", async () => {
+    const document = await ingest({
+      type: "text",
+      content:
+        "Alpha control note without answer terms.\n\nThis command verifies that the ETL dispatcher can route plain text input and return a NormalizedDocument.\n\nBeta control note without answer terms.",
+      metadata: { documentId: "doc-rrf" },
+    });
+    const index = await buildRetrievalIndex(document, {
+      embeddingProvider: new KeywordEmbeddingProvider(),
+      chunkOptions: { maxChunkChars: 300, overlapChars: 0 },
+    });
+
+    const weighted = await retrieveForDevMode(index, "dispatcher normalized document", {
+      topK: 1,
+      mode: "hybrid",
+      hybridDenseWeight: 0.2,
+      fusionMethod: "weighted",
+    });
+    const rrf = await retrieveForDevMode(index, "dispatcher normalized document", {
+      topK: 1,
+      mode: "hybrid",
+      hybridDenseWeight: 0.2,
+      fusionMethod: "rrf",
+    });
+
+    const weightedScore = weighted.hybrid?.candidates[0]?.combinedScore ?? 0;
+    const rrfScore = rrf.hybrid?.candidates[0]?.combinedScore ?? 0;
+
+    // RRF's combined score is a rank-based 1/(k+rank) sum (max ~0.033 for k=60,
+    // top rank in both lists) — an entirely different scale than the weighted
+    // dense/sparse blend, proving the rrf path actually engaged.
+    expect(rrfScore).toBeLessThan(0.05);
+    expect(rrfScore).not.toBeCloseTo(weightedScore, 3);
+  });
 });

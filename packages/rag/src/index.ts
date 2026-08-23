@@ -125,6 +125,7 @@ export {
 
 export {
   buildHypotheticalDocument,
+  buildStepBackQuery,
   buildRaptorTree,
   retrieveFromRaptorTree,
   type ClusterSummary,
@@ -141,6 +142,9 @@ export {
   rewriteQuery,
   expandQuery,
   detectIntent,
+  extractQueryFilters,
+  type RewriteQueryOptions,
+  type ExtractedQueryFilters,
 } from "./query-understanding";
 
 // Sparse retrieval — TF-IDF and BM25 (book cap. 15)
@@ -156,6 +160,20 @@ export {
   type SparseDocument,
   type TermFrequencies,
 } from "./sparse-retrieval";
+
+// Reciprocal Rank Fusion (book cap. 18)
+export { reciprocalRankFusion, type RankedItem } from "./fusion";
+
+// Minimal LLM text-completion provider, shared by HyDE/step-back/re-ranking (cap. 19/20)
+export {
+  OllamaTextProvider,
+  type LlmTextProvider,
+  type LlmTextRequest,
+  type OllamaTextProviderOptions,
+} from "./llm-text-provider";
+
+// LLM re-ranking (book cap. 19)
+export { rerankWithLlm, type RerankCandidate, type RerankedCandidate } from "./rerank";
 
 // Grounded generation — turns retrieved evidence into an actual LLM answer
 export {

@@ -413,6 +413,24 @@ If generation is enabled but the Ollama server is unreachable or errors, the
 request falls back to the extractive answer automatically rather than
 failing. See [`packages/rag/src/generation.ts`](../../packages/rag/src/generation.ts).
 
+### Ollama re-ranking (opt-in, real LLM reranker — book cap. 19)
+
+By default, the `rerank-chunks` workflow step reorders candidates with a
+lexical-overlap heuristic (a token-overlap tiebreak blended into the
+hybrid score) — it is **not** a cross-encoder or LLM judge, and every
+reranked candidate's `method` field says so (`"lexical-heuristic"`). Set
+`GROUNDEDOS_ENABLE_LLM_RERANK=true` to have a local Ollama model actually
+judge relevance and reorder candidates instead (`method: "llm"`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `GROUNDEDOS_ENABLE_LLM_RERANK` | unset (lexical heuristic) | Set to `"true"` to enable real LLM re-ranking |
+
+Reuses `GROUNDEDOS_OLLAMA_CHAT_MODEL`, `GROUNDEDOS_LLM_TEMPERATURE` and
+`GROUNDEDOS_OLLAMA_BASE_URL` above. If re-ranking is enabled but the LLM
+call fails, the request falls back to the lexical heuristic automatically.
+See [`packages/rag/src/rerank.ts`](../../packages/rag/src/rerank.ts).
+
 ### OpenAI embeddings
 
 `embeddingProvider: "openai"` uses OpenAI embeddings via `POST /v1/embeddings`.

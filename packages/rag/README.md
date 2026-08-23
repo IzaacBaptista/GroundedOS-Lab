@@ -342,9 +342,73 @@ e.g. SPLADE) — the book's third cap. 15 concept — are **not** implemented;
 they need a real trained model, not a formula, and this package doesn't
 integrate one.
 
-In the API workflow, retrieval can fetch a larger candidate set and apply a
-dedicated reranking step before answer generation. The API Dev Mode includes
-reranking/stage telemetry for that orchestration layer.
+### Retrieval básico: similarity threshold (book cap. 16)
+
+`VectorSearchQuery.minScore` (and `retrieveFromIndex(..., { minScore })`)
+excludes chunks below a similarity cutoff, instead of always returning
+`topK` results regardless of how weak the weakest one is. Unset by default
+(existing behavior unchanged); `InMemoryVectorStore` enforces it directly.
+
+### Query understanding: real rewriting and explicit filter extraction (book cap. 17)
+
+`rewriteQuery(text, options?)` now does more than strip filler words:
+
+- **Abbreviation expansion** — a real dictionary (`db` → `database`, `auth`
+  → `authentication`, etc.), separate from `expandQuery()`'s synonym map.
+- **Anaphoric reference resolution** — `{ previousQuery }` lets a bare
+  reference ("what about it?") pull in the previous turn's content words.
+  Heuristic, not a coreference model — it only fires when the query
+  contains a reference word (it/that/this/those/them/he/she).
+- **Typo correction** — `{ vocabulary }` corrects a token within edit
+  distance 1 of a known-good word. No vocabulary, no correction: there's no
+  way to tell a typo from a valid rare term without one.
+
+`extractQueryFilters(text)` parses explicit `key:value` tokens (`tag:`,
+`author:`, `tenant:`) into a `VectorMetadataFilter`-shaped object and
+strips them from the query. It does **not** parse free natural-language
+constraints ("a política de reembolso em 2023") — that needs NER/an LLM,
+not a formula, and is a disclosed limitation, not theater.
+
+### Hybrid search: Reciprocal Rank Fusion (book cap. 18)
+
+`retrieveFromIndex(..., { fusionMethod: "rrf" })` fuses the dense and BM25
+rankings by position (`reciprocalRankFusion`, also exported standalone)
+instead of the default weighted score sum — useful when the two scores'
+scales aren't meaningfully comparable for a given corpus. Default stays
+`"weighted"`; existing behavior is unchanged unless you opt in.
+
+### Re-ranking: a real LLM reranker replaces billed-but-fake reranking (book cap. 19)
+
+`rerankWithLlm(query, candidates, llmProvider)` is a genuine reranker: it
+asks an LLM to judge relevance and reorders candidates by where their id
+appears in the response. In `apps/api`, this is wired in behind
+`GROUNDEDOS_ENABLE_LLM_RERANK=true` (same opt-in pattern as
+`GROUNDEDOS_ENABLE_LLM_GENERATION`, ADR-017) — before this, the "reranking"
+stage that ran unconditionally, was traced, and was billed as a
+`"reranking"` cost unit was actually a lexical-overlap tiebreak, not a
+reranker of any kind (see ADR-029). Every reranked candidate now carries a
+`method: "llm" | "lexical-heuristic"` field so it's never silently reported
+as the real thing when it's the fallback.
+
+### Query transformation: real HyDE and step-back prompting (book cap. 20)
+
+`buildHypotheticalDocument(query, { llmProvider })` now optionally asks an
+LLM for a real hypothetical answer — HyDE's actual technique — instead of
+always returning a fixed template. Without a provider (or if it throws),
+it falls back to the template, disclosed as a heuristic approximation, not
+the technique itself.
+
+`buildStepBackQuery(query, { llmProvider })` is new: generalizes a specific
+query into a broader one before retrieval, matching reference documentation
+better than the exact question asked. LLM-backed when a provider is given;
+otherwise a naive keyword-stripping heuristic. `retrieveFromIndex(...,
+{ stepBack: true })` wires it into the candidate pool alongside dense/HyDE/
+expansion results.
+
+Both share `LlmTextProvider`/`OllamaTextProvider` — a minimal
+text-completion primitive distinct from `GenerationProvider` (which is
+shaped specifically for grounded question-answering), reused by HyDE,
+step-back, and the LLM reranker instead of three separate provider shapes.
 
 The output contract is documented in
 [`docs/phase-1-dev-mode-output.md`](../../docs/phase-1-dev-mode-output.md).
@@ -389,14 +453,20 @@ The end-to-end internals guide is documented in
 | `retrieveForDevMode(index, query, options?)` | Retrieve ranked chunks as the Dev Mode diagnostics contract |
 | `RetrievalDevModeOutput` | Stable Dev Mode retrieval output shape |
 | `processQuery(raw)` | Run query rewriting, expansion and intent detection before retrieval |
-| `rewriteQuery(text)` | Normalize and simplify a raw query |
+| `rewriteQuery(text, options?)` | Normalize, expand abbreviations, resolve anaphoric references, correct typos (book cap. 17) |
 | `expandQuery(text)` | Generate lexical variants for retrieval recall |
 | `detectIntent(text)` | Classify query intent into a stable contract |
+| `extractQueryFilters(text)` | Parse explicit `key:value` tokens into a metadata filter (book cap. 17) |
 | `bm25Score(queryTokens, doc, documentFrequency, totalDocuments, averageDocumentLength, params?)` | BM25 relevance score for one document (book cap. 15) |
 | `scoreCandidatesWithBm25(query, candidates, params?)` | BM25-score and min-max normalize a candidate pool — what hybrid search uses |
 | `tfIdfScore(queryTokens, doc, documentFrequency, totalDocuments)` | TF-IDF relevance score, BM25's conceptual foundation |
 | `buildCorpusStats(documents)` | Document frequency + average document length over a corpus |
+| `reciprocalRankFusion(rankedLists, k?)` | Rank-based RRF fusion, independent of raw score scale (book cap. 18) |
 | `SemanticCache` | In-memory semantic cache keyed by document scope and query embedding similarity |
 | `buildGroundedPrompt(request)` | Build a system/user prompt that restricts the model to the given chunks and asks it to cite chunk ids |
 | `OllamaChatProvider` | Opt-in real LLM generation provider using Ollama `/api/chat`; turns retrieved evidence into an actual grounded answer |
 | `GenerationProvider` | Interface for chat/completion providers consumed by grounded generation |
+| `LlmTextProvider`, `OllamaTextProvider` | Minimal text-completion primitive shared by HyDE, step-back and LLM re-ranking (book cap. 19/20) |
+| `rerankWithLlm(query, candidates, llmProvider)` | Real LLM-judged re-ranking (book cap. 19) |
+| `buildHypotheticalDocument(query, options?)` | HyDE — LLM-backed when `llmProvider` given, template fallback otherwise (book cap. 20) |
+| `buildStepBackQuery(query, options?)` | Generalize a query before retrieval — LLM-backed or keyword-heuristic fallback (book cap. 20) |

@@ -12,6 +12,13 @@ export interface VectorSearchQuery {
   embedding: EmbeddingVector;
   topK?: number;
   filter?: VectorMetadataFilter;
+  /**
+   * Book cap. 16: a minimum-similarity cutoff. Unlike `topK` (always
+   * returns up to k results, however weak), `minScore` excludes chunks
+   * whose score falls below it — fewer than `topK` results (even zero) if
+   * the corpus doesn't have anything similar enough.
+   */
+  minScore?: number;
 }
 
 export interface VectorSearchResult {
@@ -65,6 +72,10 @@ export class InMemoryVectorStore implements VectorStore {
     validateVector(query.embedding, "query embedding");
     validateTopK(topK);
 
+    if (query.minScore !== undefined && !Number.isFinite(query.minScore)) {
+      throw new Error(`${ERROR_PREFIX} minScore must be a finite number.`);
+    }
+
     if (this.dimensions !== undefined && query.embedding.length !== this.dimensions) {
       throw new Error(
         `${ERROR_PREFIX} query embedding has ${query.embedding.length} dimensions; expected ${this.dimensions}.`
@@ -79,6 +90,7 @@ export class InMemoryVectorStore implements VectorStore {
         chunk,
         score: scoreFn(query.embedding, chunk.embedding),
       }))
+      .filter((result) => query.minScore === undefined || result.score >= query.minScore)
       .sort((left, right) => {
         if (right.score !== left.score) {
           return right.score - left.score;

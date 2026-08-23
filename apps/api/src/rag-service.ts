@@ -33,9 +33,11 @@ import {
   isVectorDualWriteEnabled,
   LocalHashEmbeddingsProvider,
   OllamaChatProvider,
+  OllamaTextProvider,
   OpenAIEmbeddingsProvider,
   OllamaEmbeddingsProvider,
   QdrantVectorStore,
+  rerankWithLlm,
   resolveVectorBackend,
   retrieveForDevMode,
   selectAdaptiveCacheThreshold,
@@ -45,6 +47,7 @@ import {
   type EmbeddingProviderId,
   type EmbeddingVector,
   type GenerationProvider,
+  type LlmTextProvider,
   type RetrievalIndex,
   type RetrievalDevModeOutput,
   type VectorStore,
@@ -404,6 +407,8 @@ export type RagAskResponse = {
         hybridScore: number;
         lexicalOverlapScore: number;
         finalScore: number;
+        /** Book cap. 19: which reranker actually produced this score — never silently reported as "llm" when it's the heuristic fallback. */
+        method?: "llm" | "lexical-heuristic";
       }>;
     };
     stageMetrics?: Array<{
@@ -2064,7 +2069,12 @@ async function runLocalRag(
           throw new ApiRequestError("RAG workflow retrieval output is missing.", 500);
         }
 
-        const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const reranked = await rerankRetrievalOutput(
+          input.devMode,
+          input.retrievalQuery,
+          input.topK,
+          resolveRerankProvider()
+        );
         const routingSignals = buildRetrievalRoutingSignals(reranked);
         const refinedRoutingDecision = routeModel(input.rawQuery, {
           postRetrieval: routingSignals,
@@ -2747,7 +2757,12 @@ async function runPersistedRag(
         }
 
         const providerName = input.index.embeddingProvider.name;
-        const reranked = rerankRetrievalOutput(input.devMode, input.retrievalQuery, input.topK);
+        const reranked = await rerankRetrievalOutput(
+          input.devMode,
+          input.retrievalQuery,
+          input.topK,
+          resolveRerankProvider()
+        );
         const routingSignals = buildRetrievalRoutingSignals(reranked);
         const refinedRoutingDecision = routeModel(input.rawQuery, {
           postRetrieval: routingSignals,
@@ -4020,6 +4035,29 @@ function resolveGenerationProvider(): GenerationProvider | undefined {
   });
 }
 
+/**
+ * Real re-ranking is opt-in (`GROUNDEDOS_ENABLE_LLM_RERANK=true`), same
+ * pattern as `resolveGenerationProvider` above (ADR-017). Without it,
+ * `rerankRetrievalOutput` falls back to a lexical-overlap heuristic —
+ * disclosed as a heuristic in its `method` field, not silently billed
+ * or reported as if it were the real thing.
+ */
+function isRealRerankEnabled(): boolean {
+  return process.env.GROUNDEDOS_ENABLE_LLM_RERANK === "true";
+}
+
+function resolveRerankProvider(): LlmTextProvider | undefined {
+  if (!isRealRerankEnabled()) {
+    return undefined;
+  }
+
+  return new OllamaTextProvider({
+    baseUrl: process.env.GROUNDEDOS_OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL,
+    model: process.env.GROUNDEDOS_OLLAMA_CHAT_MODEL ?? DEFAULT_OLLAMA_CHAT_MODEL,
+    temperature: parseOptionalFloat(process.env.GROUNDEDOS_LLM_TEMPERATURE),
+  });
+}
+
 function parseOptionalFloat(rawValue: string | undefined): number | undefined {
   if (!rawValue) {
     return undefined;
@@ -4086,11 +4124,21 @@ async function createGroundedAnswer(
   };
 }
 
-function rerankRetrievalOutput(
+/**
+ * Book cap. 19 re-ranking. With `llmProvider` (opt-in, see
+ * `resolveRerankProvider`), this is a real LLM reranker: `rerankWithLlm`
+ * actually asks the model to judge relevance and reorders by its answer.
+ * Without one — or if the LLM call fails — it falls back to a
+ * lexical-overlap heuristic. Every candidate's `method` field says which
+ * one actually produced its score, so this is never silently reported (or
+ * billed) as real reranking when it wasn't.
+ */
+async function rerankRetrievalOutput(
   devMode: RetrievalDevModeOutput,
   retrievalQuery: string,
-  topK: number
-): RetrievalDevModeWithRerank {
+  topK: number,
+  llmProvider?: LlmTextProvider
+): Promise<RetrievalDevModeWithRerank> {
   if (!shouldApplyAdaptiveReranking(devMode)) {
     return {
       ...devMode,
@@ -4119,10 +4167,72 @@ function rerankRetrievalOutput(
         hybridScore: result.score,
         lexicalOverlapScore: 0,
         finalScore: result.score,
+        method: "lexical-heuristic" as const,
       })),
     };
   }
 
+  if (llmProvider) {
+    try {
+      return await rerankWithRealLlm(devMode, retrievalQuery, topK, llmProvider);
+    } catch (error) {
+      console.warn(
+        "[api/rag-service] LLM reranker failed; falling back to lexical-overlap heuristic.",
+        error
+      );
+    }
+  }
+
+  return rerankWithLexicalHeuristic(devMode, retrievalQuery, topK);
+}
+
+async function rerankWithRealLlm(
+  devMode: RetrievalDevModeOutput,
+  retrievalQuery: string,
+  topK: number,
+  llmProvider: LlmTextProvider
+): Promise<RetrievalDevModeWithRerank> {
+  const judged = await rerankWithLlm(
+    retrievalQuery,
+    devMode.results.map((result) => ({ id: result.chunkId, text: result.text })),
+    llmProvider
+  );
+  const scoreById = new Map(judged.map((entry) => [entry.id, entry.score]));
+
+  const reranked = devMode.results
+    .map((result) => ({
+      ...result,
+      beforeRank: result.rank,
+      hybridScore: result.score,
+      lexicalOverlapScore: 0,
+      score: scoreById.get(result.chunkId) ?? 0,
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, topK)
+    .map((result, index) => ({ ...result, rank: index + 1 }));
+
+  return {
+    ...devMode,
+    resultCount: reranked.length,
+    results: reranked,
+    reranking: reranked.map((result) => ({
+      chunkId: result.chunkId,
+      sectionId: result.sectionId,
+      beforeRank: result.beforeRank,
+      afterRank: result.rank,
+      hybridScore: result.hybridScore,
+      lexicalOverlapScore: result.lexicalOverlapScore,
+      finalScore: result.score,
+      method: "llm" as const,
+    })),
+  };
+}
+
+function rerankWithLexicalHeuristic(
+  devMode: RetrievalDevModeOutput,
+  retrievalQuery: string,
+  topK: number
+): RetrievalDevModeWithRerank {
   const queryTokens = new Set(tokenize(retrievalQuery));
 
   const reranked = devMode.results
@@ -4175,6 +4285,7 @@ function rerankRetrievalOutput(
       hybridScore: result.hybridScore,
       lexicalOverlapScore: result.lexicalOverlapScore,
       finalScore: result.score,
+      method: "lexical-heuristic" as const,
     })),
   };
 }
